@@ -28,6 +28,19 @@ Everything you need to integrate with the Ballpoint Marketing direct mail API: o
 - [Sandbox](examples/ballpoint-sandbox.postman_environment.json) — for testing
 - [Production](examples/ballpoint-production.postman_environment.json) — for live traffic
 
+## Webhook Security
+
+All webhook payloads are signed with HMAC-SHA256. Your integration **must** verify signatures before processing events.
+
+| Header | Purpose |
+|--------|---------|
+| `X-Ballpoint-Signature` | `sha256=<hex>` — HMAC of `timestamp + raw body` using your webhook secret |
+| `X-Ballpoint-Timestamp` | ISO 8601 timestamp — reject if older than 5 minutes (replay protection) |
+| `X-Ballpoint-Event-Id` | Unique event ID — store and check for deduplication |
+| `Idempotency-Key` | Required on `POST /v1/billing/orders` — prevents duplicate orders on retry |
+
+See the [API Integration Kit](API_KIT.md#7-status-updates-via-webhooks) for full verification examples and the webhook receiver templates in [`examples/`](examples/) for working implementations.
+
 ## Support
 
-Contact your Ballpoint integration manager for API keys, webhook provisioning, and technical support.
+For API access, environment keys, and technical support, reach out to your partner technical contact at Ballpoint.
