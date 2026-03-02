@@ -1,0 +1,322 @@
+{
+  "info": {
+    "name": "Ballpoint API",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API.\n\nImport the matching environment file (sandbox or production) to set your base_url and api_key.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "item": [
+    {
+      "name": "Quick Start",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Verify the API is reachable. No authentication required."
+          }
+        },
+        {
+          "name": "Preview cost",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"4x6_printed\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/preview",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders", "preview"]
+            },
+            "description": "Preview the cost of an order without creating it."
+          }
+        },
+        {
+          "name": "Create test order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"4x6_printed\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders"]
+            },
+            "description": "Create an order. Save the order_id from the response."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('order_id', data.order_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get order status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders", "{{order_id}}"]
+            },
+            "description": "Check the current status of an order."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create postcard order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"4x6_printed\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 25\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('order_id', data.order_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create letter order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"handwritten_card\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 10,\n  \"envelope_style\": \"plain\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('order_id', data.order_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders?limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List orders by user",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders?external_user_id={{external_user_id}}&limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders"],
+              "query": [
+                { "key": "external_user_id", "value": "{{external_user_id}}" },
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel order",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelled\",\n  \"note\": \"Cancelled via Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders", "{{order_id}}", "status"]
+            },
+            "description": "Cancel an order. Only works while order is in 'accepted' status."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tracking",
+      "item": [
+        {
+          "name": "Order tracking",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/orders/{{order_id}}/mail-tracking",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "orders", "{{order_id}}", "mail-tracking"]
+            },
+            "description": "Get USPS delivery tracking for a specific order."
+          }
+        },
+        {
+          "name": "Campaign tracking",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/campaigns/{{campaign_id}}/mail-tracking",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "campaigns", "{{campaign_id}}", "mail-tracking"]
+            },
+            "description": "Get USPS delivery tracking for all orders in a campaign."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pricing",
+      "item": [
+        {
+          "name": "List all pricing",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/pricing",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "pricing"]
+            }
+          }
+        },
+        {
+          "name": "Filter by product type",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/pricing?product_type=4x6_printed",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "pricing"],
+              "query": [
+                { "key": "product_type", "value": "4x6_printed" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "SSE (iframe)",
+      "item": [
+        {
+          "name": "Mint SSE token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/sse-token",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders", "{{order_id}}", "sse-token"]
+            },
+            "description": "Mint a short-lived SSE token for browser-side EventSource connections."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1954 @@
+openapi: 3.1.0
+info:
+  title: Ballpoint Marketing API
+  version: 3.1.0
+  description: "Direct mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\
+    \nThree authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://api.ballpointmarketing.com/v1/orders \\\n  -H \
+    \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://api.ballpointmarketing.com/v1/orders \\\n  -H \
+    \"X-Partner-Key: pk_live_abc123\"\n```\n\n### API Key (internal dashboard)\n```bash\ncurl https://api.ballpointmarketing.com/v1/orders \\\n  -H \
+    \"X-API-Key: sk_internal_abc123\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n\
+    | `test` | Bearer JWT | Sandbox only, no real mail |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id\
+    \ |\n| `internal_dashboard` | X-API-Key | Cross-tenant access with restrictions |\n\n## Integration Identity\n\
+    \nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier (e.g., \"propstream\"\
+    , \"dealmachine\")\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within\
+    \ tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nAll errors return a consistent envelope\
+    \ with trace ID for debugging:\n\n```json\n{\n  \"error\": {\n    \"type\": \"validation_error\",\n    \"code\": \"INVALID_ADDRESS\"\
+    ,\n    \"message\": \"Address could not be verified\",\n    \"details\": { \"field\": \"to_address_line1\" },\n    \"\
+    trace_id\": \"tr_abc123\"\n  }\n}\n```\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /v1/orders` (returns 400 if missing):\n\
+    \n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching\
+    \ key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Webhooks: `X-Webhook-Version`\
+    \ header + `version` field in payload\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking\
+    \ (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive\
+    \ scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged\
+    \ `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed\
+    \ origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`,\
+    \ `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP\
+    \ fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on all responses:\n\
+    \    - `X-RateLimit-Remaining`: requests remaining in window\n    - `Retry-After`: seconds until reset (on 429 only)\n\
+    \    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`:\
+    \ `sha256=<hex>` — HMAC of `timestamp + body`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: unique ID for deduplication\n    - `X-Ballpoint-Delivery`:\
+    \ unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n   \
+    \ are tried during verification for overlap window.\n"
+  contact:
+    name: Ballpoint API Support
+    email: api-support@ballpoint.com
+  license:
+    name: Proprietary
+servers:
+- url: https://api.ballpoint.com
+  description: Production
+- url: https://api.staging.ballpoint.com
+  description: Staging
+tags:
+- name: Orders
+  description: Single-piece mail orders
+- name: Campaigns
+  description: Bulk mail campaigns with recipient lists
+- name: Addresses
+  description: Address verification
+- name: Webhooks
+  description: Event notifications
+- name: Reconciliation
+  description: Partner debugging and support
+- name: Sandbox
+  description: Testing and integration validation
+- name: Mail Tracking
+  description: USPS mail tracking — campaign summary, piece-level status, scan events, RTS suppression
+- name: Mail Tracking Internal
+  description: Internal endpoints — ingest, status, health (internal_dashboard principal only)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token for live/test principals. Obtain from the Ballpoint dashboard.
+        ```
+        Authorization: Bearer eyJhbG...
+        ```
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Internal dashboard API key. Cross-tenant access for Ballpoint operations.
+        ```
+        X-API-Key: sk_internal_...
+        ```
+    partnerKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Partner-Key
+      description: |
+        Partner integration key (PropStream, SoldFast, etc.).
+        Scoped to source + external_account_id.
+        ```
+        X-Partner-Key: pk_live_...
+        ```
+  headers:
+    X-Trace-Id:
+      description: Unique trace ID for debugging
+      schema:
+        type: string
+    X-Idempotency-Key:
+      description: Idempotency key for request deduplication
+      schema:
+        type: string
+        maxLength: 64
+    RateLimit-Limit:
+      description: Request limit per window
+      schema:
+        type: integer
+    RateLimit-Remaining:
+      description: Remaining requests in window
+      schema:
+        type: integer
+    RateLimit-Reset:
+      description: Window reset time (Unix timestamp)
+      schema:
+        type: integer
+    X-RateLimit-Remaining:
+      description: Number of requests remaining in current window
+      schema:
+        type: integer
+    Retry-After:
+      description: Seconds until rate limit resets (present on 429 responses)
+      schema:
+        type: integer
+    X-Ballpoint-Signature:
+      description: 'HMAC-SHA256 signature: sha256=<hex>. Verify with webhook secret.'
+      schema:
+        type: string
+        example: sha256=a1b2c3d4...
+    X-Ballpoint-Event:
+      description: Webhook event type (e.g., tracking.status_changed)
+      schema:
+        type: string
+    X-Ballpoint-Event-Id:
+      description: Unique event ID for deduplication
+      schema:
+        type: string
+        format: uuid
+    X-Ballpoint-Delivery:
+      description: Unique delivery attempt ID
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    IntegrationIdentity:
+      type: object
+      description: Partner integration identity fields
+      properties:
+        source:
+          type: string
+          maxLength: 50
+          description: Integration source identifier
+          example: propstream
+        external_account_id:
+          type: string
+          maxLength: 100
+          description: Partner's tenant/customer ID
+          example: tenant_12345
+        external_user_id:
+          type: string
+          maxLength: 100
+          description: Partner's user ID within tenant
+          example: user_789
+        external_id:
+          type: string
+          maxLength: 100
+          description: Partner's ID for this resource
+          example: campaign_abc
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - type
+          - code
+          - message
+          properties:
+            type:
+              type: string
+              enum:
+              - validation_error
+              - authentication_error
+              - authorization_error
+              - not_found
+              - conflict
+              - rate_limit_error
+              - server_error
+            code:
+              type: string
+              description: Machine-readable error code
+              enum:
+              - INVALID_ADDRESS
+              - ADDRESS_UNDELIVERABLE
+              - INVALID_PDF
+              - INVALID_STATUS_TRANSITION
+              - AMBIGUOUS_LOOKUP
+              - IDEMPOTENCY_CONFLICT
+              - INSUFFICIENT_BALANCE
+              - RATE_LIMITED
+              - NOT_FOUND
+              - UNAUTHORIZED
+              - FORBIDDEN
+            message:
+              type: string
+              description: Human-readable error message
+            details:
+              type: object
+              description: Additional error context
+            trace_id:
+              type: string
+              description: Request trace ID for support
+    IdempotencyConflict:
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      description: 'Returned when idempotency key matches but request body differs.
+
+
+        **Resolution**: Use a new idempotency key or send identical body.
+
+        '
+    AmbiguousLookup:
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      description: 'Returned when internal_dashboard principal looks up by external_id
+
+        without specifying external_account_id.
+
+
+        **Resolution**: Include external_account_id in query.
+
+        '
+    OrderCreate:
+      type: object
+      required:
+      - to_name
+      - to_address_line1
+      - to_address_city
+      - to_address_state
+      - to_address_zip
+      - product_type
+      properties:
+        source:
+          type: string
+          maxLength: 50
+          description: Integration source (auto-set for partner keys)
+        external_account_id:
+          type: string
+          maxLength: 100
+          description: Partner tenant ID
+        external_user_id:
+          type: string
+          maxLength: 100
+          description: Partner user ID
+        external_id:
+          type: string
+          maxLength: 100
+          description: Partner's order ID (for lookups)
+        to_name:
+          type: string
+          maxLength: 100
+        to_company:
+          type: string
+          maxLength: 100
+        to_address_line1:
+          type: string
+          maxLength: 100
+        to_address_line2:
+          type: string
+          maxLength: 100
+        to_address_city:
+          type: string
+          maxLength: 100
+        to_address_state:
+          type: string
+          maxLength: 2
+        to_address_zip:
+          type: string
+          maxLength: 10
+        product_type:
+          type: string
+          description: 'Mail piece type and size.
+
+
+            **Postcards:**
+
+            - `4x6_printed` - Standard 4"×6" printed postcard
+
+            - `6x9_printed` - Large 6"×9" printed postcard
+
+            - `4x6_handwritten` - 4"×6" with handwritten message
+
+            - `6x9_handwritten` - 6"×9" with handwritten message
+
+
+            **Letters:**
+
+            - `color_letter` - Printed #10 envelope + printed 8.5×11 insert (folded)
+
+            - `handwritten_letter` - Handwritten 5×7 envelope + handwritten insert
+
+            - `hybrid_letter` - Handwritten 5×7 envelope + printed insert
+
+
+            **Artwork Requirements:**
+
+            All postcards require **1/8" bleed** on all sides.
+
+            - 4×6 artwork: 4.25" × 6.25" with 1/8" bleed
+
+            - 6×9 artwork: 6.25" × 9.25" with 1/8" bleed
+
+            '
+          enum:
+          - 4x6_printed
+          - 6x9_printed
+          - 4x6_handwritten
+          - 6x9_handwritten
+          - color_letter
+          - handwritten_letter
+          - hybrid_letter
+        postage_type:
+          type: string
+          description: 'Postage class. Affects delivery time and cost.
+
+            - `first_class` - 2-5 business days
+
+            - `standard` - 5-10 business days (printed postcards + color letters only)
+
+            - `presort` - 3-7 business days (hybrid + handwritten letters only, volume discount)
+
+            '
+          enum:
+          - first_class
+          - standard
+          - presort
+          default: first_class
+        envelope_style:
+          type: string
+          description: 'Envelope design for letter products. Required for color_letter,
+            hybrid_letter, and handwritten_letter. Postcards must not include this field.
+
+
+            color_letter only supports `plain_white` (#10 envelope format).
+
+            5×7 products (hybrid_letter, handwritten_letter) support all styles.
+
+            '
+          enum:
+          - candy
+          - party
+          - pastel
+          - confetti
+          - desert
+          - floral
+          - stone
+          - retro
+          - deco
+          - doodle
+          - plain_white
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    Order:
+      allOf:
+      - $ref: '#/components/schemas/OrderCreate'
+      - type: object
+        properties:
+          id:
+            type: string
+            pattern: ^ord_[a-zA-Z0-9]+$
+          account_id:
+            type: string
+          status:
+            type: string
+            enum:
+            - pending
+            - validated
+            - queued
+            - in_production
+            - shipped
+            - delivered
+            - failed
+            - cancelled
+          integration:
+            $ref: '#/components/schemas/IntegrationIdentity'
+          created_at:
+            type: string
+            format: date-time
+          updated_at:
+            type: string
+            format: date-time
+    CampaignCreate:
+      type: object
+      required:
+      - name
+      - product_type
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        product_type:
+          type: string
+          description: 'Mail piece type. See Order schema for full descriptions.
+
+            All postcards require **1/8" bleed** on all sides.
+
+            '
+          enum:
+          - 4x6_printed
+          - 6x9_printed
+          - 4x6_handwritten
+          - 6x9_handwritten
+          - color_letter
+          - handwritten_letter
+          - hybrid_letter
+        postage_type:
+          type: string
+          enum:
+          - first_class
+          - standard
+          - presort
+          default: presort
+        source:
+          type: string
+          maxLength: 50
+        external_account_id:
+          type: string
+          maxLength: 100
+        external_user_id:
+          type: string
+          maxLength: 100
+        external_id:
+          type: string
+          maxLength: 100
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    Campaign:
+      allOf:
+      - $ref: '#/components/schemas/CampaignCreate'
+      - type: object
+        properties:
+          id:
+            type: string
+            pattern: ^cmp_[a-zA-Z0-9]+$
+          account_id:
+            type: string
+          status:
+            type: string
+            enum:
+            - draft
+            - upload_received
+            - processing
+            - needs_action
+            - ready
+            - queued
+            - in_production
+            - mailed
+            - completed
+            - failed
+            - canceled
+            description: Internal status
+          status_external:
+            type: string
+            enum:
+            - processing
+            - action_required
+            - ready
+            - in_production
+            - in_transit
+            - completed
+            - failed
+            - canceled
+            description: Simplified status for partners
+          integration:
+            $ref: '#/components/schemas/IntegrationIdentity'
+          recipient_count:
+            type: integer
+          valid_count:
+            type: integer
+          invalid_count:
+            type: integer
+          created_at:
+            type: string
+            format: date-time
+          updated_at:
+            type: string
+            format: date-time
+    CampaignList:
+      type: object
+      properties:
+        object:
+          type: string
+          enum:
+          - list
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Campaign'
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+    CampaignReconciliation:
+      type: object
+      properties:
+        campaign:
+          $ref: '#/components/schemas/Campaign'
+        events:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              event_type:
+                type: string
+              from_status:
+                type: string
+              to_status:
+                type: string
+              actor_type:
+                type: string
+              actor_id:
+                type: string
+              metadata:
+                type: object
+              created_at:
+                type: string
+                format: date-time
+        webhook_deliveries:
+          type: array
+          items:
+            type: object
+            properties:
+              event_id:
+                type: string
+              event_type:
+                type: string
+              webhook_url:
+                type: string
+              status:
+                type: string
+                enum:
+                - success
+                - failed
+                - retrying
+              attempt_number:
+                type: integer
+              response_status:
+                type: integer
+              delivered_at:
+                type: string
+                format: date-time
+        resolution:
+          type: object
+          properties:
+            current_status:
+              type: string
+            is_terminal:
+              type: boolean
+            can_cancel:
+              type: boolean
+            allowed_transitions:
+              type: array
+              items:
+                type: string
+            next_steps:
+              type: array
+              items:
+                type: string
+            support_hint:
+              type: string
+    WebhookCreate:
+      type: object
+      required:
+      - url
+      - events
+      properties:
+        url:
+          type: string
+          format: uri
+          description: HTTPS URL for webhook delivery
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+            - campaign.created
+            - campaign.processing
+            - campaign.ready
+            - campaign.needs_action
+            - campaign.queued
+            - campaign.in_production
+            - campaign.mailed
+            - campaign.completed
+            - campaign.failed
+            - campaign.canceled
+            - order.created
+            - order.validated
+            - order.queued
+            - order.shipped
+            - order.delivered
+            - order.failed
+            - order.cancelled
+        source:
+          type: string
+          description: Filter events by integration source
+        external_account_id:
+          type: string
+          description: Filter events by partner tenant
+    Webhook:
+      allOf:
+      - $ref: '#/components/schemas/WebhookCreate'
+      - type: object
+        properties:
+          id:
+            type: string
+            pattern: ^whk_[a-zA-Z0-9]+$
+          secret:
+            type: string
+            description: HMAC signing secret (only shown on create)
+          api_version:
+            type: string
+            description: Webhook payload version
+            example: '2026-02-01'
+          is_enabled:
+            type: boolean
+          is_paused:
+            type: boolean
+          health_status:
+            type: string
+            enum:
+            - healthy
+            - degraded
+            - unhealthy
+            - paused
+            - disabled
+            - unknown
+          consecutive_failures:
+            type: integer
+          success_rate:
+            type: number
+          created_at:
+            type: string
+            format: date-time
+    WebhookPayload:
+      type: object
+      description: 'Versioned webhook payload envelope.
+
+
+        **Headers sent:**
+
+        - `X-Webhook-Signature`: HMAC-SHA256 signature
+
+        - `X-Webhook-Version`: Payload version (e.g., "2026-02-01")
+
+        - `X-Webhook-Event`: Event type
+
+        - `X-Webhook-Event-Id`: Stable event ID for idempotency
+
+        - `X-Webhook-Timestamp`: Unix timestamp
+
+        - `X-Trace-Id`: Request trace ID
+
+        '
+      properties:
+        id:
+          type: string
+          description: Stable event ID (same on replay)
+          example: evt_campaign.mailed_cmp_abc123_2026022112_a1b2c3
+        type:
+          type: string
+          description: Event type
+          example: campaign.mailed
+        version:
+          type: string
+          description: Payload schema version
+          example: '2026-02-01'
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          description: Event-specific payload
+    MailTrackingSummary:
+      type: object
+      description: Campaign-level mail tracking summary. Safe for all principal types — no PII.
+      properties:
+        campaign_id:
+          type: string
+        mail_status:
+          type: string
+          enum:
+          - shipped
+          - in_transit
+          - out_for_delivery
+          - delivered
+        mail_status_label:
+          type: string
+        total_pieces:
+          type: integer
+        scanned_pieces:
+          type: integer
+        delivered:
+          type: integer
+        in_transit:
+          type: integer
+        out_for_delivery:
+          type: integer
+        rts:
+          type: integer
+        forwarded:
+          type: integer
+        delivered_rate:
+          type: number
+          format: float
+        scan_coverage:
+          type: number
+          format: float
+        rts_rate:
+          type: number
+          format: float
+        first_scan_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_scan_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        status_version:
+          type: string
+    PieceDetail:
+      type: object
+      description: Piece-level tracking detail. PII fields redacted by principal type.
+      properties:
+        piece_id:
+          type: string
+          description: SHA-256 hash of IMB + campaign_id
+        status:
+          type: string
+          enum:
+          - UNKNOWN
+          - ORIGIN_PROCESSING
+          - IN_TRANSIT
+          - DESTINATION_PROCESSING
+          - SORTING_FOR_DELIVERY
+          - OUT_FOR_DELIVERY
+          - DELIVERED
+          - RTS
+          - FORWARDED
+          - UNDELIVERABLE
+          - ALERT
+        scan_count:
+          type: integer
+        last_scan_at:
+          type: string
+          format: date-time
+          nullable: true
+        recipient_name:
+          type: string
+          nullable: true
+        recipient_city:
+          type: string
+          nullable: true
+        recipient_state:
+          type: string
+          nullable: true
+        recipient_zip:
+          type: string
+          nullable: true
+    IngestJobStatus:
+      type: object
+      description: Ingest job tracking status.
+      properties:
+        job_id:
+          type: string
+        job_type:
+          type: string
+          enum:
+          - scan
+          - manifest
+        status:
+          type: string
+          enum:
+          - pending
+          - processing
+          - completed
+          - failed
+          - dead_letter
+        rows_total:
+          type: integer
+        rows_processed:
+          type: integer
+        rows_rejected:
+          type: integer
+        campaigns_affected:
+          type: integer
+        attempts:
+          type: integer
+        error_message:
+          type: string
+          nullable: true
+    OperationalStatus:
+      type: object
+      description: Full operational status — internal only.
+      properties:
+        status:
+          type: string
+          enum:
+          - healthy
+          - degraded
+          - stale
+        db_connected:
+          type: boolean
+        last_sftp_pull_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_ingest_completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        events_ingested_24h:
+          type: integer
+        pending_jobs:
+          type: integer
+        failed_jobs_24h:
+          type: integer
+        campaigns_tracked:
+          type: integer
+        pieces_tracked:
+          type: integer
+        api_version:
+          type: string
+        status_version:
+          type: string
+        iv_parser_version:
+          type: string
+    Liveness:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - degraded
+        db_connected:
+          type: boolean
+        uptime_seconds:
+          type: number
+    RateLimitError:
+      type: object
+      description: Returned when request rate exceeds limit. Check Retry-After header.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              example: rate_limit_error
+            code:
+              type: string
+              enum:
+              - RATE_LIMITED
+              - INGEST_RATE_LIMITED
+            message:
+              type: string
+            trace_id:
+              type: string
+    BackpressureError:
+      type: object
+      description: Returned when ingest queue exceeds MAX_PENDING_JOBS. Retry later.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              example: backpressure_error
+            code:
+              type: string
+              example: QUEUE_FULL
+            pending_jobs:
+              type: integer
+            trace_id:
+              type: string
+    RetentionResult:
+      type: object
+      description: Result of retention / vacuum job.
+      properties:
+        status:
+          type: string
+          example: completed
+        dry_run:
+          type: boolean
+        scan_events_deleted:
+          type: integer
+        pii_redacted:
+          type: integer
+        idempotency_keys_purged:
+          type: integer
+        dead_letter_jobs_purged:
+          type: integer
+        webhook_deliveries_purged:
+          type: integer
+        analyze_ran:
+          type: boolean
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+    WebhookEndpoint:
+      type: object
+      description: Registered webhook endpoint with auto-disable tracking.
+      properties:
+        id:
+          type: string
+        account_id:
+          type: string
+        url:
+          type: string
+          format: uri
+        event_types:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+        consecutive_failures:
+          type: integer
+        disabled_reason:
+          type: string
+          nullable: true
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_failure_at:
+          type: string
+          format: date-time
+          nullable: true
+    WebhookDelivery:
+      type: object
+      description: Webhook delivery log entry.
+      properties:
+        event_id:
+          type: string
+        endpoint_id:
+          type: string
+        event_type:
+          type: string
+        delivered:
+          type: boolean
+        attempts:
+          type: integer
+        status_code:
+          type: integer
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+security:
+- bearerAuth: []
+- apiKeyAuth: []
+- partnerKeyAuth: []
+paths:
+  /v1/orders:
+    post:
+      tags:
+      - Orders
+      summary: Create order
+      operationId: createOrder
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: >-
+          Required. Unique key for idempotent order creation. Retry with same key + same body
+          for safe replay; use a new key for each new order.
+        schema:
+          type: string
+          maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreate'
+      responses:
+        '201':
+          description: Order created
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/X-Trace-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '409':
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflict'
+    get:
+      tags:
+      - Orders
+      summary: List orders
+      operationId: listOrders
+      parameters:
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: source
+        in: query
+        schema:
+          type: string
+      - name: external_account_id
+        in: query
+        schema:
+          type: string
+      - name: external_user_id
+        in: query
+        schema:
+          type: string
+      - name: external_id
+        in: query
+        schema:
+          type: string
+      - name: created_after
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: created_before
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 20
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: List of orders
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/X-Trace-Id'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  has_more:
+                    type: boolean
+                  next_cursor:
+                    type: string
+        '400':
+          description: Ambiguous lookup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmbiguousLookup'
+  /v1/orders/{order_id}:
+    get:
+      tags:
+      - Orders
+      summary: Get order
+      operationId: getOrder
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+  /v1/campaigns:
+    post:
+      tags:
+      - Campaigns
+      summary: Create campaign
+      operationId: createCampaign
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampaignCreate'
+      responses:
+        '201':
+          description: Campaign created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campaign'
+    get:
+      tags:
+      - Campaigns
+      summary: List campaigns
+      operationId: listCampaigns
+      parameters:
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - draft
+          - upload_received
+          - processing
+          - needs_action
+          - ready
+          - queued
+          - in_production
+          - mailed
+          - completed
+          - failed
+          - canceled
+      - name: status_external
+        in: query
+        schema:
+          type: string
+          enum:
+          - processing
+          - action_required
+          - ready
+          - in_production
+          - in_transit
+          - completed
+          - failed
+          - canceled
+      - name: source
+        in: query
+        schema:
+          type: string
+      - name: external_account_id
+        in: query
+        schema:
+          type: string
+      - name: external_user_id
+        in: query
+        schema:
+          type: string
+      - name: external_id
+        in: query
+        schema:
+          type: string
+      - name: created_after
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: created_before
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 20
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: List of campaigns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignList'
+  /v1/campaigns/{campaign_id}:
+    get:
+      tags:
+      - Campaigns
+      summary: Get campaign
+      operationId: getCampaign
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Campaign details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campaign'
+  /v1/campaigns/{campaign_id}/submit:
+    post:
+      tags:
+      - Campaigns
+      summary: Submit campaign
+      operationId: submitCampaign
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Campaign submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campaign'
+        '400':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/campaigns/{campaign_id}/cancel:
+    post:
+      tags:
+      - Campaigns
+      summary: Cancel campaign
+      operationId: cancelCampaign
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Campaign cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campaign'
+  /v1/reconciliation/campaigns/{campaign_id}:
+    get:
+      tags:
+      - Reconciliation
+      summary: Get campaign reconciliation
+      operationId: reconcileCampaign
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Campaign reconciliation data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignReconciliation'
+  /v1/reconciliation/campaigns/lookup:
+    get:
+      tags:
+      - Reconciliation
+      summary: Lookup campaign by external ID
+      operationId: lookupCampaign
+      parameters:
+      - name: source
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: external_id
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: external_account_id
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Campaign reconciliation data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignReconciliation'
+        '400':
+          description: Ambiguous lookup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AmbiguousLookup'
+  /v1/reconciliation/webhooks/replay/{event_id}:
+    post:
+      tags:
+      - Reconciliation
+      summary: Replay webhook event
+      operationId: replayWebhook
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                webhook_id:
+                  type: string
+      responses:
+        '200':
+          description: Replay results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id:
+                    type: string
+                  deliveries:
+                    type: array
+                    items:
+                      type: object
+  /v1/webhooks:
+    post:
+      tags:
+      - Webhooks
+      summary: Register webhook
+      operationId: createWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookCreate'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+    get:
+      tags:
+      - Webhooks
+      summary: List webhooks
+      operationId: listWebhooks
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Webhook'
+  /v1/webhooks/{webhook_id}/rotate-secret:
+    post:
+      tags:
+      - Webhooks
+      summary: Rotate webhook secret
+      operationId: rotateWebhookSecret
+      parameters:
+      - name: webhook_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                overlap_days:
+                  type: integer
+                  default: 7
+      responses:
+        '200':
+          description: Secret rotated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  new_secret:
+                    type: string
+                  previous_secret_expires_at:
+                    type: string
+                    format: date-time
+  /v1/webhooks/{webhook_id}/pause:
+    post:
+      tags:
+      - Webhooks
+      summary: Pause webhook
+      operationId: pauseWebhook
+      parameters:
+      - name: webhook_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Webhook paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+  /v1/webhooks/{webhook_id}/resume:
+    post:
+      tags:
+      - Webhooks
+      summary: Resume webhook
+      operationId: resumeWebhook
+      parameters:
+      - name: webhook_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Webhook resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+  /v1/webhooks/{webhook_id}/health:
+    get:
+      tags:
+      - Webhooks
+      summary: Get webhook health
+      operationId: getWebhookHealth
+      parameters:
+      - name: webhook_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Webhook health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+  /v1/sandbox/webhooks/{webhook_id}/trigger:
+    post:
+      tags:
+      - Sandbox
+      summary: Trigger test webhook
+      operationId: triggerTestWebhook
+      parameters:
+      - name: webhook_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - event_type
+              properties:
+                event_type:
+                  type: string
+      responses:
+        '200':
+          description: Trigger result
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/sandbox/webhooks/{webhook_id}/test-signature:
+    get:
+      tags:
+      - Sandbox
+      summary: Test signature verification
+      operationId: testSignature
+      parameters:
+      - name: webhook_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Test payload with signature
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/campaigns/{campaign_id}/mail-tracking:
+    get:
+      tags:
+      - Mail Tracking
+      summary: Get campaign mail tracking summary
+      operationId: getCampaignMailTracking
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Tracking summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailTrackingSummary'
+        '404':
+          description: Campaign not found
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+  /v1/campaigns/{campaign_id}/mail-tracking/pieces:
+    get:
+      tags:
+      - Mail Tracking
+      summary: List campaign pieces with tracking status
+      operationId: listCampaignPieces
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 20
+          maximum: 1000
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: include_total
+        in: query
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Paginated piece list
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+  /v1/campaigns/{campaign_id}/mail-tracking/rts:
+    get:
+      tags:
+      - Mail Tracking
+      summary: Get RTS suppression list
+      operationId: getRtsSuppression
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: include_forwarded
+        in: query
+        schema:
+          type: boolean
+          default: true
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 1000
+          maximum: 10000
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          default: 0
+      responses:
+        '200':
+          description: Suppression list with pagination
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+  /v1/campaigns/{campaign_id}/mail-tracking/events:
+    get:
+      tags:
+      - Mail Tracking
+      summary: Export scan events
+      operationId: exportScanEvents
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 100
+          maximum: 1000
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: days
+        in: query
+        schema:
+          type: integer
+          default: 90
+          maximum: 365
+      - name: sort_by
+        in: query
+        schema:
+          type: string
+          enum:
+          - id
+          - scan_datetime
+          default: id
+      responses:
+        '200':
+          description: Paginated scan events
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+  /v1/orders/{order_id}/mail-tracking:
+    get:
+      tags:
+      - Mail Tracking
+      summary: Get order mail tracking
+      operationId: getOrderMailTracking
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Tracking summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailTrackingSummary'
+        '404':
+          description: Order not found
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+  /v1/mail-tracking/health:
+    get:
+      tags:
+      - Mail Tracking Internal
+      summary: Liveness check (always 200)
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Liveness'
+  /v1/mail-tracking/ready:
+    get:
+      tags:
+      - Mail Tracking Internal
+      summary: Readiness check (DB probe with 200ms timeout)
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: DB reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Liveness'
+  /v1/mail-tracking/status:
+    get:
+      tags:
+      - Mail Tracking Internal
+      summary: Operational status
+      operationId: getOperationalStatus
+      responses:
+        '200':
+          description: Full operational status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalStatus'
+  /v1/mail-tracking/ingest:
+    post:
+      tags:
+      - Mail Tracking Internal
+      summary: Submit scan data for ingestion
+      operationId: ingestScanBatch
+      description: 'Mode 1: JSON file reference. Mode 2: HTTP upload (max 10MB, supports gzip Content-Encoding).'
+      responses:
+        '200':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestJobStatus'
+        '503':
+          description: Queue full (backpressure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackpressureError'
+        '429':
+          description: Ingest rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+  /v1/mail-tracking/manifest:
+    post:
+      tags:
+      - Mail Tracking Internal
+      summary: Upload Accuzip manifest
+      operationId: uploadManifest
+      description: 'Mode 1: JSON file ref. Mode 2: Raw HTTP upload. Mode 3: Browser multipart/form-data.'
+      responses:
+        '200':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestJobStatus'
+        '503':
+          description: Queue full (backpressure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackpressureError'
+        '429':
+          description: Ingest rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+  /v1/mail-tracking/ingest/{job_id}:
+    get:
+      tags:
+      - Mail Tracking Internal
+      summary: Get ingest job status
+      operationId: getIngestJobStatus
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestJobStatus'
+  /v1/mail-tracking/retention:
+    post:
+      tags:
+      - Mail Tracking Internal
+      summary: Run retention / vacuum job
+      operationId: triggerRetention
+      description: Delete old scan events, redact PII, purge expired keys and dead-letter jobs, clean webhook delivery logs,
+        ANALYZE hot tables. Pass dry_run=true to preview without modifying data.
+      parameters:
+      - name: dry_run
+        in: query
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Retention complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionResult'
+        '403':
+          description: Requires internal_dashboard principal
+
+  /v1/billing/orders/{order_id}/sse-token:
+    post:
+      tags:
+      - Orders
+      summary: Mint SSE token
+      operationId: mintSseToken
+      description: >-
+        Mint a short-lived HMAC token scoped to a single order. Use the returned token
+        as a query parameter when connecting to the SSE events endpoint. Required because
+        browser EventSource cannot send custom Authorization headers.
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: SSE token minted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Short-lived HMAC token (hex)
+                  expires_at:
+                    type: string
+                    format: date-time
+                    description: Token expiry (UTC)
+                  order_id:
+                    type: string
+                  connect_url:
+                    type: string
+                    description: Ready-to-use SSE URL with token
+        '404':
+          description: Order not found or not accessible
+        '401':
+          description: Authentication required (header auth only)
+
+  /v1/billing/orders/{order_id}/events:
+    get:
+      tags:
+      - Orders
+      summary: SSE real-time order status stream
+      operationId: orderEvents
+      description: >-
+        Server-Sent Events stream for real-time order status updates.
+        Authenticate via query token (from POST /sse-token) or standard header auth.
+        Subject to per-order and per-account subscriber caps (429 if exceeded).
+        Event types: 'status_changed' (payload), 'heartbeat' (keep-alive every 30s),
+        'dropped' (client fell behind — reconnect to resume).
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: token
+        in: query
+        description: Short-lived SSE token from POST /orders/{id}/sse-token
+        schema:
+          type: string
+      responses:
+        '200':
+          description: SSE event stream (text/event-stream)
+          content:
+            text/event-stream: {}
+        '401':
+          description: Missing or invalid authentication
+        '404':
+          description: Order not found
+        '429':
+          description: >-
+            Subscriber cap exceeded. Either per-order (MAX_SSE_SUBSCRIBERS_PER_ORDER)
+            or per-account (MAX_SSE_SUBSCRIBERS_PER_ACCOUNT) limit reached.
