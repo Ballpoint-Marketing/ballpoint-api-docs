@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API.\n\nImport the matching environment file (sandbox or production) to set your base_url and api_key.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API.\n\nImport the matching environment file (sandbox or production) to set your base_url and partner_key.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [],
@@ -27,7 +27,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
@@ -47,7 +47,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" },
               { "key": "Content-Type", "value": "application/json" },
               { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
@@ -83,7 +83,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
             ],
             "url": {
               "raw": "{{base_url}}/v1/billing/orders/{{order_id}}",
@@ -103,7 +103,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" },
               { "key": "Content-Type", "value": "application/json" },
               { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
@@ -138,7 +138,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" },
               { "key": "Content-Type", "value": "application/json" },
               { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
@@ -173,7 +173,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
             ],
             "url": {
               "raw": "{{base_url}}/v1/billing/orders?limit=20&offset=0",
@@ -191,7 +191,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
             ],
             "url": {
               "raw": "{{base_url}}/v1/billing/orders?external_user_id={{external_user_id}}&limit=20&offset=0",
@@ -210,7 +210,7 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" },
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
@@ -235,7 +235,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
             ],
             "url": {
               "raw": "{{base_url}}/v1/orders/{{order_id}}/mail-tracking",
@@ -250,7 +250,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
             ],
             "url": {
               "raw": "{{base_url}}/v1/campaigns/{{campaign_id}}/mail-tracking",
@@ -270,7 +270,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
             ],
             "url": {
               "raw": "{{base_url}}/v1/billing/pricing",
@@ -284,7 +284,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
             ],
             "url": {
               "raw": "{{base_url}}/v1/billing/pricing?product_type=4x6_printed",
@@ -306,7 +306,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{api_key}}" }
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
             ],
             "url": {
               "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/sse-token",

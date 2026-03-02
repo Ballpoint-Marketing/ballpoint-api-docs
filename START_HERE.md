@@ -18,11 +18,11 @@ You should see `{"status": "ok", ...}`. The API is up.
 
 ```bash
 curl -s -X POST https://api.ballpointmarketing.com/v1/billing/orders \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
   -H "Idempotency-Key: quickstart-$(date +%s)" \
   -H "Content-Type: application/json" \
   -d '{
-    "campaign_id": "camp_propstream_test",
+    "campaign_id": "camp_test",
     "product_type": "4x6_printed",
     "postage_type": "first_class",
     "piece_count": 10
@@ -47,7 +47,7 @@ No mail is printed with your test key — this is a safe sandbox order.
 
 ```bash
 curl -s https://api.ballpointmarketing.com/v1/billing/orders/ORDER_ID_HERE \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ"
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
 ---
@@ -81,7 +81,7 @@ function verifySignature(body, timestamp, signature, secret) {
 
 | Resource | Where |
 |----------|-------|
-| Full Integration Guide | [`PROPSTREAM_API_KIT.md`](PROPSTREAM_API_KIT.md) |
+| Full Integration Guide | [`API_KIT.md`](API_KIT.md) |
 | OpenAPI Spec (interactive) | Import [`docs/ballpoint-api-spec-v2.yaml`](docs/ballpoint-api-spec-v2.yaml) into [editor.swagger.io](https://editor.swagger.io) |
 | Postman Collection | Import [`examples/ballpoint.postman_collection.json`](examples/ballpoint.postman_collection.json) |
 | Express Example App | [`examples/express-integration/`](examples/express-integration/) |

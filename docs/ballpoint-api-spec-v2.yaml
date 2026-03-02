@@ -9,8 +9,7 @@ info:
     \"X-API-Key: sk_internal_abc123\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n\
     | `test` | Bearer JWT | Sandbox only, no real mail |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id\
     \ |\n| `internal_dashboard` | X-API-Key | Cross-tenant access with restrictions |\n\n## Integration Identity\n\
-    \nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier (e.g., \"propstream\"\
-    , \"dealmachine\")\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within\
+    \nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within\
     \ tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nAll errors return a consistent envelope\
     \ with trace ID for debugging:\n\n```json\n{\n  \"error\": {\n    \"type\": \"validation_error\",\n    \"code\": \"INVALID_ADDRESS\"\
     ,\n    \"message\": \"Address could not be verified\",\n    \"details\": { \"field\": \"to_address_line1\" },\n    \"\
@@ -31,13 +30,13 @@ info:
     \ are tried during verification for overlap window.\n"
   contact:
     name: Ballpoint API Support
-    email: api-support@ballpoint.com
+    email: api-support@ballpointmarketing.com
   license:
     name: Proprietary
 servers:
-- url: https://api.ballpoint.com
+- url: https://api.ballpointmarketing.com
   description: Production
-- url: https://api.staging.ballpoint.com
+- url: https://api.staging.ballpointmarketing.com
   description: Staging
 tags:
 - name: Orders
@@ -81,7 +80,7 @@ components:
       in: header
       name: X-Partner-Key
       description: |
-        Partner integration key (PropStream, SoldFast, etc.).
+        Partner integration key.
         Scoped to source + external_account_id.
         ```
         X-Partner-Key: pk_live_...
@@ -91,7 +90,7 @@ components:
       description: Unique trace ID for debugging
       schema:
         type: string
-    X-Idempotency-Key:
+    Idempotency-Key:
       description: Idempotency key for request deduplication
       schema:
         type: string
@@ -144,7 +143,7 @@ components:
           type: string
           maxLength: 50
           description: Integration source identifier
-          example: propstream
+          example: your_source
         external_account_id:
           type: string
           maxLength: 100

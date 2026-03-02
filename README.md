@@ -10,7 +10,7 @@ Everything you need to integrate with the Ballpoint Marketing direct mail API: o
 
 | Resource | Description |
 |----------|-------------|
-| [PropStream API Kit](PROPSTREAM_API_KIT.md) | Full integration guide: auth, endpoints, webhooks, error handling |
+| [API Integration Kit](API_KIT.md) | Full integration guide: auth, endpoints, webhooks, error handling |
 | [OpenAPI Spec](docs/ballpoint-api-spec-v2.yaml) | Machine-readable API specification (import into Postman, Swagger UI, etc.) |
 | [Quick Start Guide](START_HERE.md) | Step-by-step first-order walkthrough |
 

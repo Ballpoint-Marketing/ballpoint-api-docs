@@ -1,9 +1,9 @@
-# Ballpoint Marketing API — PropStream Integration Kit
+# Ballpoint Marketing API — Partner Integration Kit
 
 > **v1.0 · March 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
-> and real-time status updates into PropStream.
+> and real-time status updates into your platform.
 
 ---
 
@@ -13,11 +13,11 @@ Verify your credentials work — paste this into a terminal:
 
 ```bash
 curl -s -X POST https://api.ballpointmarketing.com/v1/billing/orders \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
   -H "Idempotency-Key: ps-quickstart-$(date +%s)" \
   -H "Content-Type: application/json" \
   -d '{
-    "campaign_id": "camp_propstream_test",
+    "campaign_id": "camp_test",
     "product_type": "4x6_printed",
     "postage_type": "first_class",
     "piece_count": 10
@@ -75,8 +75,8 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
 
 | What | Value |
 |------|-------|
-| **Test API Key** | `pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ` |
-| **Live API Key** | `pk_live_propstream_REPLACE_WITH_YOUR_LIVE_KEY` |
+| **Test API Key** | `pk_test_PARTNER_REPLACE_ME` |
+| **Live API Key** | `pk_live_REPLACE_WITH_YOUR_LIVE_KEY` |
 | **Base URL** | `https://api.ballpointmarketing.com` |
 | **Webhook Secret** | Provisioned during onboarding — send us your endpoint URL |
 
@@ -85,7 +85,7 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
 Every request must include your API key in the `X-Partner-Key` header:
 
 ```
-X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ
+X-Partner-Key: pk_test_PARTNER_REPLACE_ME
 ```
 
 - **Test key** (`pk_test_...`) — no real mail printed or sent. Use freely during development.
@@ -97,15 +97,15 @@ Keys are provisioned by Ballpoint. Contact us if you need to rotate them.
 
 ## 2. How It Works (End-to-End Flow)
 
-### Flow A — Embedded iframe (PropStream's Model)
+### Flow A — Embedded iframe
 
-Your users select recipients in PropStream, then the Ballpoint iframe handles product selection, copy editing, and order submission.
+Your users select recipients in your platform, then the Ballpoint iframe handles product selection, copy editing, and order submission.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
-│  PROPSTREAM IFRAME FLOW                                               │
+│  EMBEDDED IFRAME FLOW                                                 │
 │                                                                       │
-│  1. User selects mailing list in PropStream                           │
+│  1. User selects mailing list in your platform                           │
 │         │                                                             │
 │         ▼                                                             │
 │  2. Recipient data flows into embedded Ballpoint iframe               │
@@ -152,7 +152,7 @@ Partner sends order via POST /orders with their own recipient data
 > through the Ballpoint dashboard. Once a campaign is ready, you receive the
 > `campaign_id` to reference when creating orders via the API.
 
-### What PropStream Calls via API
+### What Your Platform Calls via API
 
 - **Preview cost** — show your users what they'll pay before ordering
 - **Create order** — submit an order referencing an existing campaign
@@ -165,11 +165,11 @@ Partner sends order via POST /orders with their own recipient data
 
 ## 3. How Billing Works
 
-Your account (`acct_propstream`) uses `billing_mode: none`. This means:
+Your account (`acct_partner`) uses `billing_mode: none`. This means:
 
 - **All orders succeed immediately** — no balance checks, no upfront charges
 - **Ballpoint invoices separately** — after orders are marked `complete`, Ballpoint sends an invoice for review
-- **PropStream audits and pays** — payment happens outside the API, on your schedule
+- **Partner audits and pays** — payment happens outside the API, on your schedule
 
 This billing mode applies to both your test key and live key. There are no changes needed when you go to production — the only difference between test and live is that live orders trigger real fulfillment and real mail.
 
@@ -202,13 +202,13 @@ Your backend creates orders and receives webhook status updates.
 └──────────────┘                    └──────────────────┘
 ```
 
-### Pattern B — Embedded iframe (PropStream's Model)
+### Pattern B — Embedded iframe
 
-Your platform embeds a Ballpoint iframe. Your users select recipients in PropStream, then the iframe handles product selection, copy editing, and order submission. SSE provides real-time status updates in the browser.
+Your platform embeds a Ballpoint iframe. Your users select recipients in your platform, then the iframe handles product selection, copy editing, and order submission. SSE provides real-time status updates in the browser.
 
 ```
 ┌─────────────────┐
-│  PropStream UI   │  1. User selects mailing list
+│  Partner UI      │  1. User selects mailing list
 │                  │  2. Data passed to iframe
 │  ┌─────────────┐ │
 │  │ Ballpoint   │ │  3. User picks product, edits copy, submits
@@ -223,7 +223,7 @@ Your platform embeds a Ballpoint iframe. Your users select recipients in PropStr
           │        └──────────────────┘
 ```
 
-SSE requires cookie auth with `withCredentials: true`. The iframe must be served over HTTPS. CORS is already configured to allow `app.propstream.com`.
+SSE requires cookie auth with `withCredentials: true`. The iframe must be served over HTTPS. CORS is configured per-partner — provide your production domain during onboarding.
 
 Webhooks remain the backend source of truth — SSE is for browser-side real-time display only.
 
@@ -289,14 +289,14 @@ You can also fetch pricing programmatically:
 
 ```bash
 curl -s https://api.ballpointmarketing.com/v1/billing/pricing \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ"
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
 Filter by product:
 
 ```bash
 curl -s "https://api.ballpointmarketing.com/v1/billing/pricing?product_type=4x6_printed" \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ"
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
 Response:
@@ -331,7 +331,7 @@ All endpoints use `https://api.ballpointmarketing.com` as the base URL.
 Every request must include:
 
 ```
-X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ
+X-Partner-Key: pk_test_PARTNER_REPLACE_ME
 ```
 
 Write requests (`POST`, `PATCH`) must also include `Content-Type: application/json`. Read requests (`GET`) do not need it.
@@ -350,7 +350,7 @@ POST /v1/billing/orders/preview
 
 ```bash
 curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/preview \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
   -H "X-External-User-ID: user_789" \
   -H "Content-Type: application/json" \
   -d '{
@@ -398,7 +398,7 @@ POST /v1/billing/orders
 | `X-Partner-Key` | Yes | Your API key |
 | `Idempotency-Key` | Yes | Unique UUID per order (see [6h. Idempotency](#6h-idempotency)) |
 | `Content-Type` | Yes | `application/json` |
-| `X-External-User-ID` | Recommended | Attributes the order to a specific PropStream user (see [6i](#6i-user-attribution)) |
+| `X-External-User-ID` | Recommended | Attributes the order to a specific platform user (see [6i](#6i-user-attribution)) |
 
 **Request body:**
 
@@ -415,12 +415,12 @@ POST /v1/billing/orders
 
 ```bash
 curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
   -H "X-External-User-ID: user_789" \
   -H "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000" \
   -H "Content-Type: application/json" \
   -d '{
-    "campaign_id": "camp_propstream_test",
+    "campaign_id": "camp_test",
     "product_type": "4x6_printed",
     "postage_type": "first_class",
     "piece_count": 500,
@@ -434,7 +434,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
 {
   "order_id": "ord_7f3a2b",
   "status": "accepted",
-  "campaign_id": "camp_propstream_test",
+  "campaign_id": "camp_test",
   "product_type": "4x6_printed",
   "piece_count": 500,
   "unit_price_tcents": 5054,
@@ -449,11 +449,11 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
 
 ```bash
 curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
   -H "Idempotency-Key: 660f9500-f30c-52e5-b827-557766551111" \
   -H "Content-Type: application/json" \
   -d '{
-    "campaign_id": "camp_propstream_test",
+    "campaign_id": "camp_test",
     "product_type": "hybrid_letter",
     "postage_type": "presort",
     "piece_count": 200,
@@ -475,7 +475,7 @@ GET /v1/billing/orders/{order_id}
 
 ```bash
 curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ"
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
 **Response (`200`):**
@@ -483,7 +483,7 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
 ```json
 {
   "id": "ord_7f3a2b",
-  "campaign_id": "camp_propstream_test",
+  "campaign_id": "camp_test",
   "product_type": "4x6_printed",
   "postage_type": "first_class",
   "piece_count": 500,
@@ -513,7 +513,7 @@ GET /v1/billing/orders
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `external_user_id` | string | — | Filter to a specific PropStream user |
+| `external_user_id` | string | — | Filter to a specific platform user |
 | `status` | string | — | Filter by order status (e.g., `accepted`, `printing`, `complete`, `delivered`) |
 | `limit` | integer | 20 | Results per page (1–100) |
 | `offset` | integer | 0 | Pagination offset |
@@ -522,7 +522,7 @@ GET /v1/billing/orders
 
 ```bash
 curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=user_789&limit=10" \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ"
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
 **Response (`200`):**
@@ -532,7 +532,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
   "orders": [
     {
       "id": "ord_7f3a2b",
-      "campaign_id": "camp_propstream_test",
+      "campaign_id": "camp_test",
       "product_type": "4x6_printed",
       "postage_type": "first_class",
       "piece_count": 500,
@@ -553,7 +553,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
 ```
 
 **Notes:**
-- Results are scoped to your PropStream account automatically — you only see your own orders.
+- Results are scoped to your partner account automatically — you only see your own orders.
 - `display_status` is the single field to show users. It equals `usps_status` when USPS tracking is available, otherwise `production_status`.
 - Use `total` for pagination: if `total > limit + offset`, there are more pages.
 
@@ -571,14 +571,14 @@ GET /v1/orders/{order_id}/mail-tracking
 
 ```bash
 curl -s https://api.ballpointmarketing.com/v1/orders/ord_7f3a2b/mail-tracking \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ"
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
 **Response (`200`):**
 
 ```json
 {
-  "campaign_id": "camp_propstream_test",
+  "campaign_id": "camp_test",
   "mail_status": "delivered",
   "mail_status_label": "Delivered",
   "total_pieces": 500,
@@ -630,8 +630,8 @@ GET /v1/campaigns/{campaign_id}/mail-tracking
 **Example:**
 
 ```bash
-curl -s https://api.ballpointmarketing.com/v1/campaigns/camp_propstream_test/mail-tracking \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ"
+curl -s https://api.ballpointmarketing.com/v1/campaigns/camp_test/mail-tracking \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
 Response has the same shape as [Order Tracking](#6e-order-tracking) but aggregated across all orders in the campaign.
@@ -650,7 +650,7 @@ PATCH /v1/billing/orders/{order_id}/status
 
 ```bash
 curl -X PATCH https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/status \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
   -H "Content-Type: application/json" \
   -d '{"status": "cancelled", "note": "Customer changed their mind"}'
 ```
@@ -698,7 +698,7 @@ Every `POST /v1/billing/orders` **must** include an `Idempotency-Key` header wit
 
 ### 6i. User Attribution
 
-Pass `X-External-User-ID` on any request to attribute it to a specific PropStream end-user:
+Pass `X-External-User-ID` on any request to attribute it to a specific end-user:
 
 ```
 X-External-User-ID: user_789
@@ -710,7 +710,7 @@ This ID:
 - Can be used to filter `GET /v1/billing/orders?external_user_id=user_789`
 - Routes tracking data back to the correct user's dashboard
 
-This is optional but recommended — it lets you show each PropStream user only their own orders and track per-user activity.
+This is optional but recommended — it lets you show each platform user only their own orders and track per-user activity.
 
 ---
 
@@ -738,13 +738,13 @@ When an order's status changes, we send an `order.status_changed` event:
   "timestamp": "2026-03-01T16:30:00Z",
   "data": {
     "order_id": "ord_7f3a2b",
-    "campaign_id": "camp_propstream_test",
+    "campaign_id": "camp_test",
     "previous_production_status": "accepted",
     "production_status": "printing",
     "display_status": "printing",
     "product_type": "4x6_printed",
-    "source": "propstream",
-    "external_account_id": "acct_propstream",
+    "source": "your_source",
+    "external_account_id": "acct_partner",
     "external_user_id": "user_789"
   }
 }
@@ -928,7 +928,7 @@ If you're embedding order status in an iframe or dashboard, SSE gives instant up
 
 ```bash
 curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/sse-token \
-  -H "X-Partner-Key: pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ"
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
 Response:
@@ -966,7 +966,7 @@ es.onerror = () => {
 
 ### CORS
 
-CORS is already configured to allow `app.propstream.com` with credentials. If you need additional origins, let us know.
+CORS is configured per-partner. Provide your production domain (e.g., `your-app.example.com`) and we will add it. If you need additional origins, let us know.
 
 ---
 
@@ -1094,12 +1094,12 @@ Retry-After: 12
 
 ### Test Key Behavior
 
-Your test key (`pk_test_propstream_X9hvTPr0zpYmzfAJj7mDkiFZzPwuMpGJ`):
+Your test key (`pk_test_PARTNER_REPLACE_ME`):
 
 - All orders succeed immediately (`billing_mode: none`)
 - No real mail is printed or sent
 - Validation, status codes, and error responses are identical to production
-- Use `camp_propstream_test` as the campaign ID for testing
+- Use `camp_test` as the campaign ID for testing
 
 **What happens to test orders?** Test orders are created with status `accepted` and stay there — production status does not auto-advance because there is no physical fulfillment. To test your webhook handler, ask us to trigger test events against your endpoint. We can simulate the full lifecycle (`accepted` → `printing` → ... → `complete` → `shipped` → `delivered`) so you can verify your handler end-to-end without waiting for real mail.
 
