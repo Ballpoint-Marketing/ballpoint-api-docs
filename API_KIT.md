@@ -716,6 +716,8 @@ This is optional but recommended — it lets you show each platform user only th
 
 ## 7. Status Updates via Webhooks
 
+> **Ballpoint delivers webhooks at least once. Your integration must handle duplicates, delays, and out-of-order delivery.**
+
 ### Registration
 
 Send us your webhook endpoint URL — Ballpoint will configure it on our side. There is no self-service webhook registration endpoint today. *(Contact details provided during onboarding.)*
@@ -814,6 +816,12 @@ function verifySignature(bodyBuffer, timestamp, signature, secret) {
 | 5 | Reject duplicate `X-Ballpoint-Event-Id` values (store processed IDs with TTL) |
 | 6 | Return `2xx` quickly — do heavy processing asynchronously |
 
+### Processing Model
+
+- **Return `2xx` immediately** — do heavy processing asynchronously. We time out after 10 seconds.
+- **Queue events** for background processing (SQS, Bull, Durable Objects, etc.).
+- **If you need strict ordering**, use a single-threaded consumer keyed on `order_id`.
+
 ### Delivery Semantics
 
 Webhook delivery is **at-least-once**. Your handler must be idempotent:
@@ -821,6 +829,17 @@ Webhook delivery is **at-least-once**. Your handler must be idempotent:
 - Deduplicate on `X-Ballpoint-Event-Id` — you may receive the same event more than once
 - If you enqueue downstream jobs, deduplicate there too
 - Failed deliveries (non-2xx or timeout) are retried with exponential backoff
+
+### Deduplication (Required)
+
+Store `X-Ballpoint-Event-Id` values for at least 24 hours. Reject any event ID you have already processed. This is not optional — at-least-once delivery means duplicates **will** occur during retries and deploys.
+
+- **Lambda:** DynamoDB conditional put with TTL — see the [Lambda example](examples/lambda-webhook/)
+- **Cloudflare Workers:** KV with `expirationTtl` — see the [Worker example](examples/cloudflare-worker-webhook/)
+- **Express/Node:** Redis `SETNX` with `EX 86400`
+- **Any platform:** a SQL `UNIQUE` constraint on `event_id` works too
+
+If you fan out to downstream queues, deduplicate there as well — the event ID is stable across retries.
 
 ### Production Status Lifecycle
 
@@ -892,6 +911,73 @@ In addition to order-level updates, you may receive campaign-level tracking even
 | `campaign.mail_tracking.delivered` | ≥80% of campaign pieces delivered |
 | `campaign.mail_tracking.rts_update` | Return-to-sender pieces found (includes addresses for suppression) |
 | `campaign.mail_tracking.stalled` | No scans in 72+ hours with pieces still in transit |
+
+#### Example Payloads
+
+**`campaign.mail_tracking.in_transit`**
+
+```json
+{
+  "type": "campaign.mail_tracking.in_transit",
+  "data": {
+    "campaign_id": "camp_spring_2026",
+    "order_ids": ["ord_7f3a2b", "ord_8c4d5e"],
+    "pieces_total": 1000,
+    "pieces_scanned": 120,
+    "first_scan_at": "2026-03-03T14:22:00Z"
+  }
+}
+```
+
+**`campaign.mail_tracking.delivered`**
+
+```json
+{
+  "type": "campaign.mail_tracking.delivered",
+  "data": {
+    "campaign_id": "camp_spring_2026",
+    "order_ids": ["ord_7f3a2b", "ord_8c4d5e"],
+    "pieces_total": 1000,
+    "pieces_delivered": 812,
+    "delivery_rate": 0.812,
+    "delivered_at": "2026-03-06T09:15:00Z"
+  }
+}
+```
+
+**`campaign.mail_tracking.rts_update`**
+
+```json
+{
+  "type": "campaign.mail_tracking.rts_update",
+  "data": {
+    "campaign_id": "camp_spring_2026",
+    "rts_count": 14,
+    "rts_addresses": [
+      { "line1": "123 Main St", "city": "Austin", "state": "TX", "zip": "78701" },
+      { "line1": "456 Oak Ave", "city": "Dallas", "state": "TX", "zip": "75201" }
+    ],
+    "suppression_recommended": true
+  }
+}
+```
+
+**`campaign.mail_tracking.stalled`**
+
+```json
+{
+  "type": "campaign.mail_tracking.stalled",
+  "data": {
+    "campaign_id": "camp_spring_2026",
+    "order_ids": ["ord_8c4d5e"],
+    "pieces_total": 500,
+    "pieces_scanned": 310,
+    "pieces_stalled": 190,
+    "last_scan_at": "2026-03-04T08:00:00Z",
+    "hours_since_last_scan": 78
+  }
+}
+```
 
 ### Retry Policy
 

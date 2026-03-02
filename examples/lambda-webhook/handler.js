@@ -48,26 +48,24 @@ exports.handler = async (event) => {
   }
 
   // 3. Deduplicate on eventId to handle at-least-once delivery.
-  //    Recommended: store event IDs in DynamoDB with a TTL attribute.
-  //
-  //    const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
-  //    const ddb = new DynamoDBClient({});
-  //    try {
-  //      await ddb.send(new PutItemCommand({
-  //        TableName: "webhook-events",
-  //        Item: {
-  //          eventId: { S: eventId },
-  //          ttl: { N: String(Math.floor(Date.now() / 1000) + 86400) },
-  //        },
-  //        ConditionExpression: "attribute_not_exists(eventId)",
-  //      }));
-  //    } catch (e) {
-  //      if (e.name === "ConditionalCheckFailedException") {
-  //        return { statusCode: 200, body: JSON.stringify({ received: true, duplicate: true }) };
-  //      }
-  //      throw e;
-  //    }
-  //
+  //    Uses DynamoDB conditional put with a 24-hour TTL.
+  const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
+  const ddb = new DynamoDBClient({});
+  try {
+    await ddb.send(new PutItemCommand({
+      TableName: "webhook-events",
+      Item: {
+        eventId: { S: eventId },
+        ttl: { N: String(Math.floor(Date.now() / 1000) + 86400) },
+      },
+      ConditionExpression: "attribute_not_exists(eventId)",
+    }));
+  } catch (e) {
+    if (e.name === "ConditionalCheckFailedException") {
+      return { statusCode: 200, body: JSON.stringify({ received: true, duplicate: true }) };
+    }
+    throw e;
+  }
   //    Alternative: ElastiCache/Redis with SETNX and TTL.
 
   // 4. Parse and process the event

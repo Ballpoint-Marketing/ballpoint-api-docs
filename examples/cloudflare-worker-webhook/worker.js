@@ -37,14 +37,12 @@ export default {
     }
 
     // 3. Deduplicate on eventId to handle at-least-once delivery.
-    //    Recommended: store event IDs in KV with expirationTtl.
-    //
-    //    const seen = await env.WEBHOOK_EVENTS.get(eventId);
-    //    if (seen) {
-    //      return Response.json({ received: true, duplicate: true }, { status: 200 });
-    //    }
-    //    await env.WEBHOOK_EVENTS.put(eventId, "1", { expirationTtl: 86400 });
-    //
+    //    Uses KV with a 24-hour TTL.
+    const seen = await env.WEBHOOK_EVENTS.get(eventId);
+    if (seen) {
+      return Response.json({ received: true, duplicate: true }, { status: 200 });
+    }
+    await env.WEBHOOK_EVENTS.put(eventId, "1", { expirationTtl: 86400 });
     //    For strong consistency, use Durable Objects instead of KV.
 
     // 4. Parse and process the event

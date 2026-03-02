@@ -22,6 +22,10 @@ Validation checklist:
   ✓ Return 2xx quickly — do heavy processing async
 ```
 
+### API Gateway Raw Body
+
+Verify signatures against the exact raw body bytes. If your API Gateway integration sets `isBase64Encoded: true`, decode the body before verifying. The handler does this automatically — see `handler.js` lines 29-34.
+
 ## Setup
 
 ### 1. Create the Lambda function
