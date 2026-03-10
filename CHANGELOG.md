@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.0 — 2026-03-10
+
+- **Production pipeline updated to 8 stages**: added `prep` (data formatting) and `shipping` (manifest/labeling) stages
+- Updated production sequences for all product types
+- Updated order lifecycle diagram with new stages
+- Updated webhook event descriptions and test lifecycle examples
+
 ## v1.0.1 — 2026-03-02
 
 - Webhook docs: prominent at-least-once delivery statement

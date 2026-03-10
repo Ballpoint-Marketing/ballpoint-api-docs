@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.0 · March 2026**
+> **v1.1 · March 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -117,7 +117,7 @@ Your users select recipients in your platform, then the Ballpoint iframe handles
 │  4. POST /orders creates order ──────────────────────► Ballpoint API  │
 │         │                                                             │
 │         ▼                                                             │
-│  5. Ballpoint team fulfills (printing → stamping → complete)          │
+│  5. Ballpoint team fulfills (prep → printing → stamping → shipping → complete) │
 │         │                                                             │
 │         ▼                                                             │
 │  6. Status updates push to iframe via SSE                             │
@@ -848,21 +848,23 @@ Production status is set by Ballpoint operations staff. It moves forward only.
 | Status | Meaning | Your UX |
 |--------|---------|---------|
 | `accepted` | Order created. Only status where cancellation is allowed. | "Order placed" |
-| `printing` | In the physical print queue. Cancellation no longer possible. | "In production" |
+| `prep` | Data formatting and pre-production setup. Cancellation no longer possible. | "In production" |
+| `printing` | In the physical print queue. | "In production" |
 | `writing` | Handwritten content being applied by pen plotters. *Handwritten products only.* | "In production" |
 | `inserting` | Printed materials being folded into envelopes. *Letter products only.* | "In production" |
 | `stamping` | Postage applied, pieces trayed for USPS induction. | "In production" |
+| `shipping` | Manifesting and labeling for USPS drop-off. | "In production" |
 | `complete` | All pieces dropped at USPS. First scans arrive 1–2 business days later. | "Shipped" |
 | `cancelled` | Cancelled before production. Removed from fulfillment queue. | "Cancelled" |
 
 **Production sequences by product:**
 
 ```
-Printed postcards:     accepted → printing → stamping → complete
-Handwritten postcards: accepted → writing → stamping → complete
-Color letters:         accepted → printing → inserting → stamping → complete
-Hybrid letters:        accepted → printing → writing → inserting → stamping → complete
-Handwritten letters:   accepted → writing → inserting → stamping → complete
+Printed postcards (4x6/6x9):  accepted → prep → printing → stamping → shipping → complete
+Handwritten postcards:         accepted → prep → printing → writing → stamping → shipping → complete
+Color letters:                 accepted → prep → printing → inserting → stamping → shipping → complete
+Hybrid letters:                accepted → prep → printing → writing → inserting → stamping → shipping → complete
+Handwritten letters:           accepted → prep → writing → inserting → stamping → shipping → complete
 ```
 
 ### USPS Tracking Lifecycle
@@ -905,7 +907,7 @@ In addition to order-level updates, you may receive campaign-level tracking even
 
 | Event Type | When |
 |------------|------|
-| `order.status_changed` | Production status changes (accepted → printing → ... → complete) |
+| `order.status_changed` | Production status changes (accepted → prep → printing → ... → shipping → complete) |
 | `order.usps_update` | USPS scan data changes the order's delivery status |
 | `campaign.mail_tracking.in_transit` | First USPS scans detected for the campaign |
 | `campaign.mail_tracking.delivered` | ≥80% of campaign pieces delivered |
@@ -1061,30 +1063,30 @@ CORS is configured per-partner. Provide your production domain (e.g., `your-app.
 An order has two parallel status tracks. They are independent — USPS never overwrites production status, and vice versa.
 
 ```
-                    YOUR API CALL                 BALLPOINT PRODUCTION                     USPS SCANS
-                    ─────────────                 ────────────────────                     ──────────
+                    YOUR API CALL                       BALLPOINT PRODUCTION                               USPS SCANS
+                    ─────────────                       ────────────────────                               ──────────
 
                  POST /v1/billing/orders
                           │
                           ▼
-┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                                                                                    │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    │
-│  │ accepted │───►│ printing │───►│ writing  │───►│inserting │───►│ stamping │───►│ complete │    │
-│  └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘    │
-│       │                                                                               │           │
-│       │ PATCH /status                                                                 │ 1-2 days  │
-│       ▼                                                                               ▼           │
-│  ┌──────────┐                                        ┌─────────┐   ┌───────────┐   ┌──────────┐ │
-│  │cancelled │                                        │ shipped │──►│out_for_   │──►│delivered │ │
-│  └──────────┘                                        │         │   │delivery   │   │          │ │
-│                                                      └─────────┘   └───────────┘   └──────────┘ │
-│                                                                                                    │
-└────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│  ┌────────┐  ┌──────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐                     │
+│  │accepted│─►│ prep │─►│printing│─►│writing │─►│inserting│─►│stamping│─►│shipping│─►│complete│                     │
+│  └────────┘  └──────┘  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘                     │
+│       │                                                                                  │                          │
+│       │ PATCH /status                                                                    │ 1-2 days                 │
+│       ▼                                                                                  ▼                          │
+│  ┌──────────┐                                              ┌─────────┐   ┌───────────┐   ┌──────────┐              │
+│  │cancelled │                                              │ shipped │──►│out_for_   │──►│delivered │              │
+│  └──────────┘                                              │         │   │delivery   │   │          │              │
+│                                                            └─────────┘   └───────────┘   └──────────┘              │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-    PRODUCTION TRACK (top)                              USPS TRACK (bottom)
-    Set by Ballpoint staff                              Set automatically by scan pipeline
-    Forward-only                                        Forward-only, starts 1-2 days after "complete"
+    PRODUCTION TRACK (top)                                    USPS TRACK (bottom)
+    Set by Ballpoint staff                                    Set automatically by scan pipeline
+    Forward-only (8 stages)                                   Forward-only, starts 1-2 days after "complete"
 ```
 
 **Not all products go through every step.** See [production sequences](#production-status-lifecycle) for which steps apply to each product type.
@@ -1187,7 +1189,7 @@ Your test key (`pk_test_PARTNER_REPLACE_ME`):
 - Validation, status codes, and error responses are identical to production
 - Use `camp_test` as the campaign ID for testing
 
-**What happens to test orders?** Test orders are created with status `accepted` and stay there — production status does not auto-advance because there is no physical fulfillment. To test your webhook handler, ask us to trigger test events against your endpoint. We can simulate the full lifecycle (`accepted` → `printing` → ... → `complete` → `shipped` → `delivered`) so you can verify your handler end-to-end without waiting for real mail.
+**What happens to test orders?** Test orders are created with status `accepted` and stay there — production status does not auto-advance because there is no physical fulfillment. To test your webhook handler, ask us to trigger test events against your endpoint. We can simulate the full lifecycle (`accepted` → `prep` → `printing` → ... → `shipping` → `complete` → `shipped` → `delivered`) so you can verify your handler end-to-end without waiting for real mail.
 
 ### Webhook Testing
 
