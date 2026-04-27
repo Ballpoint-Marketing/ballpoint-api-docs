@@ -179,7 +179,7 @@ Cost = `unit_price_tcents × piece_count`. No minimums, no surcharges, no per-re
 
 ### Cancellations
 
-Cancelling an order (from `accepted` status only) removes it from the fulfillment queue. Since there is no upfront charge, there is no refund to process — the cancelled order simply won't appear on your next invoice.
+Cancelling an order (from `scheduled` or `accepted` status only — before production prep begins) removes it from the fulfillment queue. Since there is no upfront charge, there is no refund to process — the cancelled order simply won't appear on your next invoice.
 
 ---
 
@@ -640,7 +640,7 @@ Response has the same shape as [Order Tracking](#6e-order-tracking) but aggregat
 
 ### 6g. Cancel Order
 
-Cancel is allowed **only while the order is in `accepted` status** (before production begins).
+Cancel is allowed **only while the order is in `scheduled` or `accepted` status** (before production prep begins).
 
 ```
 PATCH /v1/billing/orders/{order_id}/status
@@ -673,7 +673,7 @@ curl -X PATCH https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/st
 
 **Note:** Since your account uses `billing_mode: none`, cancelling an order simply removes it from the fulfillment queue. The `refund` field will be `null` — there is no charge to reverse.
 
-Once an order moves to `printing` or beyond, it cannot be cancelled — physical production has started. Contact Ballpoint support for production-stage issues.
+Once an order moves to `prep` or beyond, it cannot be cancelled — staff time and (later) materials are being spent on the order. Contact Ballpoint support for production-stage issues.
 
 ---
 
@@ -847,25 +847,31 @@ Production status is set by Ballpoint operations staff. It moves forward only.
 
 | Status | Meaning | Your UX |
 |--------|---------|---------|
-| `accepted` | Order created. Only status where cancellation is allowed. | "Order placed" |
-| `prep` | Data formatting and pre-production setup. Cancellation no longer possible. | "In production" |
+| `scheduled` | Order created with a future drop date. Waiting for the production date to arrive — a cron auto-transitions to `accepted` when the date hits. Send-now orders skip this state. | "Scheduled" |
+| `accepted` | Payment cleared and the order is queued for production. Cancellation allowed up to (and including) this state. | "Order placed" |
+| `prep` | Data formatting and pre-production setup (list cleanup, NCOA, address validation). Cancellation no longer possible — staff time is being spent. | "In production" |
 | `printing` | In the physical print queue. | "In production" |
 | `writing` | Handwritten content being applied by pen plotters. *Handwritten products only.* | "In production" |
 | `inserting` | Printed materials being folded into envelopes. *Letter products only.* | "In production" |
 | `stamping` | Postage applied, pieces trayed for USPS induction. | "In production" |
-| `shipping` | Manifesting and labeling for USPS drop-off. | "In production" |
+| `shipping` | Manifesting and labeling for USPS drop-off. Final production step. | "In production" |
 | `complete` | All pieces dropped at USPS. First scans arrive 1–2 business days later. | "Shipped" |
-| `cancelled` | Cancelled before production. Removed from fulfillment queue. | "Cancelled" |
+| `cancelled` | Cancelled before production began (only from `scheduled` or `accepted`). Charge auto-refunded. Removed from fulfillment queue. | "Cancelled" |
+| `failed` | Terminal error from unrecoverable processing failure after the order was created (e.g., dead-lettered fulfillment job). Pre-creation payment failures return `402 INSUFFICIENT_BALANCE` instead of creating a `failed` order. Non-editable. | "Failed" |
+
+> **Naming heads-up:** `shipping` (production status — staff is manifesting for USPS drop-off) is distinct from `shipped` (USPS status — first scans received from the postal network). Both can appear in the same order's lifecycle on different fields.
 
 **Production sequences by product:**
 
 ```
-Printed postcards (4x6/6x9):  accepted → prep → printing → stamping → shipping → complete
-Handwritten postcards:         accepted → prep → printing → writing → stamping → shipping → complete
-Color letters:                 accepted → prep → printing → inserting → stamping → shipping → complete
-Hybrid letters:                accepted → prep → printing → writing → inserting → stamping → shipping → complete
-Handwritten letters:           accepted → prep → writing → inserting → stamping → shipping → complete
+Printed postcards (4x6/6x9):  [scheduled →] accepted → prep → printing → stamping → shipping → complete
+Handwritten postcards:         [scheduled →] accepted → prep → printing → writing → stamping → shipping → complete
+Color letters:                 [scheduled →] accepted → prep → printing → inserting → stamping → shipping → complete
+Hybrid letters:                [scheduled →] accepted → prep → printing → writing → inserting → stamping → shipping → complete
+Handwritten letters:           [scheduled →] accepted → prep → printing → writing → inserting → stamping → shipping → complete
 ```
+
+The `[scheduled →]` prefix only applies to orders with a future drop date. Send-now orders start at `accepted`.
 
 ### USPS Tracking Lifecycle
 
@@ -873,14 +879,23 @@ USPS status is set automatically by the scan ingest pipeline. Also forward-only.
 
 | Status | Meaning | Threshold | Your UX |
 |--------|---------|-----------|---------|
-| `shipped` | At least one piece has a USPS scan. Mail entered the postal network. | ≥1 piece scanned | "Shipped" |
+| `shipped` | At least one piece has any USPS scan. Mail entered the postal network. | ≥1 piece scanned | "Shipped" |
 | `out_for_delivery` | Mail is at the recipients' local postal facilities. | ≥51% of pieces at destination | "Out for delivery" |
-| `delivered` | Mail has been sorted into carrier walk order — final automated scan. | ≥80% of pieces have stop-the-clock scans | "Delivered" |
+| `delivered` | ≥80% of pieces resolved (delivered + RTS combined). RTS counts toward the threshold so a campaign with high return rates does not get stuck below `delivered` forever; the RTS detail surfaces separately on the `campaign.mail_tracking.rts_update` event. | ≥80% of pieces resolved | "Delivered" |
 
-> **Note:** USPS Informed Visibility provides facility-level processing scans,
-> not carrier-level "delivered to mailbox" tracking. `delivered` means the mail
-> has been sorted for carrier delivery — the industry-standard delivery indicator
-> for marketing mail.
+#### How USPS data really works
+
+USPS Informed Visibility (IV-MTR) provides **facility-level processing scans**, not carrier-level tracking. For marketing mail there is no "out for delivery" or "delivered to mailbox" event from USPS itself. What IV emits per piece is a raw **Operation Code** (e.g., `015` for AFCS cancellation, `246` for DPS sort), each tagged with:
+
+- `mail_phase` — Phase 0 (origin cancellation) → Phase 1 (origin sort) → Transportation → Phase 2 (destination arrival) → Phase 3 (destination secondary / DPS sort) → Phase 4 (logical delivery — geofence-based, no physical scan)
+- `stop_the_clock` (Yes/No) — USPS's official flag indicating whether this scan stops the service-clock for SLA purposes
+- Plus PARS scans (separate phase) for return-to-sender and forwarding
+
+The three `usps_status` values above are **Ballpoint rollups** computed from those raw scans using the percentage thresholds. The names are our convention; the underlying signal is real USPS IV data. `delivered` is the industry-standard delivery indicator for flat marketing mail (DPS sort = mail sorted for carrier delivery on the next route).
+
+#### Return-to-sender (RTS) details
+
+RTS pieces count toward the `delivered` threshold above so the badge progresses normally even on campaigns with returns. The **per-piece RTS detail** is delivered on a separate webhook event: `campaign.mail_tracking.rts_update`, which carries the address payload so you can suppress bad addresses on your side. Do not expect RTS information on `usps_status` itself — subscribe to the dedicated event.
 
 ### USPS Update Webhook
 
@@ -907,9 +922,10 @@ In addition to order-level updates, you may receive campaign-level tracking even
 
 | Event Type | When |
 |------------|------|
-| `order.status_changed` | Production status changes (accepted → prep → printing → ... → shipping → complete) |
+| `order.status_changed` | Production status changes (scheduled → accepted → prep → printing → ... → shipping → complete; also `cancelled` and `failed`) |
 | `order.usps_update` | USPS scan data changes the order's delivery status |
 | `campaign.mail_tracking.in_transit` | First USPS scans detected for the campaign |
+| `campaign.mail_tracking.out_for_delivery` | ≥51% of campaign pieces at destination facility |
 | `campaign.mail_tracking.delivered` | ≥80% of campaign pieces delivered |
 | `campaign.mail_tracking.rts_update` | Return-to-sender pieces found (includes addresses for suppression) |
 | `campaign.mail_tracking.stalled` | No scans in 72+ hours with pieces still in transit |
@@ -1063,30 +1079,32 @@ CORS is configured per-partner. Provide your production domain (e.g., `your-app.
 An order has two parallel status tracks. They are independent — USPS never overwrites production status, and vice versa.
 
 ```
-                    YOUR API CALL                       BALLPOINT PRODUCTION                               USPS SCANS
-                    ─────────────                       ────────────────────                               ──────────
+              YOUR API CALL                             BALLPOINT PRODUCTION                                                            USPS SCANS
+              ─────────────                             ────────────────────                                                            ──────────
 
-                 POST /v1/billing/orders
-                          │
-                          ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                                                                                                      │
-│  ┌────────┐  ┌──────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐                     │
-│  │accepted│─►│ prep │─►│printing│─►│writing │─►│inserting│─►│stamping│─►│shipping│─►│complete│                     │
-│  └────────┘  └──────┘  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘  └────────┘                     │
-│       │                                                                                  │                          │
-│       │ PATCH /status                                                                    │ 1-2 days                 │
-│       ▼                                                                                  ▼                          │
-│  ┌──────────┐                                              ┌─────────┐   ┌───────────┐   ┌──────────┐              │
-│  │cancelled │                                              │ shipped │──►│out_for_   │──►│delivered │              │
-│  └──────────┘                                              │         │   │delivery   │   │          │              │
-│                                                            └─────────┘   └───────────┘   └──────────┘              │
-│                                                                                                                      │
-└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+           POST /v1/billing/orders
+                    │
+                    ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                                                │
+│  ┌───────────┐  ┌────────┐  ┌──────┐  ┌────────┐  ┌────────┐  ┌─────────┐  ┌────────┐  ┌────────┐  ┌────────┐                                 │
+│  │[scheduled]│─►│accepted│─►│ prep │─►│printing│─►│writing │─►│inserting│─►│stamping│─►│shipping│─►│complete│                                 │
+│  └───────────┘  └────────┘  └──────┘  └────────┘  └────────┘  └─────────┘  └────────┘  └────────┘  └────────┘                                 │
+│                      │                                                                                  │                                      │
+│                      │ PATCH /status                                                                    │ 1-2 days                             │
+│                      ▼                                                                                  ▼                                      │
+│                 ┌──────────┐                                                  ┌─────────┐   ┌───────────┐   ┌──────────┐                       │
+│                 │cancelled │                                                  │ shipped │──►│out_for_   │──►│delivered │                       │
+│                 └──────────┘                                                  │         │   │delivery   │   │          │                       │
+│                                                                               └─────────┘   └───────────┘   └──────────┘                       │
+│                                                                                                                                                │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
     PRODUCTION TRACK (top)                                    USPS TRACK (bottom)
     Set by Ballpoint staff                                    Set automatically by scan pipeline
-    Forward-only (8 stages)                                   Forward-only, starts 1-2 days after "complete"
+    Forward-only                                              Forward-only, starts 1-2 days after "complete"
+    [scheduled] only for future-dated orders;                 Plus terminal `failed` for unrecoverable errors
+    send-now orders start at `accepted`
 ```
 
 **Not all products go through every step.** See [production sequences](#production-status-lifecycle) for which steps apply to each product type.
