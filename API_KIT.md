@@ -1111,6 +1111,30 @@ An order has two parallel status tracks. They are independent — USPS never ove
 
 **Display status** = USPS status when available, otherwise production status. This is the single field you should show to end users — it's returned as `display_status` in API responses and webhooks.
 
+### Partner-Billed Variant (Payment Gate)
+
+Accounts where `requires_payment_confirmation = TRUE` (e.g. PropStream) take a slightly different entry path: the order is created without an immediate balance debit and waits on `POST /v1/billing/orders/{id}/confirm-payment`.
+
+```
+POST /orders (partner-billed)
+       │
+       ├── send-now ──────────► pending_payment ──/confirm-payment success──► accepted ──► prep ──► … ──► complete
+       │                              │
+       │                              └─/confirm-payment failed─► payment_failed (terminal)
+       │
+       └── future mail_date ──► scheduled, payment_confirmed=FALSE
+                                       │
+                                       ├── /confirm-payment success ──► payment_confirmed=TRUE, stays scheduled,
+                                       │                                cron advances on production date
+                                       │
+                                       ├── /confirm-payment failed   ──► payment_failed (terminal)
+                                       │
+                                       └── production date passes
+                                           with no /confirm-payment   ──► payment_failed (terminal, no debit)
+```
+
+Wholesale charge runs on `/confirm-payment success` (same `charge_order` flow used for direct accounts at creation time). Cancelling from `pending_payment` or `payment_failed` is free — no debit ever happened. Cancelling from `accepted` (or `scheduled` after a successful confirmation) still triggers the auto-refund. See `INTEGRATION.md` *Partner Payment Gate* for the full endpoint contract.
+
 ---
 
 ## 10. Error Handling
