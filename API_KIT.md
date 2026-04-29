@@ -813,10 +813,13 @@ When an order's status changes, we send an `order.status_changed` event:
     "product_type": "4x6_printed",
     "source": "your_source",
     "external_account_id": "acct_partner",
-    "external_user_id": "user_789"
+    "external_user_id": "user_789",
+    "list_id": "marketing_q1_2026"
   }
 }
 ```
+
+`list_id` echoes back verbatim the value you originally passed when creating the order (or `null` for orders not created via the partner endpoint). Use it as the join key on your side for reconciliation.
 
 ### Webhook Headers
 
