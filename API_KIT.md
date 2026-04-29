@@ -60,6 +60,7 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
    - [6g. Cancel Order](#6g-cancel-order)
    - [6h. Idempotency](#6h-idempotency)
    - [6i. User Attribution (X-External-User-ID)](#6i-user-attribution)
+   - [6j. Per-end-user attribution (external_user_metadata)](#6j-per-end-user-attribution-external_user_metadata)
 7. [Status Updates via Webhooks](#7-status-updates-via-webhooks)
 8. [Real-Time UI via SSE (Optional)](#8-real-time-ui-via-sse-optional)
 9. [Order Lifecycle Diagram](#9-order-lifecycle-diagram)
@@ -711,6 +712,71 @@ This ID:
 - Routes tracking data back to the correct user's dashboard
 
 This is optional but recommended — it lets you show each platform user only their own orders and track per-user activity.
+
+### 6j. Per-end-user attribution (`external_user_metadata`)
+
+For partners that need to attribute orders to richer end-user records (display name, plan tier, internal billing id, etc.) without making a separate lookup, pass `external_user_metadata` at order creation:
+
+```json
+POST /v1/billing/orders
+{
+  "campaign_id": "camp_2025_q1",
+  "product_type": "4x6_printed",
+  "postage_type": "first_class",
+  "piece_count": 250,
+  "external_user_id": "user_789",
+  "external_user_metadata": {
+    "display_name": "Alice Cooper",
+    "internal_user_id": "u_42",
+    "plan": "pro",
+    "team_id": "t_17"
+  }
+}
+```
+
+We do not read or interpret the contents. Whatever you send is echoed verbatim on every `order.status_changed` webhook for that order, so you can reconcile to your own per-end-user records without an additional API call.
+
+**Limits (validated at the API boundary):**
+
+| Limit | Value |
+|---|---|
+| Max top-level keys | 8 |
+| Key character set | `A-Z a-z 0-9 _ . -` |
+| Max key length | 64 chars |
+| Max value length | 256 chars (after string conversion) |
+| Nested objects/arrays | Not allowed (flat dict only) |
+| Max total size | 2,048 bytes (compact JSON) |
+
+Validator violations return `422 Unprocessable Entity` with a descriptive error message.
+
+**Lifecycle:**
+
+- Captured **only at order creation** — represents the end-user who placed the order. Subsequent `PATCH /orders/{id}` calls cannot mutate it.
+- Echoed on every `order.status_changed` event (covers status changes, cancel, complete, payment_failed).
+- Subject to the same retention window as recipient PII — when an order ages past the partner-controlled retention threshold, this field is scrubbed from our storage automatically.
+
+**Sample webhook payload with the field present:**
+
+```json
+{
+  "type": "order.status_changed",
+  "data": {
+    "order_id": "ord_7f3a2b",
+    "campaign_id": "camp_2025_q1",
+    "previous_production_status": "accepted",
+    "production_status": "printing",
+    "external_user_id": "user_789",
+    "external_user_metadata": {
+      "display_name": "Alice Cooper",
+      "internal_user_id": "u_42",
+      "plan": "pro",
+      "team_id": "t_17"
+    }
+  }
+}
+```
+
+If you didn't send the field at creation, it is omitted from the payload (or set to `null`).
 
 ---
 
