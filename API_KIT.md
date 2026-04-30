@@ -792,6 +792,21 @@ For accounts where Ballpoint waits for the partner to debit the end-user before 
 - `/confirm-payment` is a **server-to-server** call by integration contract. It must be issued from the partner backend after the partner has confirmed the payment outcome with its payment provider. The customer browser must **not** call this endpoint directly — the partner key would be exposed.
 - Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. Before charging the end-user, the partner backend must call `GET /v1/billing/partner/orders` and use the server-side amount as the billing source of truth. Browser-provided values must never be treated as authoritative.
 
+**User-flow timing**
+
+Where this call sits in the end-user journey for an iframe-driven order:
+
+1. iframe loads. Parent app sends `set_api_config` + `set_list`.
+2. End-user customizes the campaign and clicks Submit.
+3. iframe calls `POST /v1/billing/partner/orders`. Ballpoint creates the order in `pending_payment` (no charge yet).
+4. iframe emits `campaign_submitted` to the parent (carries `ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger to start the payment popup.
+5. Partner backend refetches the authoritative amount from `GET /v1/billing/partner/orders` before charging.
+6. Partner shows the payment popup; end-user pays via the partner's payment provider.
+7. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
+8. On success, Ballpoint debits the partner balance and moves the order from `pending_payment` to `accepted`. Production proceeds.
+
+After step 4, the iframe lifecycle and the payment lifecycle run in parallel: the iframe may emit `campaign_complete` / `done` once its own submission flow finishes, independent of the payment popup. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
+
 **Endpoint**
 
 ```
