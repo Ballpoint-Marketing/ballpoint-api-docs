@@ -61,7 +61,9 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
    - [6h. Idempotency](#6h-idempotency)
    - [6i. User Attribution (X-External-User-ID)](#6i-user-attribution)
    - [6j. Per-end-user attribution (external_user_metadata)](#6j-per-end-user-attribution-external_user_metadata)
+   - [6k. Confirm Payment (Partner Payment Gate)](#6k-confirm-payment-partner-payment-gate)
 7. [Status Updates via Webhooks](#7-status-updates-via-webhooks)
+   - [Per-piece RTS Push-Back (V1)](#per-piece-rts-push-back-v1)
 8. [Real-Time UI via SSE (Optional)](#8-real-time-ui-via-sse-optional)
 9. [Order Lifecycle Diagram](#9-order-lifecycle-diagram)
 10. [Error Handling](#10-error-handling)
@@ -780,9 +782,121 @@ If you didn't send the field at creation, it is omitted from the payload (or set
 
 ---
 
+### 6k. Confirm Payment (Partner Payment Gate)
+
+For accounts where Ballpoint waits for the partner to debit the end-user before producing the order (currently PropStream — flagged via `accounts.requires_payment_confirmation = TRUE`), use this endpoint to report the result of the end-user payment attempt.
+
+**Security boundary**
+
+- The end-user payment is captured **on the partner side** using the partner's own payment provider. Ballpoint never sees card data, payment-method data, or any PCI-relevant payload.
+- `/confirm-payment` is a **server-to-server** call by integration contract. It must be issued from the partner backend after the partner has confirmed the payment outcome with its payment provider. The customer browser must **not** call this endpoint directly — the partner key would be exposed.
+- Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. Before charging the end-user, the partner backend must call `GET /v1/billing/partner/orders` and use the server-side amount as the billing source of truth. Browser-provided values must never be treated as authoritative.
+
+**Endpoint**
+
+```
+POST /v1/billing/orders/{order_id}/confirm-payment
+X-Partner-Key: pk_live_...
+Content-Type: application/json
+```
+
+**Request body — success**
+
+```json
+{
+  "status": "success",
+  "payment_date": "2026-04-27T15:30:00Z",
+  "transaction_id": "ps_txn_8f2a1d",
+  "amount_charged_to_user_cents": 12500
+}
+```
+
+**Request body — failed**
+
+```json
+{
+  "status": "failed",
+  "transaction_id": "ps_txn_8f2a1d",
+  "failure_reason": "card declined",
+  "failure_code": "CARD_DECLINED"
+}
+```
+
+**Fields**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `status` | string | yes | `"success"` or `"failed"`. |
+| `payment_date` | string | no | ISO 8601 timestamp of the partner-side debit. Audit only. |
+| `transaction_id` | string | no | Partner-side transaction id. Used for audit and idempotency dedup. Stored verbatim. |
+| `amount_charged_to_user_cents` | integer | no | What the partner charged the end-user, in cents. Audit only — Ballpoint does not validate this against the wholesale price. |
+| `failure_reason` | string | yes (when `status:failed`) | Free-form description stored on the order for audit. |
+| `failure_code` | string | no | Optional partner-side code (e.g. `CARD_DECLINED`). |
+
+**Behavior**
+
+- **`status:success`** — wholesale charge runs (debits the partner balance), `payment_confirmed` flips to `TRUE`. Send-now orders advance from `pending_payment` to `accepted`. Scheduled orders stay `scheduled` until the production date hits.
+- **`status:failed`** — order moves to `payment_failed` (terminal) and `failure_reason` is stored. No partner balance debit happens.
+- **Idempotency** — repeating the same status is a no-op (last call wins for `transaction_id` and `failure_reason`). Repeating with the **opposite** status is rejected with `409` — payment outcome is unidirectional once recorded.
+- **Cancelled orders** — calling `/confirm-payment` against a cancelled order returns `409 ORDER_CANCELLED`.
+- **Late confirmation** — if the order's `scheduled_production_date` passes without a `success` call, a Ballpoint cron flips it to `payment_failed` automatically. A subsequent `/confirm-payment` returns `409 PAYMENT_ALREADY_FAILED`.
+- **No-gate accounts** — calling `/confirm-payment` against an account where `requires_payment_confirmation = FALSE` returns `409 PAYMENT_GATE_NOT_ACTIVE` (the order was already debited at creation).
+- **Tenant isolation** — orders owned by a different account return `404 ORDER_NOT_FOUND`. Never `403`, to avoid leaking which order ids exist on other accounts.
+
+**Response — success**
+
+```json
+{
+  "order_id": "ord_7f3a2b",
+  "status": "success",
+  "previous_status": "pending_payment",
+  "production_status": "accepted",
+  "payment_confirmed": true,
+  "billing": {
+    "charged": true,
+    "amount_cents": 12300,
+    "total_tcents": 123000,
+    "balance_after_cents": 4500000,
+    "billing_mode": "stripe",
+    "transaction_id": "txn_a1b2c3"
+  },
+  "idempotent": false
+}
+```
+
+`billing.amount_cents` is the wholesale amount Ballpoint debited from the partner balance — this is the value carried on the cancellation webhook as `ballpoint_billed_amount_tcents` if the order is later cancelled. It is **not** the same as `amount_charged_to_user_cents`, which is what the partner billed the end-user.
+
+**Response — failed**
+
+```json
+{
+  "order_id": "ord_7f3a2b",
+  "status": "failed",
+  "previous_status": "pending_payment",
+  "production_status": "payment_failed",
+  "payment_confirmed": false,
+  "failure_reason": "card declined",
+  "idempotent": false
+}
+```
+
+**Retry & finalization (V1)**
+
+Payment retry logic lives **on the partner side**. Ballpoint does not retry the partner debit and only records the final outcome.
+
+- Handle retries internally with the partner payment provider. Only call `/confirm-payment` with the **final** outcome.
+- Current operating policy: 3 retries same-day on the partner side, no delivery-date push.
+- Multi-send drops: if a drop fails, pause subsequent drops on the partner side (stop calling `/confirm-payment` for downstream drops).
+- Once an order is in `payment_failed`, it stays there. To reschedule, submit a **new** order via `POST /orders` with the new `mail_date` — the failed order remains in `payment_failed` for audit.
+- If the partner is still retrying with the end-user, **do not** send `status:failed` yet — only send it when payment is truly terminal.
+
+---
+
 ## 7. Status Updates via Webhooks
 
 > **Ballpoint delivers webhooks at least once. Your integration must handle duplicates, delays, and out-of-order delivery.**
+
+> Ballpoint emits two webhook event families: `order.status_changed` (this section, lifecycle of every order) and the per-piece RTS push-back (see [§7b](#7b-per-piece-rts-push-back-v1) below — V1 contract documented; live emission shipping in a future release).
 
 ### Registration
 
@@ -1093,6 +1207,38 @@ Events are guaranteed to be delivered. If your endpoint is down, we retry with e
 
 ---
 
+### Per-piece RTS Push-Back (V1)
+
+When the USPS scan pipeline detects a returned-to-sender piece, Ballpoint emits a per-piece RTS event server-to-server so the partner can reconcile each undeliverable mailing piece against its CRM contact directly.
+
+> **Status:** V1 contract is finalized as documented below. Live emission to the partner endpoint is scheduled for a future release; we will notify the partner before enabling delivery.
+
+**Delivery**
+
+- HTTP `POST` to the partner-registered webhook endpoint (same endpoint configured at onboarding for `order.status_changed`).
+- HMAC-signed using the same scheme as `order.status_changed` (see [Signature Verification](#signature-verification)).
+- Server-to-server only.
+
+**Batch limits**
+
+- Max **10,000 entries** per call.
+
+**Per entry**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `contact_id` | string | yes | The same `contact_id` the partner supplied in the original `POST /v1/billing/orders/{id}/recipients` upload. Echoed verbatim. |
+| `reason` | string | yes | Return-to-sender reason (e.g. `vacant`, `moved_no_forwarding`, `insufficient_address`). |
+| `last_scan_date` | string | yes | ISO 8601 date of the last scan associated with the returned piece. |
+
+**Notes**
+
+- `name`, `address`, `city`, `state`, `zip` are **not** included in the V1 payload. Reconciliation is by `contact_id` only.
+- Every recipient that should be eligible for RTS push-back must include `contact_id` in the original `/recipients` upload. Ballpoint persists the value verbatim and echoes it back unchanged on the RTS event.
+- This event is distinct from `order.status_changed`. The two events use the same delivery channel but carry different payloads.
+
+---
+
 ## 8. Real-Time UI via SSE (Optional)
 
 If you're embedding order status in an iframe or dashboard, SSE gives instant updates without polling. **Webhooks are the primary integration path** — SSE is for display only.
@@ -1202,7 +1348,7 @@ POST /orders (partner-billed)
                                            with no /confirm-payment   ──► payment_failed (terminal, no debit)
 ```
 
-Wholesale charge runs on `/confirm-payment success` (same `charge_order` flow used for direct accounts at creation time). Cancelling from `pending_payment` or `payment_failed` is free — no debit ever happened. Cancelling from `accepted` (or `scheduled` after a successful confirmation) still triggers the auto-refund. See `INTEGRATION.md` *Partner Payment Gate* for the full endpoint contract.
+Wholesale charge runs on `/confirm-payment success` (same `charge_order` flow used for direct accounts at creation time). Cancelling from `pending_payment` or `payment_failed` is free — no debit ever happened. Cancelling from `accepted` (or `scheduled` after a successful confirmation) still triggers the auto-refund. See [§6k. Confirm Payment](#6k-confirm-payment-partner-payment-gate) for the full endpoint contract.
 
 ---
 
