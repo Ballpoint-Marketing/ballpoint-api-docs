@@ -3,12 +3,11 @@ info:
   title: Ballpoint Marketing API
   version: 3.1.0
   description: "Direct mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\
-    \nThree authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://api.ballpointmarketing.com/v1/orders \\\n  -H \
+    \nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://api.ballpointmarketing.com/v1/orders \\\n  -H \
     \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://api.ballpointmarketing.com/v1/orders \\\n  -H \
-    \"X-Partner-Key: pk_live_abc123\"\n```\n\n### API Key (internal dashboard)\n```bash\ncurl https://api.ballpointmarketing.com/v1/orders \\\n  -H \
-    \"X-API-Key: sk_internal_abc123\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n\
+    \"X-Partner-Key: pk_live_abc123\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n\
     | `test` | Bearer JWT | Sandbox only, no real mail |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id\
-    \ |\n| `internal_dashboard` | X-API-Key | Cross-tenant access with restrictions |\n\n## Integration Identity\n\
+    \ |\n\n## Integration Identity\n\
     \nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within\
     \ tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nAll errors return a consistent envelope\
     \ with trace ID for debugging:\n\n```json\n{\n  \"error\": {\n    \"type\": \"validation_error\",\n    \"code\": \"INVALID_ADDRESS\"\
@@ -53,8 +52,6 @@ tags:
   description: Testing and integration validation
 - name: Mail Tracking
   description: USPS mail tracking — campaign summary, piece-level status, scan events, RTS suppression
-- name: Mail Tracking Internal
-  description: Internal endpoints — ingest, status, health (internal_dashboard principal only)
 components:
   securitySchemes:
     bearerAuth:
@@ -65,15 +62,6 @@ components:
         JWT token for live/test principals. Obtain from the Ballpoint dashboard.
         ```
         Authorization: Bearer eyJhbG...
-        ```
-    apiKeyAuth:
-      type: apiKey
-      in: header
-      name: X-API-Key
-      description: |
-        Internal dashboard API key. Cross-tenant access for Ballpoint operations.
-        ```
-        X-API-Key: sk_internal_...
         ```
     partnerKeyAuth:
       type: apiKey
@@ -217,9 +205,7 @@ components:
     AmbiguousLookup:
       allOf:
       - $ref: '#/components/schemas/Error'
-      description: 'Returned when internal_dashboard principal looks up by external_id
-
-        without specifying external_account_id.
+      description: 'Returned when a lookup by external_id is ambiguous without external_account_id.
 
 
         **Resolution**: Include external_account_id in query.
@@ -776,86 +762,6 @@ components:
         recipient_zip:
           type: string
           nullable: true
-    IngestJobStatus:
-      type: object
-      description: Ingest job tracking status.
-      properties:
-        job_id:
-          type: string
-        job_type:
-          type: string
-          enum:
-          - scan
-          - manifest
-        status:
-          type: string
-          enum:
-          - pending
-          - processing
-          - completed
-          - failed
-          - dead_letter
-        rows_total:
-          type: integer
-        rows_processed:
-          type: integer
-        rows_rejected:
-          type: integer
-        campaigns_affected:
-          type: integer
-        attempts:
-          type: integer
-        error_message:
-          type: string
-          nullable: true
-    OperationalStatus:
-      type: object
-      description: Full operational status — internal only.
-      properties:
-        status:
-          type: string
-          enum:
-          - healthy
-          - degraded
-          - stale
-        db_connected:
-          type: boolean
-        last_sftp_pull_at:
-          type: string
-          format: date-time
-          nullable: true
-        last_ingest_completed_at:
-          type: string
-          format: date-time
-          nullable: true
-        events_ingested_24h:
-          type: integer
-        pending_jobs:
-          type: integer
-        failed_jobs_24h:
-          type: integer
-        campaigns_tracked:
-          type: integer
-        pieces_tracked:
-          type: integer
-        api_version:
-          type: string
-        status_version:
-          type: string
-        iv_parser_version:
-          type: string
-    Liveness:
-      type: object
-      properties:
-        status:
-          type: string
-          enum:
-          - ok
-          - degraded
-        db_connected:
-          type: boolean
-        uptime_seconds:
-          type: number
     RateLimitError:
       type: object
       description: Returned when request rate exceeds limit. Check Retry-After header.
@@ -875,50 +781,6 @@ components:
               type: string
             trace_id:
               type: string
-    BackpressureError:
-      type: object
-      description: Returned when ingest queue exceeds MAX_PENDING_JOBS. Retry later.
-      properties:
-        error:
-          type: object
-          properties:
-            type:
-              type: string
-              example: backpressure_error
-            code:
-              type: string
-              example: QUEUE_FULL
-            pending_jobs:
-              type: integer
-            trace_id:
-              type: string
-    RetentionResult:
-      type: object
-      description: Result of retention / vacuum job.
-      properties:
-        status:
-          type: string
-          example: completed
-        dry_run:
-          type: boolean
-        scan_events_deleted:
-          type: integer
-        pii_redacted:
-          type: integer
-        idempotency_keys_purged:
-          type: integer
-        dead_letter_jobs_purged:
-          type: integer
-        webhook_deliveries_purged:
-          type: integer
-        analyze_ran:
-          type: boolean
-        started_at:
-          type: string
-          format: date-time
-        completed_at:
-          type: string
-          format: date-time
     WebhookEndpoint:
       type: object
       description: Registered webhook endpoint with auto-disable tracking.
@@ -974,7 +836,6 @@ components:
           format: date-time
 security:
 - bearerAuth: []
-- apiKeyAuth: []
 - partnerKeyAuth: []
 paths:
   /v1/orders:
@@ -1734,146 +1595,6 @@ paths:
               $ref: '#/components/headers/Retry-After'
             X-RateLimit-Remaining:
               $ref: '#/components/headers/X-RateLimit-Remaining'
-  /v1/mail-tracking/health:
-    get:
-      tags:
-      - Mail Tracking Internal
-      summary: Liveness check (always 200)
-      operationId: healthCheck
-      responses:
-        '200':
-          description: Process alive
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Liveness'
-  /v1/mail-tracking/ready:
-    get:
-      tags:
-      - Mail Tracking Internal
-      summary: Readiness check (DB probe with 200ms timeout)
-      operationId: readinessCheck
-      responses:
-        '200':
-          description: DB reachable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Liveness'
-  /v1/mail-tracking/status:
-    get:
-      tags:
-      - Mail Tracking Internal
-      summary: Operational status
-      operationId: getOperationalStatus
-      responses:
-        '200':
-          description: Full operational status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OperationalStatus'
-  /v1/mail-tracking/ingest:
-    post:
-      tags:
-      - Mail Tracking Internal
-      summary: Submit scan data for ingestion
-      operationId: ingestScanBatch
-      description: 'Mode 1: JSON file reference. Mode 2: HTTP upload (max 10MB, supports gzip Content-Encoding).'
-      responses:
-        '200':
-          description: Job created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IngestJobStatus'
-        '503':
-          description: Queue full (backpressure)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BackpressureError'
-        '429':
-          description: Ingest rate limit exceeded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RateLimitError'
-          headers:
-            Retry-After:
-              $ref: '#/components/headers/Retry-After'
-  /v1/mail-tracking/manifest:
-    post:
-      tags:
-      - Mail Tracking Internal
-      summary: Upload Accuzip manifest
-      operationId: uploadManifest
-      description: 'Mode 1: JSON file ref. Mode 2: Raw HTTP upload. Mode 3: Browser multipart/form-data.'
-      responses:
-        '200':
-          description: Job created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IngestJobStatus'
-        '503':
-          description: Queue full (backpressure)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BackpressureError'
-        '429':
-          description: Ingest rate limit exceeded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RateLimitError'
-          headers:
-            Retry-After:
-              $ref: '#/components/headers/Retry-After'
-  /v1/mail-tracking/ingest/{job_id}:
-    get:
-      tags:
-      - Mail Tracking Internal
-      summary: Get ingest job status
-      operationId: getIngestJobStatus
-      parameters:
-      - name: job_id
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Job status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IngestJobStatus'
-  /v1/mail-tracking/retention:
-    post:
-      tags:
-      - Mail Tracking Internal
-      summary: Run retention / vacuum job
-      operationId: triggerRetention
-      description: Delete old scan events, redact PII, purge expired keys and dead-letter jobs, clean webhook delivery logs,
-        ANALYZE hot tables. Pass dry_run=true to preview without modifying data.
-      parameters:
-      - name: dry_run
-        in: query
-        schema:
-          type: boolean
-          default: false
-      responses:
-        '200':
-          description: Retention complete
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RetentionResult'
-        '403':
-          description: Requires internal_dashboard principal
-
   /v1/billing/orders/{order_id}/sse-token:
     post:
       tags:
