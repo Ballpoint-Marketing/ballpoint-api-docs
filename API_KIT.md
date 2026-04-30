@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.2 · April 2026**
+> **v1.2.1 · April 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -170,21 +170,30 @@ Partner sends order via POST /orders with their own recipient data
 
 ## 3. How Billing Works
 
-Your account (`acct_partner`) uses `billing_mode: none`. This means:
+Ballpoint supports two partner billing models, set per-account during onboarding.
 
-- **All orders succeed immediately** — no balance checks, no upfront charges
-- **Ballpoint invoices separately** — after orders are marked `complete`, Ballpoint sends an invoice for review
-- **Partner audits and pays** — payment happens outside the API, on your schedule
+### Standard invoiced partners (`billing_mode: none`)
 
-This billing mode applies to both your test key and live key. There are no changes needed when you go to production — the only difference between test and live is that live orders trigger real fulfillment and real mail.
+Orders are accepted immediately on `POST /orders` — no balance check, no upfront charge. Ballpoint invoices separately after orders are marked `complete`; payment happens outside the API on the partner's audit cycle. This is the default for new partners.
+
+### Partner-billed / payment-gated partners (`requires_payment_confirmation = TRUE`)
+
+For partners who collect the end-user payment on their side (for example, PropStream), orders are created without starting production until payment is confirmed. Send-now orders enter `pending_payment`; future-dated orders remain `scheduled` with `payment_confirmed = false`. The end-user pays through the partner's payment provider; the partner's backend then calls `/confirm-payment` to flip the order into the production lifecycle.
+
+Ballpoint never receives card or payment-method data. The partner key required for `/confirm-payment` must stay server-side.
+
+For the full endpoint contract, see [§6k Confirm Payment](#6k-confirm-payment-partner-payment-gate).
 
 ### Pricing
 
-Cost = `unit_price_tcents × piece_count`. No minimums, no surcharges, no per-request fees. See [Product Catalog & Pricing](#5-product-catalog--pricing) for the full price list.
+Cost = `unit_price_tcents × piece_count`. No minimums, no surcharges, no per-request fees. See [§5 Product Catalog & Pricing](#5-product-catalog--pricing) for the full price list.
 
 ### Cancellations
 
-Cancelling an order (from `scheduled` or `accepted` status only — before production prep begins) removes it from the fulfillment queue. Since there is no upfront charge, there is no refund to process — the cancelled order simply won't appear on your next invoice.
+Cancelling an order before production `prep` begins removes it from the fulfillment queue.
+
+- *Invoiced partners*: no upfront charge means no refund — the cancelled order simply won't appear on the next invoice.
+- *Payment-gated partners*: cancelling from `pending_payment` or `payment_failed` is free (no debit ever happened). Cancelling from `accepted` (after `/confirm-payment success`) auto-refunds the partner-balance debit.
 
 ---
 
@@ -388,7 +397,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/preview \
 
 The preview runs the same limit checks as real order creation but reports results as warnings. If `limits.passed` is `false`, the real order would fail — show the user why before they submit.
 
-> **Note:** Your account uses `billing_mode: none`, so `balance_cents` is `null` and balance checks always pass. The preview still validates product type, postage, and piece count.
+> **Note:** For accounts with `billing_mode: none`, `balance_cents` is `null` and balance checks always pass. The preview still validates product type, postage, and piece count.
 
 ---
 
@@ -678,7 +687,7 @@ curl -X PATCH https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/st
 }
 ```
 
-**Note:** Since your account uses `billing_mode: none`, cancelling an order simply removes it from the fulfillment queue. The `refund` field will be `null` — there is no charge to reverse.
+**Note:** Cancellation behavior depends on the account's billing model. For invoiced partners (`billing_mode: none`), the `refund` field will be `null` — there is no charge to reverse, and the cancelled order won't appear on the next invoice. For payment-gated partners, cancelling from `pending_payment` or `payment_failed` is free (no debit happened); cancelling from `accepted` (after `/confirm-payment success`) auto-refunds the partner-balance debit.
 
 Once an order moves to `prep` or beyond, it cannot be cancelled — staff time and (later) materials are being spent on the order. Contact Ballpoint support for production-stage issues.
 
@@ -1405,7 +1414,7 @@ Use `error_code` for programmatic handling. Use `message` for logging/display.
 | `202` | Order accepted | — | — |
 | `400` | Bad request (malformed JSON, missing fields) | **No** | Fix your request payload |
 | `401` | Authentication failed | **No** | Check your API key |
-| `402` | Insufficient balance or spending limit hit | **No** | **Does not apply to your account** (`billing_mode: none`) |
+| `402` | Insufficient balance or spending limit hit | **No** | Applies only to accounts with prepaid balance or spending-limit enforcement; `billing_mode: none` accounts always pass balance checks |
 | `403` | Account suspended | **No** | Contact Ballpoint |
 | `404` | Resource not found | **No** | Check the ID |
 | `409` | Conflict (idempotency key reuse with different body) | **No** | Use a new idempotency key |

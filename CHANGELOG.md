@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.1 — 2026-04-29
+
+- **API Kit §3 (How Billing Works) restructured** to document Ballpoint's two partner billing models side-by-side: standard invoiced partners (`billing_mode: none`) and partner-billed / payment-gated partners (`requires_payment_confirmation = TRUE`). Removes prior wording that assumed every reader was on `billing_mode: none`, which contradicted §6k Confirm Payment for payment-gated accounts.
+- **API Kit §3 Cancellations** updated to differentiate refund behavior between invoiced and payment-gated partners.
+- **API Kit §6a (Preview)** note generalized: "For accounts with `billing_mode: none`, `balance_cents` is null" instead of presuming the reader's account.
+- **API Kit §6g (Cancel Order)** note expanded to describe cancellation behavior for both billing models, including the auto-refund behavior on payment-gated `accepted` orders.
+- **API Kit §10 (Error Handling)** `402` row clarified: applies only to accounts with prepaid balance or spending-limit enforcement; `billing_mode: none` accounts always pass balance checks.
+
 ## v1.2.0 — 2026-04-29
 
 - **New: [IFRAME_KIT.md](IFRAME_KIT.md)** — partner-facing iframe integration guide moved into the public docs repo so partners can track the latest version directly. Covers embed, bootstrap, parent ↔ iframe message contracts, recipient upload flow, URL parameters, and security notes.
