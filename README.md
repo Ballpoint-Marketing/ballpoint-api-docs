@@ -10,9 +10,11 @@ Everything you need to integrate with the Ballpoint Marketing direct mail API: o
 
 | Resource | Description |
 |----------|-------------|
-| [API Integration Kit](API_KIT.md) | Full integration guide: auth, endpoints, webhooks, error handling |
+| [API Integration Kit](API_KIT.md) | Full integration guide: auth, endpoints, webhooks, error handling, partner payment gate |
+| [Iframe Integration Kit](IFRAME_KIT.md) | Embedded iframe pattern: bootstrap, message contracts, recipient upload, partner payment gate flow |
 | [OpenAPI Spec](docs/ballpoint-api-spec-v2.yaml) | Machine-readable API specification (import into Postman, Swagger UI, etc.) |
 | [Quick Start Guide](START_HERE.md) | Step-by-step first-order walkthrough |
+| [Changelog](CHANGELOG.md) | Revision history for the integration kits |
 
 ## Examples
 

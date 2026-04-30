@@ -1,9 +1,11 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.1 · March 2026**
+> **v1.2 · April 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
+>
+> See [CHANGELOG.md](CHANGELOG.md) for revision history. For the embedded iframe pattern, see [IFRAME_KIT.md](IFRAME_KIT.md).
 
 ---
 
@@ -229,6 +231,8 @@ Your platform embeds a Ballpoint iframe. Your users select recipients in your pl
 SSE requires cookie auth with `withCredentials: true`. The iframe must be served over HTTPS. CORS is configured per-partner — provide your production domain during onboarding.
 
 Webhooks remain the backend source of truth — SSE is for browser-side real-time display only.
+
+For the full iframe integration contract — embed setup, parent ↔ iframe message contracts, recipient upload flow, partner payment gate walkthrough — see [IFRAME_KIT.md](IFRAME_KIT.md).
 
 ---
 

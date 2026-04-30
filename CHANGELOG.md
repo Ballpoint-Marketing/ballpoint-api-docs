@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.0 — 2026-04-29
+
+- **New: [IFRAME_KIT.md](IFRAME_KIT.md)** — partner-facing iframe integration guide moved into the public docs repo so partners can track the latest version directly. Covers embed, bootstrap, parent ↔ iframe message contracts, recipient upload flow, URL parameters, and security notes.
+- **API Kit §6j — Per-end-user attribution (`external_user_metadata`)** — opaque dict passed at order creation, echoed verbatim on every `order.status_changed` webhook. Limits: max 8 keys, 64-char keys, 256-char values, no nested structures, ≤2KB total. Subject to the partner-controlled retention window (same as recipient PII).
+- **API Kit webhooks — `list_id` verbatim echo** — every `order.status_changed` payload now carries the `list_id` the partner originally passed at order creation, removing the need to derive it from the internal campaign id format.
+- **API Kit §6k — Confirm Payment (Partner Payment Gate)** — full `/confirm-payment` endpoint contract inlined: request/response schemas, field tables, idempotency rules, error codes (`PAYMENT_ALREADY_CONFIRMED`, `PAYMENT_ALREADY_FAILED`, `PAYMENT_GATE_NOT_ACTIVE`, `ORDER_CANCELLED`, tenant-isolation 404), security boundary (server-to-server only, no card data on Ballpoint side, browser pricing is UX/display-only), retry/finalization V1 (partner-determined billing policy, Ballpoint receives only the final outcome).
+- **API Kit §6k user-flow timing subsection** — 10-step end-to-end walkthrough showing where each iframe event (`campaign_created`, `campaign_submitted`, `campaign_complete`) and API call (`POST /orders`, `/confirm-payment`, `GET /partner/orders`) fits in the user journey for an iframe-driven partner-billed order, including the iframe-vs-payment lifecycle parallelism note.
+- **API Kit webhooks — RTS Push-Back V1** — per-piece return-to-sender event documented as a dedicated server-to-server webhook. Cap 10K entries per call. Per-entry payload: `contact_id` + `reason` + `last_scan_date` (no name/address fields in V1). Reconciliation is by `contact_id` only; partners must populate `contact_id` on every eligible recipient at upload.
+- **Iframe Kit — Partner Payment Gate Flow** — companion section to API Kit §6k giving the same 10-step walkthrough from the iframe-integration angle.
+- **Iframe Kit — `campaign_submitted` field table** — expanded with `listId`, `listName`, `externalAccountId`, `externalUserId`, `mailDate`, `productIds` rows. `total_dollars` is explicitly marked UX/display only, with a pointer to refetch the authoritative amount from `GET /v1/billing/partner/orders` before charging the end-user.
+- **Iframe Kit — `contact_id` requirement** — `contact_id` description on the `/recipients` upload now notes the V1 RTS push-back dependency: partners using the RTS push-back must populate `contact_id` on every recipient.
+
 ## v1.1.0 — 2026-03-10
 
 - **Production pipeline updated to 8 stages**: added `prep` (data formatting) and `shipping` (manifest/labeling) stages
