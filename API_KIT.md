@@ -797,15 +797,19 @@ For accounts where Ballpoint waits for the partner to debit the end-user before 
 Where this call sits in the end-user journey for an iframe-driven order:
 
 1. iframe loads. Parent app sends `set_api_config` + `set_list`.
-2. End-user customizes the campaign and clicks Submit.
-3. iframe calls `POST /v1/billing/partner/orders`. Ballpoint creates the order in `pending_payment` (no charge yet).
-4. iframe emits `campaign_submitted` to the parent (carries `ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger to start the payment popup.
-5. Partner backend refetches the authoritative amount from `GET /v1/billing/partner/orders` before charging.
-6. Partner shows the payment popup; end-user pays via the partner's payment provider.
-7. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
-8. On success, Ballpoint debits the partner balance and moves the order from `pending_payment` to `accepted`. Production proceeds.
+2. End-user creates the campaign locally inside the iframe (picks list, product, drop type).
+3. iframe emits `campaign_created` to the parent. `orderIds` in this event are local iframe IDs only — no Ballpoint order exists yet.
+4. End-user customizes the campaign and clicks Submit.
+5. iframe calls `POST /v1/billing/partner/orders`. Ballpoint creates the order in `pending_payment` (no charge yet).
+6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger to start the payment popup.
+7. Partner backend refetches the authoritative amount from `GET /v1/billing/partner/orders` before charging.
+8. Partner shows the payment popup; end-user pays via the partner's payment provider.
+9. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
+10. On success, Ballpoint debits the partner balance and moves the order from `pending_payment` to `accepted`. Production proceeds.
 
-After step 4, the iframe lifecycle and the payment lifecycle run in parallel: the iframe may emit `campaign_complete` / `done` once its own submission flow finishes, independent of the payment popup. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
+After step 6, the iframe lifecycle and the payment lifecycle run in parallel: the iframe may emit `campaign_complete` / `done` once its own submission flow finishes, independent of the payment popup. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
+
+For payment, reconciliation, or backend workflows, key off `campaign_submitted.orders[].ballpointOrderId` — not `campaign_created.orderIds` (those are pre-API local IDs).
 
 **Endpoint**
 
