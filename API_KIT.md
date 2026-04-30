@@ -885,7 +885,7 @@ Content-Type: application/json
 Payment retry logic lives **on the partner side**. Ballpoint does not retry the partner debit and only records the final outcome.
 
 - Handle retries internally with the partner payment provider. Only call `/confirm-payment` with the **final** outcome.
-- Current operating policy: 3 retries same-day on the partner side, no delivery-date push.
+- The partner may retry payment internally according to its own billing policy, as long as Ballpoint only receives the final `success` or terminal `failed` result.
 - Multi-send drops: if a drop fails, pause subsequent drops on the partner side (stop calling `/confirm-payment` for downstream drops).
 - Once an order is in `payment_failed`, it stays there. To reschedule, submit a **new** order via `POST /orders` with the new `mail_date` — the failed order remains in `payment_failed` for audit.
 - If the partner is still retrying with the end-user, **do not** send `status:failed` yet — only send it when payment is truly terminal.
@@ -1211,7 +1211,7 @@ Events are guaranteed to be delivered. If your endpoint is down, we retry with e
 
 When the USPS scan pipeline detects a returned-to-sender piece, Ballpoint emits a per-piece RTS event server-to-server so the partner can reconcile each undeliverable mailing piece against its CRM contact directly.
 
-> **Status:** V1 contract is finalized as documented below. Live emission to the partner endpoint is scheduled for a future release; we will notify the partner before enabling delivery.
+> **Status:** V1 contract finalized. Delivery will be enabled once the partner endpoint is configured and E2E testing is complete.
 
 **Delivery**
 
