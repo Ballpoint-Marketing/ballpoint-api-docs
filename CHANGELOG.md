@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.2 — 2026-05-01
+
+- **New: API Kit §6l — Partner Dashboard Endpoints** — `GET /v1/billing/partner/stats` and `GET /v1/billing/partner/orders` now formally documented. Both accept the new `list_id` query parameter (echoes the same value passed when creating orders, combinable with `external_user_id` via AND). Stats response covers totals, status breakdown, SLA buckets, and RTS summary. Orders response is a paginated drill-down with computed `sla_status`. Unknown `list_id` returns the same shape with all counts zero.
+- **API Kit §12 (Endpoint Quick Reference)** — added rows for `/confirm-payment`, `/partner/stats`, and `/partner/orders`.
+- **Payment-flow reminder** — for charging the end-user, partner backends must refetch the relevant order from `GET /v1/billing/partner/orders` server-side; browser-side values like `campaign_submitted.total_dollars` remain UX/display only.
+
 ## v1.2.1 — 2026-04-29
 
 - **API Kit §3 (How Billing Works) restructured** to document Ballpoint's two partner billing models side-by-side: standard invoiced partners (`billing_mode: none`) and partner-billed / payment-gated partners (`requires_payment_confirmation = TRUE`). Removes prior wording that assumed every reader was on `billing_mode: none`, which contradicted §6k Confirm Payment for payment-gated accounts.

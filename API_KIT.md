@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.2.1 · April 2026**
+> **v1.2.2 · May 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -64,6 +64,7 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
    - [6i. User Attribution (X-External-User-ID)](#6i-user-attribution)
    - [6j. Per-end-user attribution (external_user_metadata)](#6j-per-end-user-attribution-external_user_metadata)
    - [6k. Confirm Payment (Partner Payment Gate)](#6k-confirm-payment-partner-payment-gate)
+   - [6l. Partner Dashboard Endpoints](#6l-partner-dashboard-endpoints)
 7. [Status Updates via Webhooks](#7-status-updates-via-webhooks)
    - [Per-piece RTS Push-Back (V1)](#per-piece-rts-push-back-v1)
 8. [Real-Time UI via SSE (Optional)](#8-real-time-ui-via-sse-optional)
@@ -924,6 +925,125 @@ Payment retry logic lives **on the partner side**. Ballpoint does not retry the 
 
 ---
 
+### 6l. Partner Dashboard Endpoints
+
+These endpoints power partner-side operational dashboards (per-account aggregate stats, paginated order list with SLA, drill-down by user or campaign list). Both require an `X-Partner-Key` header and are scoped to your `source` + `external_account_id`.
+
+> **For payment flows:** refetch the relevant order from `GET /v1/billing/partner/orders` server-side before charging the end-user. Browser-side values like `campaign_submitted.total_dollars` are UX/display only. See [§6k](#6k-confirm-payment-partner-payment-gate) and [IFRAME_KIT.md](IFRAME_KIT.md) for the full payment-gate context.
+
+#### `GET /v1/billing/partner/stats`
+
+Aggregate counts for a dashboard top panel: order totals, status breakdown, SLA buckets, RTS summary.
+
+**Query parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | integer | 7 | Range of recent days to aggregate (1–365) |
+| `external_user_id` | string | — | Narrow to a single end-user within the account. Omit for account-wide totals |
+| `list_id` | string | — | Narrow to a single campaign list. Echoes the same `list_id` originally passed when creating orders. Combinable with `external_user_id` (AND) |
+
+**Example:**
+
+```bash
+curl -s "https://api.ballpointmarketing.com/v1/billing/partner/stats?days=30&list_id=marketing_q1_2026" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
+```
+
+**Response (`200`):**
+
+```json
+{
+  "total_orders": 8,
+  "total_pieces": 3000,
+  "orders_by_status": {
+    "pending": 0,
+    "pending_payment": 0,
+    "scheduled": 1,
+    "accepted": 0,
+    "prep": 0,
+    "printing": 5,
+    "writing": 0,
+    "inserting": 0,
+    "stamping": 0,
+    "shipping": 0,
+    "complete": 1,
+    "cancelled": 1,
+    "payment_failed": 0,
+    "failed": 0
+  },
+  "sla_summary": {
+    "on_time": 7,
+    "at_risk": 0,
+    "breached": 1
+  },
+  "rts_summary": {
+    "total_rts": 20,
+    "tracked_pieces": 1000,
+    "rts_rate": 0.02
+  },
+  "date_range": { "from": "2026-04-01", "to": "2026-05-01" }
+}
+```
+
+Unknown `list_id` (or one with no orders in the partner's scope) returns the same shape with all counts zero.
+
+#### `GET /v1/billing/partner/orders`
+
+Paginated, partner-scoped order list with computed `sla_status`. Use this to drill from a stats tile into the underlying orders.
+
+**Query parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `external_user_id` | string | — | Filter to a single end-user within the account |
+| `list_id` | string | — | Filter to a single campaign list. Same value passed when creating orders |
+| `status` | string | — | Filter by `production_status` (e.g. `accepted`, `printing`, `complete`) |
+| `product_type` | string | — | Filter by product type |
+| `sla` | string | — | One of `on_time`, `at_risk`, `breached` |
+| `search` | string | — | Substring match on order id OR campaign id OR your `external_order_id` |
+| `days` | integer | 30 | Range of recent days (1–365) |
+| `limit` | integer | 100 | Page size (1–500) |
+| `offset` | integer | 0 | Pagination offset |
+
+**Example:**
+
+```bash
+curl -s "https://api.ballpointmarketing.com/v1/billing/partner/orders?days=30&list_id=marketing_q1_2026&status=printing" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
+```
+
+**Response (`200`):**
+
+```json
+{
+  "orders": [
+    {
+      "id": "ord_abc123",
+      "external_order_id": "ps_order_42",
+      "product_type": "4x6_printed",
+      "piece_count": 500,
+      "production_status": "printing",
+      "usps_status": null,
+      "created_at": "2026-04-12T15:00:00Z",
+      "scheduled_production_date": "2026-04-15",
+      "sla_due_at": "2026-04-22T00:00:00Z",
+      "sla_status": "on_time",
+      "campaign_id": "camp_partner_marketing_q1_2026",
+      "total_cost_cents": 28000
+    }
+  ],
+  "total": 5,
+  "limit": 100,
+  "offset": 0,
+  "has_more": false
+}
+```
+
+Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders or billing configurations where no partner-facing amount is set.
+
+---
+
 ## 7. Status Updates via Webhooks
 
 > **Ballpoint delivers webhooks at least once. Your integration must handle duplicates, delays, and out-of-order delivery.**
@@ -1515,6 +1635,9 @@ Before switching to your live key:
 | Get order | `GET` | `/v1/billing/orders/{id}` | `X-Partner-Key` |
 | List orders | `GET` | `/v1/billing/orders?external_user_id=...&status=...&limit=20&offset=0` | `X-Partner-Key` |
 | Cancel order | `PATCH` | `/v1/billing/orders/{id}/status` | `X-Partner-Key` |
+| Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` (server-to-server only) |
+| Partner dashboard stats | `GET` | `/v1/billing/partner/stats?days=30&list_id=...&external_user_id=...` | `X-Partner-Key` |
+| Partner dashboard orders | `GET` | `/v1/billing/partner/orders?days=30&list_id=...&status=...` | `X-Partner-Key` |
 | Order tracking | `GET` | `/v1/orders/{id}/mail-tracking` | `X-Partner-Key` |
 | Campaign tracking | `GET` | `/v1/campaigns/{id}/mail-tracking` | `X-Partner-Key` |
 | Pricing catalog | `GET` | `/v1/billing/pricing?product_type=...` | `X-Partner-Key` |
