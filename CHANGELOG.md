@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.0 — 2026-05-12
+
+- **New: `set_list.piece_counts` input contract** — PropStream may now send pre-computed piece counts for all 6 combinations of `Deliver To` (property/mailing/both) × `Remove duplicates` (off/on). Iframe consumes via lookup, displays exact piece count + price, and surfaces 2 user-facing controls (Deliver To select + Remove duplicates checkbox) on the piece-selection page. Backward compat: when `piece_counts` absent, controls are hidden and behavior is identical to prior versions — existing partners unaffected.
+- **New: `campaign_submitted.recipient_selection` output contract** — When `piece_counts` was provided, iframe now echoes the user's final selection back to the partner in the `campaign_submitted` event under `recipient_selection.{deliver_to, remove_duplicate_addresses, piece_count}`. `piece_count` is per-drop and matches each `orders[].pieces`. When `piece_counts` was not provided, `recipient_selection` is omitted from the payload (legacy shape preserved).
+- **Also supported: `set_lists[].piece_counts`** — multi-list flow propagates per-list piece_counts. When the user picks a list from the selector, the iframe applies that list's piece_counts to the active selection state.
+
 ## v1.2.2 — 2026-05-01
 
 - **New: API Kit §6l — Partner Dashboard Endpoints** — `GET /v1/billing/partner/stats` and `GET /v1/billing/partner/orders` now formally documented. Both accept the new `list_id` query parameter (echoes the same value passed when creating orders, combinable with `external_user_id` via AND). Stats response covers totals, status breakdown, SLA buckets, and RTS summary. Orders response is a paginated drill-down with computed `sla_status`. Unknown `list_id` returns the same shape with all counts zero.

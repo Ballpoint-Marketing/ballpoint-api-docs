@@ -815,7 +815,7 @@ Where this call sits in the end-user journey for an iframe-driven order:
 3. iframe emits `campaign_created` to the parent. `orderIds` in this event are local iframe IDs only — no Ballpoint order exists yet.
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /v1/billing/partner/orders`. Ballpoint creates the order in `pending_payment` (no charge yet).
-6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger to start the payment popup.
+6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger to start the payment popup. For partners that sent `piece_counts` on `set_list`, this event also carries `recipient_selection.piece_count` — per-drop, matches each `orders[].pieces`, useful for reconciliation. See [IFRAME_KIT.md](IFRAME_KIT.md#recipient-selection-contract-piece-count--dedup) for the full input/output contract.
 7. Partner backend refetches the authoritative amount from `GET /v1/billing/partner/orders` before charging.
 8. Partner shows the payment popup; end-user pays via the partner's payment provider.
 9. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).

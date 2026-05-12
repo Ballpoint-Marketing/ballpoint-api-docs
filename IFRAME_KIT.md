@@ -196,7 +196,54 @@ This is the only message that can be sent more than once (to refresh tokens). Al
 | `listId` | string | Your internal list identifier |
 | `externalAccountId` | string | Your account/tenant identifier |
 | `externalUserId` | string | Your user identifier |
+| `piece_counts` | object | Optional. Pre-computed piece counts for the 6 combinations of `Deliver To` × `Remove duplicates`. When present, the iframe shows 2 user-facing controls on the piece-selection page (Deliver To select + Remove duplicates checkbox) and uses these values as the authoritative count + price input. When absent, the controls are hidden and the iframe falls back to `count` (legacy behavior — existing partners are unaffected). See [Recipient selection contract](#recipient-selection-contract-piece-count--dedup) for the full walkthrough. |
 | `tenantKey` | string | Optional. Tenant scope key |
+
+#### `piece_counts` shape
+
+```json
+"piece_counts": {
+  "property": { "dedup_off": 480, "dedup_on": 440 },
+  "mailing":  { "dedup_off": 498, "dedup_on": 472 },
+  "both":     { "dedup_off": 920, "dedup_on": 850 }
+}
+```
+
+| Path | Type | Description |
+|------|------|-------------|
+| `piece_counts.property.dedup_off` | number or null | Count of leads with a property address, no dedup applied. |
+| `piece_counts.property.dedup_on` | number or null | Count of distinct normalized property addresses. |
+| `piece_counts.mailing.dedup_off` | number or null | Count of leads with a mailing address, no dedup applied. |
+| `piece_counts.mailing.dedup_on` | number or null | Count of distinct normalized mailing addresses. |
+| `piece_counts.both.dedup_off` | number or null | Per-lead count of unique send addresses across property + mailing (if a lead's property and mailing addresses are equal, that lead counts as 1, not 2). Duplicate addresses across different leads are not collapsed. |
+| `piece_counts.both.dedup_on` | number or null | Count of distinct normalized send addresses across the union of property + mailing. |
+
+Semantics:
+
+- **`0` is a valid value** for any combination. It means "no recipients available for this selection" (e.g. no leads have a mailing address). The iframe shows the option but with a 0-piece price.
+- **Missing key vs `0`**: an omitted combination (e.g. no `property.dedup_off` key, or the entire `property` block missing) means "option unavailable for selection in iframe UI" — the iframe hides that radio/option entirely. This is distinct from `0`, which is selectable.
+- **4 KB cap** on the serialized `piece_counts` JSON. Payloads exceeding the cap are silently rejected at the postMessage boundary — the iframe logs a console warning and falls back to legacy behavior (controls hidden, `count` used as the recipient total).
+- Leads missing the relevant address contribute 0 for that option (e.g. a lead with no mailing address contributes 0 to `mailing.*`).
+
+#### Full `set_list` example with `piece_counts`
+
+```json
+{
+  "source": "propstream",
+  "version": 1,
+  "type": "set_list",
+  "count": 500,
+  "name": "Pre-Foreclosure Leads",
+  "listId": "your_list_id",
+  "externalAccountId": "your_account_id",
+  "externalUserId": "your_user_id",
+  "piece_counts": {
+    "property": { "dedup_off": 480, "dedup_on": 440 },
+    "mailing":  { "dedup_off": 498, "dedup_on": 472 },
+    "both":     { "dedup_off": 920, "dedup_on": 850 }
+  }
+}
+```
 
 ### `set_lists` — Multiple lists for user selection (alternative to `set_list`)
 
@@ -223,6 +270,7 @@ Use this instead of `set_list` when you want the user to choose from multiple li
 | `lists[].name` | string | Human-readable list name |
 | `lists[].count` | number | Number of recipients in this list |
 | `lists[].listId` | string | Your internal list identifier |
+| `lists[].piece_counts` | object | Optional. Per-list pre-computed piece counts. Same shape and semantics as `set_list.piece_counts` (see above). When the user picks a list from the selector, the iframe applies that list's `piece_counts` to the active selection state. Lists without `piece_counts` fall back to legacy behavior (controls hidden, count from `lists[].count`). |
 | `externalAccountId` | string | Your account/tenant identifier |
 | `externalUserId` | string | Your user identifier |
 | `tenantKey` | string | Optional. Tenant scope key |
@@ -230,6 +278,48 @@ Use this instead of `set_list` when you want the user to choose from multiple li
 When the user selects a list, the iframe sends a `list_selected` event back to the parent (see [Section 6](#6-messages-you-receive-iframe--parent)).
 
 > **Note:** Send either `set_list` (single list, user goes straight to campaign builder) or `set_lists` (multiple lists, user picks first). Do not send both.
+
+### Recipient selection contract (piece count + dedup)
+
+When `set_list.piece_counts` (or `set_lists[].piece_counts`) is present, the iframe surfaces two user-facing controls on the piece-selection page and emits the user's final choice back to the parent on `campaign_submitted`. End-to-end:
+
+1. **Partner pre-computes** the 6 piece counts on its side (raw address availability + dedup math against its own normalized address index).
+2. **Partner sends** `set_list.piece_counts` on bootstrap (alongside `count`, `name`, etc.).
+3. **Iframe shows** two controls:
+   - **Deliver To** — radio/select between `property`, `mailing`, `both` (only options present in `piece_counts` are offered).
+   - **Remove duplicate addresses** — checkbox. Toggles `dedup_off` ↔ `dedup_on`.
+4. **User selects** → iframe looks up the resolved count via `piece_counts[deliver_to][dedup_on ? "dedup_on" : "dedup_off"]` → displays the count and recomputes price.
+5. **User submits** → iframe echoes the final selection on `campaign_submitted.recipient_selection` (see [Section 6](#6-messages-you-receive-iframe--parent)).
+6. **Partner reconciles** `recipient_selection.piece_count` against each `orders[].pieces` for billing and recipient-upload sizing.
+
+#### Worked example
+
+Suppose a list of 500 leads has the following address availability and dedup math on the partner side:
+
+- 20 leads have no property address → 480 leads have a property address.
+- Among those 480 property addresses, 40 are duplicates → 440 distinct property addresses.
+- 2 leads have no mailing address → 498 leads have a mailing address.
+- Among those 498 mailing addresses, 26 are duplicates → 472 distinct mailing addresses.
+- For `both`, per-lead unique address count summed across all 500 leads = 920 (leads where property == mailing count as 1).
+- Distinct normalized send addresses across the union of property + mailing = 850.
+
+The partner sends:
+
+```json
+"piece_counts": {
+  "property": { "dedup_off": 480, "dedup_on": 440 },
+  "mailing":  { "dedup_off": 498, "dedup_on": 472 },
+  "both":     { "dedup_off": 920, "dedup_on": 850 }
+}
+```
+
+If the user picks `Deliver To = both` + `Remove duplicates = on`, the iframe displays **850 pieces** and prices accordingly. On submit, `campaign_submitted.recipient_selection` carries `{ deliver_to: "both", remove_duplicate_addresses: true, piece_count: 850 }`, and each entry in `orders[].pieces` equals 850 for a single-drop campaign (multi-drop campaigns repeat the same per-drop count across orders in V1).
+
+#### Backward compatibility
+
+- `piece_counts` is **optional**. Partners not yet emitting it see no change.
+- When `piece_counts` is absent: the two new UI controls are hidden, the iframe uses `count` as before, and `campaign_submitted` does **not** carry the `recipient_selection` block (the field is omitted, not set to `null`).
+- Partners can adopt `piece_counts` per-list — emitting it on some lists and omitting it on others is supported via `set_lists[].piece_counts`.
 
 ### `set_sender` — Pre-fill sender info (optional)
 
@@ -422,7 +512,12 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
       "total_dollars": "847.00",
       "recipientsEndpoint": "/v1/billing/orders/ord_abc123/recipients"
     }
-  ]
+  ],
+  "recipient_selection": {
+    "deliver_to": "both",
+    "remove_duplicate_addresses": true,
+    "piece_count": 850
+  }
 }
 ```
 
@@ -448,6 +543,12 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 | `pendingSubmissionCount` | number | Orders still waiting to submit (usually 0). |
 | `submittedNowCount` | number | Orders submitted in this batch. |
 | `pendingOrderIds` | string[] | Iframe order ids still waiting to submit (empty in the happy path). |
+| `recipient_selection` | object or omitted | Present only when the parent provided `piece_counts` on `set_list` / `set_lists[]`. Echoes the user's final selection from the iframe's Deliver To + Remove duplicates controls. See [Recipient selection contract](#recipient-selection-contract-piece-count--dedup). |
+| `recipient_selection.deliver_to` | string | One of `"property"`, `"mailing"`, `"both"` — the address type the user chose. |
+| `recipient_selection.remove_duplicate_addresses` | boolean | `true` when the user enabled the Remove duplicates checkbox. |
+| `recipient_selection.piece_count` | number | Per-drop piece count resolved from `piece_counts[deliver_to][dedup_on ? "dedup_on" : "dedup_off"]`. Matches each `orders[].pieces` entry — in V1, all drops in a campaign use the same recipient selection, so summing `orders[].pieces` across drops equals `piece_count × number_of_drops`. |
+
+> **Backward compatibility.** `recipient_selection` is **omitted from the payload** (not set to `null`) when the parent did not send `piece_counts` on `set_list`. Existing partners that don't yet emit `piece_counts` continue to receive the legacy `campaign_submitted` shape unchanged.
 
 #### `order_added` — New order added (multi-month campaigns)
 
