@@ -571,7 +571,6 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
   "listName": "Pre-Foreclosure Leads",
   "externalAccountId": "ps_acc_42",
   "externalUserId": "ps_user_99",
-  "mailDate": "2026-05-12",
   "productIds": ["product-21"],
   "pendingSubmissionCount": 0,
   "submittedNowCount": 1,
@@ -607,12 +606,11 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 | `listName` | string or null | Verbatim echo of the `listName` the parent app passed via `set_list` (display label only). |
 | `externalAccountId` | string or null | Account id passed via `set_api_config`. |
 | `externalUserId` | string or null | End-user id passed via `set_api_config`. |
-| `mailDate` | string or null | ISO date the campaign is scheduled for, when applicable. In `single` / `split` campaigns this is the campaign-wide date. In `multi` campaigns it mirrors the first drop's date — use `orders[].mailDate` for the per-drop date. |
 | `productIds` | string[] | Product ids selected for this submission. |
 | `orders[].orderId` | string | Local iframe order ID. |
 | `orders[].ballpointOrderId` | string or null | Server-assigned order ID (null if submission still pending retry). |
 | `orders[].pieces` | number | Recipient count for this order. |
-| `orders[].mailDate` | string or null | ISO date this specific drop is scheduled for. In `single` and `split` campaigns all entries share the same date (equal to top-level `mailDate`); in `multi` campaigns each entry carries its own per-drop date. |
+| `orders[].mailDate` | string or null | ISO date this specific drop is scheduled for. Canonical scheduled-mail-date field for each submitted order. For `single` and `split` campaigns all entries carry the same date; for `multi` campaigns each entry carries its own per-drop date — partners reading multi-send schedules MUST iterate `orders[].mailDate`. |
 | `orders[].unit_price_tcents` | number | Marked-up unit price in tenth-cents. |
 | `orders[].total_tcents` | number | Marked-up total for this order in tenth-cents. |
 | `orders[].recipientsEndpoint` | string or null | API path to POST recipients (null if pending). |
