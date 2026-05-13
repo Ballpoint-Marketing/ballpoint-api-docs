@@ -731,7 +731,7 @@ End-to-end timeline:
 2. End-user creates the campaign locally inside the iframe (picks list, product, drop type).
 3. iframe emits `campaign_created` to the parent. `orderIds` in this event are local iframe IDs only — no Ballpoint order exists yet.
 4. End-user customizes the campaign and clicks Submit.
-5. iframe calls `POST /v1/billing/partner/orders`. Ballpoint creates the order in `pending_payment`. No charge yet.
+5. iframe calls `POST /orders` on the API base URL. For payment-gated accounts, Ballpoint creates the order in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated). No charge yet in either case.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX). This is the trigger to start the payment popup on the parent side.
 7. Parent backend refetches the authoritative amount from `GET /v1/billing/partner/orders` before charging. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.
 8. Parent shows the payment popup; end-user pays via the parent's payment provider.

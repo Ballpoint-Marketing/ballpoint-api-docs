@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.3 — 2026-05-13
+
+- **Clarified — partner order-creation endpoint path** — `API_KIT.md §6k` step 5 and `IFRAME_KIT.md` payment-gate walkthrough step 5 now state the partner order-creation path as `POST /orders` on the API base URL (this is the live route; iframes have always called it there). `GET /v1/billing/partner/orders` (read-only dashboard/reconciliation) is unchanged. Also clarified the send-now (`pending_payment`) vs future-dated (`scheduled` + `payment_confirmed=false`) state split that was already implicit in the payment-gate behavior.
+
 ## v1.3.2 — 2026-05-12
 
 Patch on top of v1.3.1 (edit_leads_requested + set_list refresh contracts):
