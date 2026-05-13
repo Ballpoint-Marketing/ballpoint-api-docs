@@ -245,6 +245,37 @@ Semantics:
 }
 ```
 
+#### `set_list` refresh (post-modal sync)
+
+After PropStream's Edit Leads modal saves changes to the recipient list, the parent SHOULD send `set_list` again to refresh the iframe's view of the list. Rules:
+
+- **Same `listId` required.** The refresh `set_list` payload MUST carry the same `listId` as the original first-receipt `set_list`. Any other `listId` is treated as a list switch attempt and REJECTED.
+- **Updatable fields on refresh:** `count`, `name`, `piece_counts`. These are re-validated and re-applied. The iframe's count display, pricing UI, and recipient selection state refresh in place.
+- **Immutable fields on refresh:** `externalAccountId`, `externalUserId`, `tenantKey`. The values from the first-receipt set_list are authoritative for the session. Refresh payloads attempting to change these are:
+  - `externalAccountId` / `externalUserId`: ignored (existing values preserved).
+  - `tenantKey` mismatch: ENTIRE refresh message rejected, no state change applied.
+- **Backward compatibility:** partners that do not send `set_list` a second time are unaffected. First-receipt behavior is unchanged. Partners that previously relied on second-receipt rejection still get the same rejection for *different-listId* attempts.
+
+Example refresh payload (after Edit Leads modal save):
+
+```json
+{
+  "source": "propstream",
+  "version": 1,
+  "type": "set_list",
+  "listId": "ps_list_123",
+  "name": "Pre-Foreclosure Leads (edited)",
+  "count": 472,
+  "piece_counts": {
+    "property": { "dedup_off": 460, "dedup_on": 425 },
+    "mailing":  { "dedup_off": 470, "dedup_on": 450 },
+    "both":     { "dedup_off": 870, "dedup_on": 800 }
+  }
+}
+```
+
+See also the [`edit_leads_requested` event](#edit_leads_requested--user-requested-to-edit-the-recipient-list) for the iframe → parent trigger that opens the modal.
+
 ### `set_lists` — Multiple lists for user selection (alternative to `set_list`)
 
 Use this instead of `set_list` when you want the user to choose from multiple lists before creating a campaign. The iframe shows a "Select Your List" page where the user picks one, then proceeds to the campaign builder.
@@ -421,6 +452,49 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
   "recipientCount": 847
 }
 ```
+
+#### `edit_leads_requested` — User requested to edit the recipient list
+
+Sent when the user clicks the "Edit Leads" button on the iframe's My Campaigns / Dashboard page. PropStream's parent app should listen for this event and open its Edit Leads modal overlay.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "edit_leads_requested",
+  "listId": "ps_list_123",
+  "listName": "Pre-Foreclosure Leads",
+  "recipientCount": 500,
+  "externalAccountId": "ps_acc_42",
+  "externalUserId": "ps_user_99"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source` | string | Always `ballpoint-mailer`. |
+| `version` | number | Always `1`. |
+| `type` | string | Always `edit_leads_requested`. |
+| `listId` | string | The active list identifier (echoed verbatim from the original `set_list` / `set_lists` payload). |
+| `listName` | string | The active list name. |
+| `recipientCount` | number | The RAW recipient count from the original `set_list` — NOT the post-selection effective count from `piece_counts` (see [Recipient selection contract](#recipient-selection-contract-piece-count--dedup)). Useful as the anchor count for the modal's list summary. |
+| `externalAccountId` | string | Partner account identifier echoed from `set_list`. |
+| `externalUserId` | string | Partner user identifier echoed from `set_list`. |
+
+**Visibility / lifecycle**
+
+- The iframe only renders the Edit Leads button when an active list context exists (i.e., a `set_list` or `set_lists`-selected list was received).
+- The button is hidden when no active list is set.
+- The button is rendered on the iframe's My Campaigns / Dashboard page header, top-right action area.
+- **V1 scope:** the button is global to the active list, not per-campaign. Per-campaign Edit Leads actions are a future iteration.
+- **No per-status / per-mailDate lockout enforced by the iframe in V1.** The recipient upload endpoint enforces production-state lockout independently (`scheduled` / `pending_payment` / `accepted` / `prep` only). PropStream's modal is expected to enforce any timing rules (e.g., ">3 days before ship date") on their side.
+
+**Expected PropStream behavior**
+
+1. Listen for the `edit_leads_requested` event.
+2. Open the Edit Leads modal overlay (PropStream-hosted, on top of the iframe).
+3. On modal save, send the updated list back to the iframe via the existing `set_list` postMessage with the SAME `listId` (see [`set_list` refresh](#set_list-refresh-post-modal-sync)).
+4. On modal close without changes, no postMessage required.
 
 #### `page_changed` — User navigated to a different view
 
@@ -828,7 +902,7 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 
 - **Origin validation:** The iframe only accepts `postMessage` from allowlisted parent origins. Contact Ballpoint to add your domain to the allowlist.
 - **Token delivery:** `apiToken` is only accepted via `postMessage`, never via URL params.
-- **First-write-wins:** `set_list`, `set_sender`, and `set_tenant` are accepted once per session. Duplicates are ignored. `set_api_config` can be resent to refresh the token.
+- **First-write-wins:** `set_sender` and `set_tenant` are accepted once per session. Duplicates are ignored. `set_api_config` can be resent to refresh the token. `set_list` may be resent with the SAME `listId` to refresh `count` / `name` / `piece_counts` after PropStream's Edit Leads modal saves (see [`set_list` refresh](#set_list-refresh-post-modal-sync)); a different `listId` is still rejected as a list-switch attempt.
 - **Rate limiting:** Inbound messages are rate-limited to 20 messages per 5 seconds per origin.
 - **CSP:** The iframe is served with a strict Content Security Policy. Your domain must be listed in the `frame-ancestors` directive. Contact Ballpoint if you receive CSP errors.
 

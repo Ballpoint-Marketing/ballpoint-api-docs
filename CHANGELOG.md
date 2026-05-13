@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.1 — 2026-05-12
+
+- **New: `edit_leads_requested` event (iframe → parent)** — Fired when the user clicks the "Edit Leads" button on the iframe's My Campaigns / Dashboard page. PropStream listens and opens its own Edit Leads modal overlay. Payload carries `listId`, `listName`, `recipientCount` (raw, not post-selection), `externalAccountId`, `externalUserId`. The button is rendered only when active list context exists. Per-status / per-mailDate lockout in V1 is enforced by the recipient upload endpoint and PropStream's modal; the iframe does not block clicks based on order state in this version.
+- **New: `set_list` refresh contract** — `set_list` MAY now be sent a second time with the SAME `listId` to refresh `count`, `name`, and `piece_counts` after PropStream's Edit Leads modal saves. `externalAccountId`, `externalUserId`, and `tenantKey` are immutable post first-receipt — refresh attempts to change these are ignored (externalAccountId/externalUserId) or reject the entire message (tenantKey mismatch). Different-listId mid-flow set_list is still rejected as a list switch attempt (unchanged from prior behavior). Backward compatibility: partners that do not send a second `set_list` are unaffected.
+
 ## v1.3.0 — 2026-05-12
 
 - **New: `set_list.piece_counts` input contract** — PropStream may now send pre-computed piece counts for all 6 combinations of `Deliver To` (property/mailing/both) × `Remove duplicates` (off/on). Iframe consumes via lookup, displays exact piece count + price, and surfaces 2 user-facing controls (Deliver To select + Remove duplicates checkbox) on the piece-selection page. Backward compat: when `piece_counts` absent, controls are hidden and behavior is identical to prior versions — existing partners unaffected.
