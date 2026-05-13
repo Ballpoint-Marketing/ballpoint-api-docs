@@ -2,7 +2,7 @@
 
 ## v1.3.6 — 2026-05-13
 
-- **Correction: `campaign_submitted` scheduled mail date contract** — `orders[].mailDate` is now the canonical scheduled mail date field for each submitted order/drop. Removed the ambiguous top-level `campaign_submitted.mailDate` from this multi-order event shape during the staging contract-cleanup window. For multi-send campaigns, partners should read `orders[].mailDate` for each individual drop.
+- **Correction: `campaign_submitted` scheduled mail date contract (supersedes v1.3.5 top-level multi-send fix)** — `orders[].mailDate` is now the canonical scheduled mail date field for each submitted order/drop. Removed the ambiguous top-level `campaign_submitted.mailDate` from this multi-order event shape during the staging contract-cleanup window. For multi-send campaigns, partners should read `orders[].mailDate` for each individual drop.
 
 ## v1.3.5 — 2026-05-13
 
