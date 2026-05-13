@@ -1,0 +1,56 @@
+# Gitleaks config for ballpoint-dashboard.
+# Used by `bp-gate gitleaks` (read from index, not work tree — see
+# ~/.claude/scripts/bp-gate.sh). Keep this file identical across the 4
+# Ballpoint repos (ballpoint-dashboard, ballpoint-api, ballpoint-iframe,
+# ballpoint-api-docs). Drift = audit quarterly.
+#
+# Rule design:
+# - Char classes include `-` (last in class, literal) so hyphen-bearing
+#   partner keys still match (PropStream / Stripe-style).
+# - Allowlist is intentionally restricted to 2 exact placeholder strings.
+#   Do NOT broaden to `pk_test_propstream_*` or similar — if it looks
+#   like a real key, gate treats it as a real key. Docs using realistic
+#   placeholders must migrate to `pk_test_example_not_real`.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "ballpoint-staging-key"
+description = "Ballpoint INTERNAL_API_KEYS staging-key-* format"
+regex = '''staging-key-[A-Za-z0-9_-]{16,}'''
+
+[[rules]]
+id = "partner-pk-test"
+description = "Partner publishable test key (pk_test_*)"
+regex = '''pk_test_[A-Za-z0-9_-]{16,}'''
+[rules.allowlist]
+regexes = [
+  '''pk_test_PARTNER_REPLACE_ME''',
+  '''pk_test_example_not_real''',
+]
+
+[[rules]]
+id = "partner-pk-live"
+description = "Partner publishable live key (pk_live_*)"
+regex = '''pk_live_[A-Za-z0-9_-]{16,}'''
+
+[[rules]]
+id = "partner-sk-test"
+description = "Partner secret test key (sk_test_*)"
+regex = '''sk_test_[A-Za-z0-9_-]{16,}'''
+
+[[rules]]
+id = "partner-sk-live"
+description = "Partner secret live key (sk_live_*)"
+regex = '''sk_live_[A-Za-z0-9_-]{16,}'''
+
+[[rules]]
+id = "aws-access-key-id"
+description = "AWS access key ID (AKIA...)"
+regex = '''AKIA[0-9A-Z]{16}'''
+
+[[rules]]
+id = "jwt-bearer"
+description = "JWT bearer token (3 base64url segments separated by dots)"
+regex = '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'''
