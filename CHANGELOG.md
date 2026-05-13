@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.5 — 2026-05-13
+
+- **New: `campaign_submitted.orders[].mailDate`** — additive per-drop field on each entry of the `orders[]` array. ISO date this specific drop is scheduled for. For `single` and `split` campaigns all entries share the same date (equal to top-level `mailDate`); for `multi` campaigns each entry carries its own per-drop date. Partners that ignore the field are unaffected.
+- **Fix: `campaign_submitted.mailDate` (top-level) — multi-send** — previously emitted as `null` for `multi` campaigns; now resolves to the first drop's mail date when no campaign-level date is supplied. Use `orders[].mailDate` for the per-drop date.
+
 ## v1.3.4 — 2026-05-13
 
 - **New: `GET /v1/billing/orders/{order_id}`** — retrieve a single order by ID. Tenant-scoped: partners only see their own orders; cross-tenant or unknown `order_id` both return `404` (never `403`) so order existence cannot be probed across tenants. Response shape matches each element of `GET /v1/billing/orders`. See `API_KIT.md §6c` for the field reference and example body. OpenAPI v2 spec updated with the `/v1/billing/orders/{order_id}` path, `401` and `404` responses declared. Postman collection: `Get order` request added to the `Orders` folder.
