@@ -517,7 +517,7 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
   "print_font": null,
   "shipping_option": null,
   "proof_approval_status": null,
-  "metadata": {},
+  "metadata": "{\"campaign_ref\": \"abc123\"}",
   "customer_info": null,
   "sla_due_at": "2026-03-09T14:00:00Z",
   "priority": "normal",
@@ -531,7 +531,7 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
 
 Tenant scoping: partners only see their own orders. Both cross-tenant and unknown `order_id` return `404` (never `403`) so existence cannot be probed across tenants.
 
-`customer_info` is `null` unless populated (object with `name`, `website`, `rma`, `phone`, `shipping_address` — only present keys returned). `envelope_style`, `print_font`, `shipping_option`, `proof_approval_status` are `null` for products that do not use them. Response shape matches each element of `GET /v1/billing/orders` (§6d).
+`customer_info` is `null` unless populated (object with `name`, `website`, `rma`, `phone`, `shipping_address` — only present keys returned). `envelope_style`, `print_font`, `shipping_option`, `proof_approval_status` are `null` for products that do not use them. `metadata` is returned as a JSON-encoded string; call `JSON.parse(body.metadata)` if you need nested fields. Response shape matches each element of `GET /v1/billing/orders` (§6d).
 
 ---
 

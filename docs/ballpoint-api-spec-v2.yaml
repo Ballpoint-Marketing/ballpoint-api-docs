@@ -430,10 +430,11 @@ components:
           type: string
           nullable: true
         metadata:
-          type: object
-          description: Free-form JSON (passthrough of the `metadata` JSONB column).
-          additionalProperties: true
+          type: string
           nullable: true
+          description: >-
+            JSON-encoded metadata object string; parse as JSON if you need
+            nested metadata. Matches GET /v1/billing/orders list behavior.
         customer_info:
           type: object
           nullable: true
