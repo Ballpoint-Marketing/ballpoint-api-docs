@@ -251,6 +251,8 @@ After PropStream's Edit Leads modal saves changes to the recipient list, the par
 
 - **Same `listId` required.** The refresh `set_list` payload MUST carry the same `listId` as the original first-receipt `set_list`. Any other `listId` is treated as a list switch attempt and REJECTED.
 - **Updatable fields on refresh:** `count`, `name`, `piece_counts`. These are re-validated and re-applied. The iframe's count display, pricing UI, and recipient selection state refresh in place.
+- **Preserving vs clearing `piece_counts` on refresh:** if the refresh payload OMITS the `piece_counts` key entirely, the iframe preserves the currently-active `piece_counts` table (the user's combo selection and pricing continue working). To explicitly replace the table, include `piece_counts` in the refresh payload with the new values. To explicitly clear it back to legacy single-count behavior, include `piece_counts: null`. Omitting the key is NOT the same as clearing.
+- **Pricing/display on refresh when `piece_counts` is active:** the refreshed count is applied to internal state, but the visible recipient count and price stay aligned with the user's current Deliver To + Remove duplicates selection (via the existing piece_counts lookup). If `piece_counts` is not active on the active list, the refreshed raw count drives display + price directly (legacy behavior).
 - **Immutable fields on refresh:** `externalAccountId`, `externalUserId`, `tenantKey`. The values from the first-receipt set_list are authoritative for the session. Refresh payloads attempting to change these are:
   - `externalAccountId` / `externalUserId`: ignored (existing values preserved).
   - `tenantKey` mismatch: ENTIRE refresh message rejected, no state change applied.
@@ -477,7 +479,7 @@ Sent when the user clicks the "Edit Leads" button on the iframe's My Campaigns /
 | `type` | string | Always `edit_leads_requested`. |
 | `listId` | string | The active list identifier (echoed verbatim from the original `set_list` / `set_lists` payload). |
 | `listName` | string | The active list name. |
-| `recipientCount` | number | The RAW recipient count from the original `set_list` — NOT the post-selection effective count from `piece_counts` (see [Recipient selection contract](#recipient-selection-contract-piece-count--dedup)). Useful as the anchor count for the modal's list summary. |
+| `recipientCount` | number | The RAW recipient count cached at ingress. For `set_list` flows: the count from the first-receipt `set_list` (or the most recent same-listId refresh). For `set_lists` flows: the count of the list the user picked from the selector, cached at pick time. In both cases, NOT the post-selection effective count from `piece_counts` (see [Recipient selection contract](#recipient-selection-contract-piece-count--dedup)). Useful as the anchor count for the modal's list summary. |
 | `externalAccountId` | string | Partner account identifier echoed from `set_list`. |
 | `externalUserId` | string | Partner user identifier echoed from `set_list`. |
 

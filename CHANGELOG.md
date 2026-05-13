@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.2 — 2026-05-12
+
+Patch on top of v1.3.1 (edit_leads_requested + set_list refresh contracts):
+
+- **Fix:** `set_lists` user-pick flow now caches the picked list's raw count so `edit_leads_requested.recipientCount` reflects the picked list, not the original first-receipt count.
+- **Fix:** `set_list` refresh now preserves the currently-active `piece_counts` table when the refresh payload omits the key. Previously, an omitted `piece_counts` on refresh silently cleared the table and broke v1.3.0 pricing/dedup state. To explicitly clear or replace `piece_counts` on refresh, include the key in the refresh payload.
+- **Fix:** When `piece_counts` is active, `set_list` refresh delegates the display + pricing update to the selection UI (Deliver To + Remove duplicates) instead of overriding with the raw count. Refresh no longer drops the user's combo selection.
+- **Fix:** `set_lists` message schema now formally declares `externalAccountId` and `externalUserId`. These were already read by the handler but the schema gate previously stripped them. Affects partners using the `set_lists` multi-list flow with per-account / per-user attribution.
+
 ## v1.3.1 — 2026-05-12
 
 - **New: `edit_leads_requested` event (iframe → parent)** — Fired when the user clicks the "Edit Leads" button on the iframe's My Campaigns / Dashboard page. PropStream listens and opens its own Edit Leads modal overlay. Payload carries `listId`, `listName`, `recipientCount` (raw, not post-selection), `externalAccountId`, `externalUserId`. The button is rendered only when active list context exists. Per-status / per-mailDate lockout in V1 is enforced by the recipient upload endpoint and PropStream's modal; the iframe does not block clicks based on order state in this version.
