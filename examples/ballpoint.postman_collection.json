@@ -206,6 +206,21 @@
           }
         },
         {
+          "name": "Get order",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "billing", "orders", "{{order_id}}"]
+            },
+            "description": "Get a single order by ID. Tenant-scoped (partners see only their own orders). Cross-tenant or missing order_id return 404."
+          }
+        },
+        {
           "name": "Cancel order",
           "request": {
             "method": "PATCH",

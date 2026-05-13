@@ -500,7 +500,11 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
 ```json
 {
   "id": "ord_7f3a2b",
-  "campaign_id": "camp_test",
+  "campaign_id": "cmp_abc123",
+  "account_id": "acct_partner_propstream",
+  "source": "propstream",
+  "external_account_id": "ps_acct_42",
+  "external_user_id": "user_789",
   "product_type": "4x6_printed",
   "postage_type": "first_class",
   "piece_count": 500,
@@ -509,14 +513,25 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
   "production_status": "printing",
   "usps_status": null,
   "display_status": "printing",
-  "external_id": "ps_order_12345",
-  "external_user_id": "user_789",
+  "envelope_style": null,
+  "print_font": null,
+  "shipping_option": null,
+  "proof_approval_status": null,
+  "metadata": {},
+  "customer_info": null,
+  "sla_due_at": "2026-03-09T14:00:00Z",
+  "priority": "normal",
+  "render_status": "complete",
   "status_changed_at": "2026-03-02T09:00:00Z",
   "created_at": "2026-03-01T14:00:00Z"
 }
 ```
 
 `display_status` is the single field to show your users. `usps_status` is `null` until USPS scans arrive (1–2 days after production completes).
+
+Tenant scoping: partners only see their own orders. Both cross-tenant and unknown `order_id` return `404` (never `403`) so existence cannot be probed across tenants.
+
+`customer_info` is `null` unless populated (object with `name`, `website`, `rma`, `phone`, `shipping_address` — only present keys returned). `envelope_style`, `print_font`, `shipping_option`, `proof_approval_status` are `null` for products that do not use them. Response shape matches each element of `GET /v1/billing/orders` (§6d).
 
 ---
 

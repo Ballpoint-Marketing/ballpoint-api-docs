@@ -372,6 +372,108 @@ components:
           updated_at:
             type: string
             format: date-time
+    OrderDetail:
+      type: object
+      description: >-
+        Response shape for `GET /v1/billing/orders/{order_id}` and each element
+        of `GET /v1/billing/orders`. Source of truth: `_format_order_row`
+        (billing_router.py). Status fields are documented as plain strings
+        because the live enum sets are owned by the API and can evolve;
+        partners should treat them as opaque values.
+      properties:
+        id:
+          type: string
+          pattern: ^ord_[a-zA-Z0-9]+$
+        campaign_id:
+          type: string
+        account_id:
+          type: string
+        source:
+          type: string
+          nullable: true
+        external_account_id:
+          type: string
+          nullable: true
+        external_user_id:
+          type: string
+          nullable: true
+        product_type:
+          type: string
+        postage_type:
+          type: string
+        piece_count:
+          type: integer
+        unit_price_tcents:
+          type: integer
+          description: Unit price in tenths of a cent.
+        total_price_tcents:
+          type: integer
+          description: Total price in tenths of a cent.
+        production_status:
+          type: string
+        usps_status:
+          type: string
+          nullable: true
+        display_status:
+          type: string
+          description: Aggregated status surfaced to the partner.
+        envelope_style:
+          type: string
+          nullable: true
+        print_font:
+          type: string
+          nullable: true
+        shipping_option:
+          type: string
+          nullable: true
+        proof_approval_status:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          description: Free-form JSON (passthrough of the `metadata` JSONB column).
+          additionalProperties: true
+          nullable: true
+        customer_info:
+          type: object
+          nullable: true
+          description: >-
+            Nested customer info. `null` when no `customer_*` columns are
+            populated; otherwise an object with the populated subset of the
+            five fields below (absent keys mean "not set").
+          properties:
+            name:
+              type: string
+              nullable: true
+            website:
+              type: string
+              nullable: true
+            rma:
+              type: string
+              nullable: true
+            phone:
+              type: string
+              nullable: true
+            shipping_address:
+              type: string
+              nullable: true
+        sla_due_at:
+          type: string
+          format: date-time
+          nullable: true
+        priority:
+          type: string
+          nullable: true
+        render_status:
+          type: string
+          nullable: true
+        status_changed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
     CampaignCreate:
       type: object
       required:
@@ -948,11 +1050,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AmbiguousLookup'
-  /v1/orders/{order_id}:
+  /v1/billing/orders/{order_id}:
     get:
       tags:
       - Orders
       summary: Get order
+      description: >-
+        Retrieve a single order by `order_id`. Tenant-scoped: partners only see
+        their own orders; live/test accounts only see orders on their own
+        `account_id`. Cross-tenant or missing `order_id` both return `404`
+        (never `403`) so order existence cannot be probed across tenants.
+        Response shape matches each element of `GET /v1/billing/orders`.
       operationId: getOrder
       parameters:
       - name: order_id
@@ -963,10 +1071,25 @@ paths:
       responses:
         '200':
           description: Order details
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/X-Trace-Id'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/OrderDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Order not found (also returned for cross-tenant lookups)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/campaigns:
     post:
       tags:

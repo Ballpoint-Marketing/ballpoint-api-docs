@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.4 — 2026-05-13
+
+- **New: `GET /v1/billing/orders/{order_id}`** — retrieve a single order by ID. Tenant-scoped: partners only see their own orders; cross-tenant or unknown `order_id` both return `404` (never `403`) so order existence cannot be probed across tenants. Response shape matches each element of `GET /v1/billing/orders`. See `API_KIT.md §6c` for the field reference and example body. OpenAPI v2 spec updated with the `/v1/billing/orders/{order_id}` path, `401` and `404` responses declared. Postman collection: `Get order` request added to the `Orders` folder.
+
 ## v1.3.3 — 2026-05-13
 
 - **Clarified — partner order-creation endpoint path** — `API_KIT.md §6k` step 5 and `IFRAME_KIT.md` payment-gate walkthrough step 5 now state the partner order-creation path as `POST /orders` on the API base URL (this is the live route; iframes have always called it there). `GET /v1/billing/partner/orders` (read-only dashboard/reconciliation) is unchanged. Also clarified the send-now (`pending_payment`) vs future-dated (`scheduled` + `payment_confirmed=false`) state split that was already implicit in the payment-gate behavior.
