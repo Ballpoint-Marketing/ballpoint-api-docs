@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.7 — 2026-05-14
+
+- **Clarified — recipient dedupe scope (docs-only, no behavior change)** — `IFRAME_KIT.md` now states explicitly that Ballpoint does **not** perform intra-order recipient dedupe: duplicate recipient records uploaded to the same order are treated as separate recipient records unless another normal validation rule rejects the request (missing required fields, invalid address fields, or exceeding the order's `piece_count`). Ballpoint's automatic `duplicate_in_campaign` dedupe is cross-order, same-campaign only. `lead_id` and `type` (`mailing` / `property`) are not active recipient upload fields and are not used for dedupe — unknown fields are silently ignored; use `contact_id` for partner-side identifiers. Partners must collapse same-lead `property == mailing` to one recipient before count and upload for `Deliver To = both`. New explicit notes added to (1) the `piece_counts.both.dedup_off` semantics (per-lead unique send-address count, NOT `property_count + mailing_count`), (2) the top of Recipient Upload Flow, and (3) a new "What this does NOT do" subsection under Campaign Dedup (automatic).
+
 ## v1.3.6 — 2026-05-13
 
 - **Correction: `campaign_submitted` scheduled mail date contract (supersedes v1.3.5 top-level multi-send fix)** — `orders[].mailDate` is now the canonical scheduled mail date field for each submitted order/drop. Removed the ambiguous top-level `campaign_submitted.mailDate` from this multi-order event shape during the staging contract-cleanup window. For multi-send campaigns, partners should read `orders[].mailDate` for each individual drop.

@@ -225,6 +225,10 @@ Semantics:
 - **4 KB cap** on the serialized `piece_counts` JSON. Payloads exceeding the cap are silently rejected at the postMessage boundary — the iframe logs a console warning and falls back to legacy behavior (controls hidden, `count` used as the recipient total).
 - Leads missing the relevant address contribute 0 for that option (e.g. a lead with no mailing address contributes 0 to `mailing.*`).
 
+> **`both.dedup_off` is a per-lead unique send-address count — NOT `property_count + mailing_count`.**
+> If a single lead's property address equals its mailing address, that lead contributes **1**, not 2. Duplicate addresses across *different* leads are NOT collapsed here — those are only collapsed when `dedup_on` is selected.
+> Partners must collapse same-lead `property == mailing` before counting and uploading recipients for `Deliver To = both`. See [Campaign Dedup (automatic)](#campaign-dedup-automatic) for what Ballpoint does and does not deduplicate server-side.
+
 #### Full `set_list` example with `piece_counts`
 
 ```json
@@ -750,6 +754,8 @@ For the full `/confirm-payment` endpoint contract (request/response, fields, beh
 
 After receiving `campaign_submitted`, upload the mailing addresses for each order.
 
+> **Same-order dedupe is the partner's responsibility.** Ballpoint does **not** perform intra-order recipient dedupe. If duplicate recipient records are uploaded to the same order, Ballpoint treats them as separate recipient records unless another normal validation rule rejects the request — such as missing required fields, invalid address fields, or exceeding the order's `piece_count`. If a lead's mailing and property addresses are equal, count and upload that as **one** recipient, not two. Ballpoint's automatic [Campaign Dedup](#campaign-dedup-automatic) (`duplicate_in_campaign`) is **cross-order, same-campaign only**.
+
 ### Request
 
 ```
@@ -857,7 +863,15 @@ Dedup matches on `(address, city, state, zip)`, trimmed and case-insensitive. We
 
 The `piece_count` went from 847 → 800. Order enters production with 800 unique pieces.
 
-You don't need to handle dedup on your end — the API takes care of it. Check `rejected_details` if you want to see which addresses were skipped.
+For cross-order duplicates within the same campaign, you don't need to handle dedup on your end — the API takes care of it. Check `rejected_details` if you want to see which addresses were skipped. For same-order (intra-payload) duplicates, see below.
+
+#### What this does NOT do
+
+`duplicate_in_campaign` is **cross-order, same-campaign only**. Ballpoint does **not** perform intra-order recipient dedupe. The partner is responsible for collapsing duplicates *before* uploading a given order. Specifically:
+
+- **Duplicate recipient records in the same order are treated as separate recipient records** — unless another normal validation rule rejects the request, such as missing required fields, invalid address fields, or exceeding the order's `piece_count`. This also applies to records split across an `append: true` chain on the same order.
+- **`lead_id` and `type` (`mailing` / `property`) are not active recipient upload fields and are not used for dedupe.** Unknown fields are silently ignored at parse time and are not stored. Use [`contact_id`](#recipient-fields) for partner-side identifiers that need to round-trip.
+- **Partners must collapse same-lead `property == mailing` before count and upload for `Deliver To = both`.** If a single lead's property and mailing addresses are equal, count and upload that as one recipient, not two. This matches the [`piece_counts.both.dedup_off`](#recipient-selection-contract-piece-count--dedup) contract (per-lead unique send-address count).
 
 ### Timing
 
