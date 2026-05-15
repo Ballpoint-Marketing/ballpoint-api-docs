@@ -1059,11 +1059,72 @@ Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders o
 
 ---
 
+### 6m. Reschedule Order
+
+Update an order's scheduled mail date without creating a replacement order. V1 contract: the same `order_id` is preserved and the backend recomputes `scheduled_production_date` from the product SLA.
+
+```
+POST /v1/billing/orders/{order_id}/reschedule
+```
+
+**Allowed when:** `production_status = 'scheduled'` AND `payment_confirmed = FALSE`. Any other state returns `409` with a reason code (see the table below).
+
+**Request body:**
+
+```json
+{
+  "mail_date": "2026-08-15"
+}
+```
+
+**Response (`200`):**
+
+```json
+{
+  "order_id": "ord_7f3a2b",
+  "previous_mail_date": "2026-08-01",
+  "new_mail_date": "2026-08-15",
+  "previous_scheduled_production_date": "2026-07-30T00:00:00+00:00",
+  "new_scheduled_production_date": "2026-08-13T00:00:00+00:00"
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/reschedule \
+  -H "X-Partner-Key: <PARTNER_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"mail_date": "2026-08-15"}'
+```
+
+**Idempotent no-op.** If the supplied `mail_date` equals the order's current `metadata.mail_date`, the endpoint returns `200` with `previous_mail_date == new_mail_date`. **No** webhook is fired and **no** audit row is written. Safe to retry.
+
+**Rejection reasons:**
+
+| HTTP | `error.code` | When |
+|------|------|------|
+| 400 | `MAIL_DATE_INVALID_FORMAT` | Not `YYYY-MM-DD` (datetime strings, ISO-with-TZ, missing/null are all rejected) |
+| 400 | `MAIL_DATE_TOO_SOON` | `mail_date − SLA_days(product_type)` is ≤ today + 1 day (same threshold as `create_order`'s scheduling branch) |
+| 400 | `MAIL_DATE_TOO_FAR` | `mail_date` is more than 365 days in the future |
+| 409 | `PAID_LOCKED` | `payment_confirmed = TRUE` — order is locked, no reschedule |
+| 409 | `SEND_NOW_PROCESSING` | Send-now order in `pending_payment` awaiting `/confirm-payment` |
+| 409 | `IN_PRODUCTION` | Status is `accepted`, `prep`, `printing`, `writing`, `inserting`, `stamping`, or `shipping` |
+| 409 | `TERMINAL` | Status is `complete`, `cancelled`, `failed`, or `payment_failed` |
+| 409 | `STATE_CHANGED` | Concurrent state transition between read and write — retry once |
+| 404 | `ORDER_NOT_FOUND` | Order does not exist OR belongs to a different tenant (404, never 403, to prevent existence probing) |
+
+**Distinct from `payment_failed → new order`.** The existing terminal-failed-payment flow (`§6k Confirm Payment`) applies only **after** a terminal payment failure: the failed order is left in `payment_failed`, and partners create a fresh order to retry. Same-order reschedule (this endpoint) applies **only before** payment is processed.
+
+**On success.** Ballpoint emits the `order.rescheduled` webhook (see §7 Payload Format) and — when initiated from the embedded iframe — an `order_rescheduled` postMessage to the parent (see `IFRAME_KIT.md §6`). Webhook delivery is scoped to subscriptions owned by the order's `external_account_id` (existing routing property of the outbox routing layer).
+
+---
+
 ## 7. Status Updates via Webhooks
 
 > **Ballpoint delivers webhooks at least once. Your integration must handle duplicates, delays, and out-of-order delivery.**
 
-> Ballpoint emits two webhook event families: `order.status_changed` (this section, lifecycle of every order) and the per-piece RTS push-back (see [§7b](#7b-per-piece-rts-push-back-v1) below — V1 contract documented; live emission shipping in a future release).
+> Ballpoint emits two webhook event families: order lifecycle events (`order.status_changed` for status transitions and `order.rescheduled` for mail-date changes — this section) and the per-piece RTS push-back (see [§7b](#7b-per-piece-rts-push-back-v1) below — V1 contract documented; live emission shipping in a future release).
 
 ### Registration
 
@@ -1101,6 +1162,38 @@ When an order's status changes, we send an `order.status_changed` event:
 ```
 
 `list_id` echoes back verbatim the value you originally passed when creating the order (or `null` for orders not created via the partner endpoint). Use it as the join key on your side for reconciliation.
+
+### `order.rescheduled` Payload Format (v1.4.0+)
+
+Fired on a successful `POST /v1/billing/orders/{order_id}/reschedule` (see [§6m](#6m-reschedule-order)). Suppressed on idempotent no-op (when the requested `mail_date` equals the order's current value).
+
+```json
+{
+  "id": "evt_order.rescheduled_ord_7f3a2b_20260315_a1b2c3",
+  "type": "order.rescheduled",
+  "version": "2026-02-01",
+  "timestamp": "2026-03-15T16:30:00Z",
+  "data": {
+    "order_id": "ord_7f3a2b",
+    "campaign_id": "camp_test",
+    "list_id": "marketing_q1_2026",
+    "source": "your_source",
+    "external_account_id": "acct_partner",
+    "external_user_id": "user_789",
+    "external_user_metadata": { "agent_id": "a-123" },
+    "product_type": "4x6_printed",
+    "previous_mail_date": "2026-08-01",
+    "new_mail_date": "2026-08-15"
+  }
+}
+```
+
+Field notes:
+
+- **`previous_mail_date`** / **`new_mail_date`** are `YYYY-MM-DD` strings (no time, no timezone) — same shape as the API request body in §6m.
+- The webhook intentionally does **NOT** carry `previous_scheduled_production_date` / `new_scheduled_production_date`. Those are returned only in the synchronous reschedule API response (§6m). Partners rarely need the production-date directly; consume the API response if you do.
+- The outer envelope (`id`, `type`, `version`, `timestamp`) and `data.*` field conventions match `order.status_changed`. Re-use your existing webhook deduplication, retry logic, and signature verification — no changes required.
+- **Delivery scope.** Routed only to webhook subscriptions whose `external_account_id` matches the order's. Cross-tenant subscriptions never receive this event (existing routing property of the outbox routing layer).
 
 ### Webhook Headers
 
