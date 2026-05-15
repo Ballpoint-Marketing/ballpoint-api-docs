@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.4.0 — 2026-05-15
+
+- **New: same-order reschedule endpoint.** `POST /v1/billing/orders/{order_id}/reschedule` allows partners to change `mail_date` on a scheduled, unpaid order without creating a replacement order. Recomputes `scheduled_production_date` from product SLA. Returns `{ order_id, previous_mail_date, new_mail_date, previous_scheduled_production_date, new_scheduled_production_date }`. See `API_KIT.md §6m`.
+  - **Allowed states:** `production_status='scheduled'` AND `payment_confirmed=FALSE`.
+  - **409 reason codes:** `PAID_LOCKED` (payment already processed), `SEND_NOW_PROCESSING` (send-now order awaiting `/confirm-payment`), `IN_PRODUCTION` (accepted/prep/printing/writing/inserting/stamping/shipping), `TERMINAL` (complete/cancelled/failed/payment_failed), `STATE_CHANGED` (concurrent modification — retry).
+  - **400 reason codes:** `MAIL_DATE_INVALID_FORMAT` (not YYYY-MM-DD), `MAIL_DATE_TOO_SOON` (`mail_date − SLA_days` ≤ today + 1 day), `MAIL_DATE_TOO_FAR` (more than 365 days in future).
+  - **Idempotent no-op:** if the supplied `mail_date` equals the order's current value, the endpoint returns `200` with `previous_mail_date == new_mail_date` and emits **no** webhook (no audit row written).
+  - **Distinct from `payment_failed → new order`:** the existing terminal-failed-payment flow (`API_KIT.md §6k`) applies only **after** a terminal payment failure and requires creating a fresh order. Same-order reschedule applies **only before** payment is processed.
+- **New: `order.rescheduled` webhook event.** Fires on successful reschedule (suppressed on no-op). Payload field set follows the existing `order.status_changed` envelope style (snake_case keys): `order_id`, `campaign_id`, `list_id`, `source`, `external_account_id`, `external_user_id`, `external_user_metadata`, `product_type`, `previous_mail_date`, `new_mail_date`. Routed only to webhook subscriptions whose `external_account_id` matches the order's. See `API_KIT.md §7`.
+- **New: `order_rescheduled` iframe postMessage.** Emitted to the embedding parent (e.g., PropStream) on successful reschedule. Payload uses **camelCase** keys to match sibling postMessages (`order_cancelled`, `order_added`, `list_selected`): `{ type: "order_rescheduled", source: "ballpoint-mailer", version: 1, orderId, campaignId, previousMailDate, newMailDate }`. Suppressed on no-op. See `IFRAME_KIT.md §6`.
+- **Note on casing.** Two consistent conventions, mirroring existing patterns:
+  - **API requests + webhooks** use **snake_case** field keys (e.g., `mail_date`, `previous_mail_date`).
+  - **Iframe → parent postMessage** payloads use **camelCase** keys (e.g., `newMailDate`).
+  - Existing GET response field `orders[].mailDate` (camelCase, from v1.3.5/v1.3.6) is unchanged.
+- **Internal — scheduled-orders cron race fix.** The expire-pass cron now re-checks `scheduled_production_date` (and `deleted_at`) inside the UPDATE WHERE clause so a concurrently-rescheduled order is no longer at risk of being incorrectly flipped to `payment_failed` by an in-flight cron snapshot.
+
 ## v1.3.7 — 2026-05-14
 
 - **Clarified — recipient dedupe scope (docs-only, no behavior change)** — `IFRAME_KIT.md` now states explicitly that Ballpoint does **not** perform intra-order recipient dedupe: duplicate recipient records uploaded to the same order are treated as separate recipient records unless another normal validation rule rejects the request (missing required fields, invalid address fields, or exceeding the order's `piece_count`). Ballpoint's automatic `duplicate_in_campaign` dedupe is cross-order, same-campaign only. `lead_id` and `type` (`mailing` / `property`) are not active recipient upload fields and are not used for dedupe — unknown fields are silently ignored; use `contact_id` for partner-side identifiers. Partners must collapse same-lead `property == mailing` to one recipient before count and upload for `Deliver To = both`. New explicit notes added to (1) the `piece_counts.both.dedup_off` semantics (per-lead unique send-address count, NOT `property_count + mailing_count`), (2) the top of Recipient Upload Flow, and (3) a new "What this does NOT do" subsection under Campaign Dedup (automatic).

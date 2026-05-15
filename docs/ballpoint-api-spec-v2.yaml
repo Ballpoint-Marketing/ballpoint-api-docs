@@ -1091,6 +1091,110 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /v1/billing/orders/{order_id}/reschedule:
+    post:
+      tags:
+      - Orders
+      summary: Reschedule order (same-order)
+      description: >-
+        Update an order's scheduled mail date without creating a replacement
+        order. Allowed only when `production_status='scheduled'` AND
+        `payment_confirmed=FALSE`. The same `order_id` is preserved; the
+        backend recomputes `scheduled_production_date` from the product SLA.
+        Idempotent on no-op (when the supplied `mail_date` equals the order's
+        current value, the call returns 200 with no webhook/audit side-effects).
+        See `API_KIT.md §6m` for the full contract and `order.rescheduled`
+        webhook event payload.
+      operationId: rescheduleOrder
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - mail_date
+              properties:
+                mail_date:
+                  type: string
+                  format: date
+                  description: New mail date, `YYYY-MM-DD`. Interpreted at UTC midnight.
+                  example: "2026-08-15"
+      responses:
+        '200':
+          description: >-
+            Order rescheduled. If `previous_mail_date == new_mail_date` this is
+            an idempotent no-op (no webhook fired, no audit row written).
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/X-Trace-Id'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - order_id
+                - new_mail_date
+                - new_scheduled_production_date
+                properties:
+                  order_id:
+                    type: string
+                  previous_mail_date:
+                    type: string
+                    format: date
+                    nullable: true
+                  new_mail_date:
+                    type: string
+                    format: date
+                  previous_scheduled_production_date:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  new_scheduled_production_date:
+                    type: string
+                    format: date-time
+        '400':
+          description: >-
+            Validation failure. `error.code` values: `MAIL_DATE_INVALID_FORMAT`
+            (not `YYYY-MM-DD`), `MAIL_DATE_TOO_SOON` (`mail_date − SLA_days` is
+            ≤ today + 1 day), `MAIL_DATE_TOO_FAR` (> 365 days in the future).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: >-
+            Order not found (also returned for cross-tenant lookups so order
+            existence cannot be probed across tenants).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: >-
+            Order is not in a reschedulable state. `error.code` values:
+            `PAID_LOCKED` (`payment_confirmed=TRUE`), `SEND_NOW_PROCESSING`
+            (`pending_payment` awaiting `/confirm-payment`), `IN_PRODUCTION`
+            (status is accepted/prep/printing/writing/inserting/stamping/
+            shipping), `TERMINAL` (status is complete/cancelled/failed/
+            payment_failed), `STATE_CHANGED` (concurrent state transition
+            between read and write; retry once).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/campaigns:
     post:
       tags:
