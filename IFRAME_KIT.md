@@ -350,7 +350,7 @@ The partner sends:
 }
 ```
 
-If the user picks `Deliver To = both` + `Remove duplicates = on`, the iframe displays **850 pieces** and prices accordingly. On submit, `campaign_submitted.recipient_selection` carries `{ deliver_to: "both", remove_duplicate_addresses: true, piece_count: 850 }`, and each entry in `orders[].pieces` equals 850 for a single-drop campaign (multi-drop campaigns repeat the same per-drop count across orders in V1).
+If the user picks `Deliver To = both` + `Remove duplicates = on`, the iframe displays **850 pieces** and prices accordingly. On submit, `campaign_submitted.recipient_selection` carries `{ deliver_to: "both", remove_duplicate_addresses: true, piece_count: 850 }`, and each entry in `orders[].pieces` equals 850. For multi-send (sequence) and A/B split campaigns each drop carries its own `orders[].pieces` value derived from the same `recipient_selection` — each drop's recipient set is the partner's full selection for that drop, and Ballpoint does not dedupe across drops in a sequence (see [Campaign Dedup (automatic)](#campaign-dedup-automatic) for the cross-order scope rules).
 
 #### Backward compatibility
 
@@ -590,7 +590,8 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
       "unit_price_tcents": 10000,
       "total_tcents": 8470000,
       "total_dollars": "847.00",
-      "recipientsEndpoint": "/v1/billing/orders/ord_abc123/recipients"
+      "recipientsEndpoint": "/v1/billing/orders/ord_abc123/recipients",
+      "campaignInstanceId": null
     }
   ],
   "recipient_selection": {
@@ -618,6 +619,7 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 | `orders[].unit_price_tcents` | number | Marked-up unit price in tenth-cents. |
 | `orders[].total_tcents` | number | Marked-up total for this order in tenth-cents. |
 | `orders[].recipientsEndpoint` | string or null | API path to POST recipients (null if pending). |
+| `orders[].campaignInstanceId` | string or null | Opaque submit/split instance key. `null` for `single` and `multi` campaigns (no cross-order dedup expected). For `split` campaigns, all sibling orders in the same `campaign_submitted` payload share the same opaque string value — Ballpoint uses this server-side as a guard-rail to enforce disjoint slices across A/B variants (see [Campaign Dedup (automatic)](#campaign-dedup-automatic)). Treat as opaque on the partner side; do not parse, mutate, or echo back. |
 | `total_tcents` | number | Marked-up total across all orders, in tenth-cents — what the end user pays. |
 | `total_dollars` | string | Same total as a fixed-2 dollar string. **UX/display only.** Before charging the end-user on the partner side, refetch the authoritative amount from Ballpoint server-side via `GET /v1/billing/partner/orders`. |
 | `pendingSubmissionCount` | number | Orders still waiting to submit (usually 0). |
@@ -865,9 +867,17 @@ POST .../recipients   { "recipients": [next 10k],  "append": true  }
 
 ### Campaign Dedup (automatic)
 
+**Scope: cross-order dedup is opt-in via `campaign_instance_id`.** Ballpoint groups orders internally by a list-level backend `campaign_id` (a stable key derived from your account + `list_id`), but cross-order recipient dedup only runs when an order also carries a non-null `campaign_instance_id` shared with its sibling orders. The iframe surfaces this as `orders[].campaignInstanceId` on `campaign_submitted`:
+
+- **`single` campaigns** — `campaignInstanceId` is `null`. No cross-order dedup.
+- **`multi` (sequence) campaigns** — `campaignInstanceId` is `null` on every drop. Each drop's recipient set is the partner's full selection for that drop — Ballpoint does **not** dedupe across drops, matching the product intent that a sequence repeatedly reaches the same individuals. List reuse across separate submissions is also not deduped.
+- **`split` (A/B) campaigns** — `campaignInstanceId` is the same opaque string on every sibling order in the same `campaign_submitted` payload. Cross-order dedup runs against the sibling orders only; partners must upload disjoint recipient slices per variant, and any overlap that slips through is rejected with `duplicate_in_campaign` on the second-uploaded variant. This is a guard-rail so no recipient receives both variants.
+
+When `campaignInstanceId` is `null` on every order in a campaign, the "If an order belongs to a campaign..." behavior below does **not** fire, regardless of whether the orders share a backend `campaign_id`.
+
 If an order belongs to a campaign that already has recipients from previous drops, we check for duplicate addresses automatically. Matches get rejected with `duplicate_in_campaign` and the order's `piece_count` is adjusted down so it can still reach `ready: true`.
 
-Dedup matches on `(address, city, state, zip)`, trimmed and case-insensitive. We only check against other orders in the same campaign — cancelled/deleted orders are ignored.
+Dedup matches on `(address, city, state, zip)`, trimmed and case-insensitive. We only check against other orders in the same campaign **with the same non-null `campaign_instance_id`** — cancelled/deleted orders are ignored.
 
 **Example:** Say a campaign already has 500 recipients from drop 1. You upload 847 for drop 2, and 47 of those match. You'd get back:
 ```json
@@ -895,6 +905,18 @@ For cross-order duplicates within the same campaign, you don't need to handle de
 - **Duplicate recipient records in the same order are treated as separate recipient records** — unless another normal validation rule rejects the request, such as missing required fields, invalid address fields, or exceeding the order's `piece_count`. This also applies to records split across an `append: true` chain on the same order.
 - **`lead_id` and `type` (`mailing` / `property`) are not active recipient upload fields and are not used for dedupe.** Unknown fields are silently ignored at parse time and are not stored. Use [`contact_id`](#recipient-fields) for partner-side identifiers that need to round-trip.
 - **Partners must collapse same-lead `property == mailing` before count and upload for `Deliver To = both`.** If a single lead's property and mailing addresses are equal, count and upload that as one recipient, not two. This matches the [`piece_counts.both.dedup_off`](#recipient-selection-contract-piece-count--dedup) contract (per-lead unique send-address count).
+
+#### Identifier reference — four distinct ids
+
+Four distinct identifiers. Confusing any two of them is a docs/code bug. Doc copy must reflect this map exactly:
+
+- **backend `campaign_id`** — existing DB column. List-level grouping, deterministically derived as `f"camp_{account_id}_{list_id}"` (billing_router.py:3767). Stable across all submissions touching the same list_id within an account. **NOT exposed in postMessage payloads as-is.**
+- **postMessage `campaignId`** (camelCase) — iframe-local id, `generateId('camp')` from campaign-store.js. Emitted in `campaign_created` / `campaign_submitted` / `order_added`. Has **no relationship** to backend `campaign_id`. Doc must never describe `campaign_submitted.campaignId` as "the backend campaign". Treat it as an opaque iframe handle.
+- **`campaign_instance_id`** (snake_case) — **NEW** DB/API field on `orders`. Optional submit/split instance key. NULL = bypass cross-order dedup; shared value across siblings = enable dedup.
+- **`campaignInstanceId`** (camelCase) — same value as the new DB field, surfaced into iframe→partner `campaign_submitted.orders[].campaignInstanceId`. Opaque string for partners.
+- **`sequence_instance_id`** — appears in api-docs Q2.a/Q2.b for payment-recovery clone-forward. **Different concept**. Do not touch, rename, or conflate with `campaign_instance_id` in this plan.
+
+Cross-tenant scoping is preserved by `campaign_id`'s `acct_{account_id}` prefix. `campaign_instance_id` cannot bridge accounts.
 
 ### Timing
 
