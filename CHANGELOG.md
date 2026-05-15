@@ -16,6 +16,13 @@
   - Existing GET response field `orders[].mailDate` (camelCase, from v1.3.5/v1.3.6) is unchanged.
 - **Internal — scheduled-orders cron race fix.** The expire-pass cron now re-checks `scheduled_production_date` (and `deleted_at`) inside the UPDATE WHERE clause so a concurrently-rescheduled order is no longer at risk of being incorrectly flipped to `payment_failed` by an in-flight cron snapshot.
 
+## v1.3.9 — 2026-05-15
+
+- **New: `open_create_direct_mail` iframe command (parent → iframe)** — lets PropStream open the same Create Direct Mail flow as the iframe's internal `+ Create Direct Mail` / `+ New Campaign` button. The command has no payload fields and reuses the iframe's existing `startNewCampaign()` path.
+- **Guard:** the command requires a concrete active list context: an accepted first `set_list` with non-empty `listId` and positive `count`, or a selected `set_lists` item with non-empty `listId` and positive `count` after `list_selected`. This prevents opening a create flow against the iframe's built-in demo defaults.
+- **New failure event:** `open_create_direct_mail_failed` emits instead of navigating when the command arrives before active list context exists, or if the create-flow handler is unavailable.
+- **Schema alignment:** the inbound `set_lists.lists` schema now accepts the array shape already documented and consumed by the list-selector handler.
+
 ## v1.3.8 — 2026-05-14
 
 - **New: `campaign_submitted.orders[].campaignInstanceId`** — opaque submit/split instance key surfaced on each entry of the `orders[]` array. `null` for `single` and `multi` (sequence) campaigns; opaque shared string value for `split` (A/B) sibling orders in the same `campaign_submitted` payload. Partners that ignore the field are unaffected.

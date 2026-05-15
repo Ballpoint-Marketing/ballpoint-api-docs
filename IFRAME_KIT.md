@@ -316,6 +316,24 @@ When the user selects a list, the iframe sends a `list_selected` event back to t
 
 > **Note:** Send either `set_list` (single list, user goes straight to campaign builder) or `set_lists` (multiple lists, user picks first). Do not send both.
 
+### `open_create_direct_mail` — Open the Create Direct Mail flow (optional)
+
+Use this when your parent app needs to programmatically open the same flow the iframe opens when the user clicks `+ Create Direct Mail` / `+ New Campaign`.
+
+```json
+{
+  "source": "propstream",
+  "version": 1,
+  "type": "open_create_direct_mail"
+}
+```
+
+This message has no required payload fields. On success, the iframe reuses its internal `startNewCampaign()` path and emits the normal `page_changed` event for the page it opens (`type` when sender info is already saved, otherwise `setup`).
+
+**Required list context:** send this only after the iframe has a concrete active list context: either an accepted first `set_list` with a non-empty `listId` and positive `count`, or a user-selected `set_lists` item with a non-empty `listId` and positive `count` after the iframe has emitted `list_selected`. The iframe intentionally does not treat its built-in demo defaults (`Pre-Foreclosure Leads`, `847`) as usable context for this command. If the command arrives before active list context exists, the iframe does not navigate and emits `open_create_direct_mail_failed`.
+
+`set_api_config` should still be sent during bootstrap. Missing API config does not block opening this screen because the iframe already queues submit actions until API config arrives, but partners should send `set_api_config` before the user submits.
+
 ### Recipient selection contract (piece count + dedup)
 
 When `set_list.piece_counts` (or `set_lists[].piece_counts`) is present, the iframe surfaces two user-facing controls on the piece-selection page and emits the user's final choice back to the parent on `campaign_submitted`. End-to-end:
@@ -512,6 +530,28 @@ Sent when the user clicks the "Edit Leads" button on the iframe's My Campaigns /
   "page": "products"
 }
 ```
+
+#### `open_create_direct_mail_failed` — Create Direct Mail command rejected
+
+Sent when the parent sends `open_create_direct_mail` before the iframe has the required active list context, or if the internal create-flow handler is unavailable. No navigation occurs when this event is emitted.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "open_create_direct_mail_failed",
+  "reason": "list_context_missing",
+  "message": "A concrete list context is required before opening Create Direct Mail.",
+  "requiredContext": "accepted set_list with non-empty listId and positive count, or selected set_lists item with non-empty listId and positive count",
+  "listId": null,
+  "listName": "Pre-Foreclosure Leads",
+  "recipientCount": null,
+  "hasAcceptedSetList": false,
+  "hasSelectedSetListsItem": false
+}
+```
+
+Possible `reason` values: `list_context_missing`, `handler_unavailable`.
 
 #### `cancelled` — User cancelled the flow
 
