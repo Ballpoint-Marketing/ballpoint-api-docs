@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.4.2 — 2026-05-16
+
+- **New field: `payment_confirmed` exposed in `GET /v1/billing/orders` and `GET /v1/billing/orders/{order_id}` responses.** Tri-state nullable boolean (`true`/`false`/`null`). Returned as `true` once `POST /v1/billing/orders/{order_id}/confirm-payment` succeeds for partner-gated accounts (`requires_payment_confirmation = TRUE`); `false` while awaiting partner confirmation; `null` for accounts that do not use the payment gate. Backward compatible: existing partners ignoring the field are unaffected. See `API_KIT.md §6c` + `§6d`.
+- **Why.** Iframe consumers need a reliable per-order payment-state signal that does not require parsing ambiguous `production_status` values (e.g. `scheduled` can be either pre- or post-confirmation). Foundation for future campaign-level features that distinguish billed vs unbilled drops.
+
 ## v1.4.1 — 2026-05-16
 
 - **New: `sender_setup_requested` iframe postMessage (iframe → parent).** Emitted when the user clicks the "Set up now" CTA on the iframe's first-time setup page (`page-setup`) and no `set_sender` has been received yet. Payload: `{ source: "ballpoint-mailer", version: 1, type: "sender_setup_requested", reason, page, externalAccountId, externalUserId }`. See `IFRAME_KIT.md §6`.

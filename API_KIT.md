@@ -513,6 +513,7 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
   "production_status": "printing",
   "usps_status": null,
   "display_status": "printing",
+  "payment_confirmed": true,
   "envelope_style": null,
   "print_font": null,
   "shipping_option": null,
@@ -532,6 +533,8 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
 Tenant scoping: partners only see their own orders. Both cross-tenant and unknown `order_id` return `404` (never `403`) so existence cannot be probed across tenants.
 
 `customer_info` is `null` unless populated (object with `name`, `website`, `rma`, `phone`, `shipping_address` — only present keys returned). `envelope_style`, `print_font`, `shipping_option`, `proof_approval_status` are `null` for products that do not use them. `metadata` is returned as a JSON-encoded string; call `JSON.parse(body.metadata)` if you need nested fields. Response shape matches each element of `GET /v1/billing/orders` (§6d).
+
+**`payment_confirmed`** (boolean or null): For accounts with partner-side payment confirmation gating (`requires_payment_confirmation = TRUE`, e.g. PropStream): `true` once `POST /v1/billing/orders/{order_id}/confirm-payment` has fired with `status: success`; `false` while the order is still awaiting partner confirmation. For accounts that do not use the payment gate, the value is always `null` and the field should be ignored — their billing lifecycle does not use partner-side payment confirmation.
 
 ---
 
@@ -573,6 +576,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
       "production_status": "complete",
       "usps_status": "delivered",
       "display_status": "delivered",
+      "payment_confirmed": true,
       "external_user_id": "user_789",
       "status_changed_at": "2026-03-05T10:00:00Z",
       "created_at": "2026-03-01T14:00:00Z"
@@ -588,6 +592,8 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
 - Results are scoped to your partner account automatically — you only see your own orders.
 - `display_status` is the single field to show users. It equals `usps_status` when USPS tracking is available, otherwise `production_status`.
 - Use `total` for pagination: if `total > limit + offset`, there are more pages.
+
+Each element has the same shape as §6c, including the `payment_confirmed` field.
 
 ---
 
