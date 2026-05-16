@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.1 — 2026-05-16
+
+- **New: `sender_setup_requested` iframe postMessage (iframe → parent).** Emitted when the user clicks the "Set up now" CTA on the iframe's first-time setup page (`page-setup`) and no `set_sender` has been received yet. Payload: `{ source: "ballpoint-mailer", version: 1, type: "sender_setup_requested", reason, page, externalAccountId, externalUserId }`. See `IFRAME_KIT.md §6`.
+- **Casing.** Payload keys are **camelCase** to match sibling iframe → parent postMessages (`edit_leads_requested`, `order_rescheduled`, `order_cancelled`, `list_selected`).
+- **Enums.** `reason` is the V1 enum `"sender_info_missing"`. `page` is the V1 enum `"setup"` \| `"campaigns"` (V1 wires `"setup"`; `"campaigns"` is accepted today so the future my-info CTA wire requires no schema change). Future values for both fields are additive — partners should treat unknown values as "open the sender modal" and not hard-fail.
+- **Empty identifiers allowed.** `externalAccountId` and `externalUserId` MAY be empty strings if the user reaches the CTA before any `set_list` or `set_tenant` has arrived (e.g., very first session before list selection).
+- **Parent → iframe response unchanged.** The parent replies with the existing [`set_sender`](IFRAME_KIT.md#set_sender--pre-fill-sender-info-optional) postMessage on modal save. No new inbound contract; the iframe's existing locking flow takes over from there.
+- **Pre-lock behavior.** Queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Identical treatment to `edit_leads_requested`. In standalone (non-embed) mode the iframe falls back to its built-in inline sender form and the CTA is suppressed.
+
 ## v1.4.0 — 2026-05-15
 
 - **New: same-order reschedule endpoint.** `POST /v1/billing/orders/{order_id}/reschedule` allows partners to change `mail_date` on a scheduled, unpaid order without creating a replacement order. Recomputes `scheduled_production_date` from product SLA. Returns `{ order_id, previous_mail_date, new_mail_date, previous_scheduled_production_date, new_scheduled_production_date }`. See `API_KIT.md §6m`.

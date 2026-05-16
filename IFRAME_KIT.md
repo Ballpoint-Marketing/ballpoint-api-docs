@@ -520,6 +520,47 @@ Sent when the user clicks the "Edit Leads" button on the iframe's My Campaigns /
 3. On modal save, send the updated list back to the iframe via the existing `set_list` postMessage with the SAME `listId` (see [`set_list` refresh](#set_list-refresh-post-modal-sync)).
 4. On modal close without changes, no postMessage required.
 
+#### `sender_setup_requested` — User requested sender info setup
+
+Sent when the user clicks the "Set up now" CTA on the iframe's first-time setup page because no sender info has been provided. PropStream's parent app should listen for this event and open its sender-setup modal overlay, then reply with the existing [`set_sender`](#set_sender--pre-fill-sender-info-optional) postMessage once the user saves.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "sender_setup_requested",
+  "reason": "sender_info_missing",
+  "page": "setup",
+  "externalAccountId": "ps_acc_42",
+  "externalUserId": "ps_user_99"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source` | string | Always `ballpoint-mailer`. |
+| `version` | number | Always `1`. |
+| `type` | string | Always `sender_setup_requested`. |
+| `reason` | string | V1 enum: `"sender_info_missing"`. Future values are additive — partners should treat unknown values as "open the sender modal" and not hard-fail. |
+| `page` | string | V1 enum: `"setup"` \| `"campaigns"`. Identifies the iframe view the CTA was triggered from. V1 wires `"setup"` (first-time setup page); `"campaigns"` is reserved for a future my-info CTA on the My Campaigns / Dashboard page and is accepted by the contract today so a later wire requires no schema change. |
+| `externalAccountId` | string | Partner account identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** if the user reaches "Set up now" before any `set_list` or `set_tenant` has arrived (e.g., very first session before list selection). |
+| `externalUserId` | string | Partner user identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** under the same condition as `externalAccountId`. |
+
+No sender PII (`fullName`, `address`, `city`, `state`, `zip`, `phone`, `email`, `website`) is ever included in this event. The parent already owns the sender data via the existing `set_sender` flow.
+
+**Visibility / lifecycle**
+
+- Rendered on the iframe's first-time setup page (`page-setup`) only when no `set_sender` has been received yet. Once `set_sender` has been accepted, the CTA is suppressed and the sender form is locked per the existing `set_sender` behavior.
+- In standalone (non-embed) mode the iframe falls back to its built-in inline sender form. The CTA is suppressed.
+- **Pre-lock behavior:** queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Not broadcast to all allowlisted origins. Identical treatment to `edit_leads_requested`.
+
+**Expected PropStream behavior**
+
+1. Listen for the `sender_setup_requested` event.
+2. Open the sender-setup modal overlay (PropStream-hosted, on top of the iframe).
+3. On modal save, send the existing [`set_sender`](#set_sender--pre-fill-sender-info-optional) postMessage to the iframe with the user's sender data. The iframe's existing locking flow takes over from there.
+4. On modal close without changes, no postMessage required.
+
 #### `page_changed` — User navigated to a different view
 
 ```json
