@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.0 — 2026-05-16
+
+- **BREAKING (semantically): `edit_leads_requested` postMessage is now campaign-level.** V1 list-level payload replaced with V2 campaign-level payload (`scope: "multi_month_campaign"`, `campaignId`, `ballpointCampaignId`, `affectedOrders[]`, `lockedOrders[]`). The list-level header button is replaced by per-campaign-card buttons that appear only on multi-month campaigns with at least one future/unbilled drop. Iframe is still staging-only — PropStream listener updates required before any iframe production rollout. See `IFRAME_KIT.md` `edit_leads_requested` section.
+- **New: `PATCH /v1/billing/orders/{order_id}/recipients` endpoint** for Edit Leads V2 flow. Replaces recipients, resizes `piece_count`, recomputes display pricing fields via canonical `get_unit_price`. All-or-nothing Pydantic v2 validation (any invalid recipient → `422`, no DB mutation). Gates: account `requires_payment_confirmation=TRUE`, order `payment_confirmed=FALSE`, status ∈ `{scheduled, pending_payment, accepted, prep}`. New 409 codes: `PAYMENT_GATE_NOT_ACTIVE`, `PAID_LOCKED`, `RECIPIENTS_LOCKED`. No transactions/usage/balance writes — `/confirm-payment` recomputes price at charge time using the new piece_count, so it remains the sole billing source of truth. See `API_KIT.md §6n`.
+- **New: `recipients_updated` parent→iframe postMessage.** Emitted by the partner app after successfully PATCHing each `affectedOrder`. Triggers iframe to re-fetch campaign history. Read-only `tenantKey` check (event cannot be used to establish or mutate tenant scope). See `IFRAME_KIT.md`.
+- **Note on existing `POST /v1/billing/orders/{order_id}/recipients`:** unchanged. Still the canonical endpoint for initial recipient upload (and chunked append). NOT the Edit Leads V2 flow (use the new PATCH).
+
 ## v1.4.2 — 2026-05-16
 
 - **New field: `payment_confirmed` exposed in `GET /v1/billing/orders` and `GET /v1/billing/orders/{order_id}` responses.** Tri-state nullable boolean (`true`/`false`/`null`). Returned as `true` once `POST /v1/billing/orders/{order_id}/confirm-payment` succeeds for partner-gated accounts (`requires_payment_confirmation = TRUE`); `false` while awaiting partner confirmation; `null` for accounts that do not use the payment gate. Backward compatible: existing partners ignoring the field are unaffected. See `API_KIT.md §6c` + `§6d`.

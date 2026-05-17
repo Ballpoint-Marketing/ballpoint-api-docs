@@ -280,7 +280,7 @@ Example refresh payload (after Edit Leads modal save):
 }
 ```
 
-See also the [`edit_leads_requested` event](#edit_leads_requested--user-requested-to-edit-the-recipient-list) for the iframe → parent trigger that opens the modal.
+See also the [`edit_leads_requested` event](#edit_leads_requested--user-clicked-edit-leads-on-a-campaign-card-v2) for the iframe → parent trigger that opens the modal.
 
 ### `set_lists` — Multiple lists for user selection (alternative to `set_list`)
 
@@ -477,48 +477,128 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 }
 ```
 
-#### `edit_leads_requested` — User requested to edit the recipient list
+#### `edit_leads_requested` — User clicked "Edit Leads" on a campaign card (V2)
 
-Sent when the user clicks the "Edit Leads" button on the iframe's My Campaigns / Dashboard page. PropStream's parent app should listen for this event and open its Edit Leads modal overlay.
+**Breaking change from V1 (released 2026-05-16, iframe staging-only):** the V1 list-level event (`{listId, listName, recipientCount, externalAccountId, externalUserId}` emitted from a single global header button) has been replaced with a V2 campaign-level event. The header button is removed; each multi-month campaign card in My Campaigns now has its own Edit Leads button.
+
+**When emitted:** the user clicks the Edit Leads button inside a multi-month campaign card. Eligibility requires:
+- `campaign.orders.length > 1`
+- `campaign.type !== 'split'`
+- All orders have `paymentConfirmed` not null (defense: campaigns with any null are skipped — typically non-gated accounts)
+- At least one order is "affected" (see classification below)
+
+**Payload:**
 
 ```json
 {
   "source": "ballpoint-mailer",
   "version": 1,
   "type": "edit_leads_requested",
+  "scope": "multi_month_campaign",
+  "campaignId": "api_campaign_cmp_abc",
+  "ballpointCampaignId": "cmp_abc",
+  "campaignType": "multi",
   "listId": "ps_list_123",
   "listName": "Pre-Foreclosure Leads",
   "recipientCount": 500,
   "externalAccountId": "ps_acc_42",
-  "externalUserId": "ps_user_99"
+  "externalUserId": "user_789",
+  "affectedOrders": [
+    {
+      "orderId": "ord_local_or_api",
+      "ballpointOrderId": "ord_abc123",
+      "mailDate": "2026-07-15",
+      "productionStatus": "scheduled",
+      "paymentConfirmed": false,
+      "pieces": 500,
+      "editRecipientsEndpoint": "/v1/billing/orders/ord_abc123/recipients",
+      "editRecipientsMethod": "PATCH"
+    }
+  ],
+  "lockedOrders": [
+    {
+      "orderId": "ord_other",
+      "ballpointOrderId": "ord_xyz",
+      "mailDate": "2026-06-01",
+      "productionStatus": "accepted",
+      "paymentConfirmed": true,
+      "pieces": 500,
+      "lockedReason": "billed"
+    }
+  ]
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `source` | string | Always `ballpoint-mailer`. |
-| `version` | number | Always `1`. |
-| `type` | string | Always `edit_leads_requested`. |
-| `listId` | string | The active list identifier (echoed verbatim from the original `set_list` / `set_lists` payload). |
-| `listName` | string | The active list name. |
-| `recipientCount` | number | The RAW recipient count cached at ingress. For `set_list` flows: the count from the first-receipt `set_list` (or the most recent same-listId refresh). For `set_lists` flows: the count of the list the user picked from the selector, cached at pick time. In both cases, NOT the post-selection effective count from `piece_counts` (see [Recipient selection contract](#recipient-selection-contract-piece-count--dedup)). Useful as the anchor count for the modal's list summary. |
-| `externalAccountId` | string | Partner account identifier echoed from `set_list`. |
-| `externalUserId` | string | Partner user identifier echoed from `set_list`. |
+| Field | Description |
+|---|---|
+| `scope` | Always `"multi_month_campaign"` in V1. Reserved for future scopes (e.g. split, single-send if reintroduced). |
+| `campaignId` | Iframe-local group key (e.g. `api_campaign_<id>` for API-loaded campaigns; `cmp_<local>` for in-builder). Use `ballpointCampaignId` for cross-system reference. |
+| `ballpointCampaignId` | Server-side Ballpoint campaign ID (from API `campaign_id`). May be `null` for campaigns not yet persisted server-side (rare in multi-month flow). |
+| `campaignType` | `"multi"` (only eligible type in V1). |
+| `recipientCount` | Raw list recipient count at the time of click (not the affected/locked breakdown sum). |
+| `affectedOrders[]` | Orders eligible for edit. Each has `editRecipientsEndpoint` + `editRecipientsMethod: "PATCH"`. PropStream's Edit Leads modal should PATCH each one with the new recipient list after the user saves. |
+| `lockedOrders[]` | Orders that cannot be edited (billed, in production, mailed, delivered, terminal). Each has `lockedReason`. Use these to explain to the user which orders won't be affected. |
 
-**Visibility / lifecycle**
+**`lockedReason` enum:**
 
-- The iframe only renders the Edit Leads button when an active list context exists (i.e., a `set_list` or `set_lists`-selected list was received).
-- The button is hidden when no active list is set.
-- The button is rendered on the iframe's My Campaigns / Dashboard page header, top-right action area.
-- **V1 scope:** the button is global to the active list, not per-campaign. Per-campaign Edit Leads actions are a future iteration.
-- **No per-status / per-mailDate lockout enforced by the iframe in V1.** The recipient upload endpoint enforces production-state lockout independently (`scheduled` / `pending_payment` / `accepted` / `prep` only). PropStream's modal is expected to enforce any timing rules (e.g., ">3 days before ship date") on their side.
+| Value | Meaning |
+|---|---|
+| `"billed"` | `paymentConfirmed === true` (partner has confirmed payment for this drop). |
+| `"in_production"` | Status in `{processing, in_production, printing, quality_check, printed}`. |
+| `"mailed"` | Status `complete`. |
+| `"delivered"` | Status in `{shipped, in_transit, out_for_delivery, delivered}`. |
+| `"terminal"` | Status in `{cancelled, failed, payment_failed}`. |
+| `"unsupported_status"` | Status outside both the affected allowlist and known production states (e.g. `submitted`, `received`). |
+| `"unknown"` | `paymentConfirmed` is `null` or missing (typically non-gated account; campaign should not have been eligible — defense-in-depth). |
+
+**Affected allowlist** (mirrors the backend gate on `PATCH /v1/billing/orders/{id}/recipients`):
+
+- Status ∈ `{scheduled, pending_payment, accepted, prep}` AND
+- `paymentConfirmed === false`
+
+`submitted` and `received` are NOT in the allowlist — they appear in `lockedOrders` with `lockedReason: "unsupported_status"`.
+
+**Emit-only-when-affected:** the iframe does NOT emit this event when `affectedOrders.length === 0`. The button is hidden in that case.
 
 **Expected PropStream behavior**
 
-1. Listen for the `edit_leads_requested` event.
-2. Open the Edit Leads modal overlay (PropStream-hosted, on top of the iframe).
-3. On modal save, send the updated list back to the iframe via the existing `set_list` postMessage with the SAME `listId` (see [`set_list` refresh](#set_list-refresh-post-modal-sync)).
-4. On modal close without changes, no postMessage required.
+1. Listen for `edit_leads_requested`.
+2. Open the Edit Leads modal (PropStream-hosted, on top of the iframe).
+3. On modal save, **PATCH each `affectedOrders[].editRecipientsEndpoint` with the updated recipient list** (`PATCH /v1/billing/orders/{order_id}/recipients`, see `API_KIT.md §6n`). All-or-nothing — invalid recipients → `422`.
+4. After all PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
+5. On modal close without changes, no postMessage required.
+
+#### `recipients_updated` — Partner finished editing recipients (parent → iframe)
+
+Emitted by the parent app (e.g. PropStream) after successfully PATCHing each `affectedOrder`. Triggers the iframe to re-fetch campaign history and re-render My Campaigns.
+
+```json
+{
+  "source": "propstream-app",
+  "version": 1,
+  "type": "recipients_updated",
+  "tenantKey": "ps_acc_42",
+  "campaignId": "api_campaign_cmp_abc",
+  "ballpointCampaignId": "cmp_abc",
+  "updatedBallpointOrderIds": ["ord_abc123", "ord_def456"]
+}
+```
+
+| Field | Description |
+|---|---|
+| `tenantKey` | MUST match the iframe's active tenant scope. The iframe rejects mismatches without mutating tenant state — this event cannot be used to establish or change tenant scope. |
+| `campaignId` | Iframe-local group key, echoed from the original `edit_leads_requested` event. |
+| `ballpointCampaignId` | Server-side campaign ID. |
+| `updatedBallpointOrderIds` | Array of `ballpointOrderId` strings that were PATCHed. Maximum 1000 IDs, each up to 256 chars. The iframe treats this as advisory (full refresh happens regardless). |
+
+**Iframe behavior on receipt:**
+
+1. Validate `tenantKey` against the active scope (read-only check; mismatch → rejected, no state mutation).
+2. Validate `updatedBallpointOrderIds` array shape + per-element string + length caps.
+3. Re-fetch campaign history (full refresh).
+4. Re-render My Campaigns page so the user sees the new `piece_count` and price for the edited drops.
+
+**Defense in depth:** the iframe does NOT trust `updatedBallpointOrderIds` for access control. The list is advisory; refresh is unconditional once tenant + shape validation pass. This prevents a malicious or buggy parent from selectively invalidating per-order state.
 
 #### `sender_setup_requested` — User requested sender info setup
 

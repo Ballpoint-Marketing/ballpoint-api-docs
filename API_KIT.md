@@ -1124,6 +1124,92 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/res
 
 **On success.** Ballpoint emits the `order.rescheduled` webhook (see §7 Payload Format) and — when initiated from the embedded iframe — an `order_rescheduled` postMessage to the parent (see `IFRAME_KIT.md §6`). Webhook delivery is scoped to subscriptions owned by the order's `external_account_id` (existing routing property of the outbox routing layer).
 
+### 6n. Edit Leads — Replace + Resize + Reprice (Recipients PATCH)
+
+```
+PATCH /v1/billing/orders/{order_id}/recipients
+X-Partner-Key: pk_test_...
+Content-Type: application/json
+```
+
+For Edit Leads campaign-level flow on multi-month future/unbilled drops. Replaces all recipients on the order, resizes `piece_count` to match the new count, and recomputes display pricing fields (`unit_price_tcents`, `total_price_tcents`) via the canonical pricing helper.
+
+**Distinction from POST /recipients:** the POST endpoint is for **initial recipient upload** (or chunked append). It does NOT resize `piece_count` and is NOT the Edit Leads V2 flow. Use this PATCH instead for Edit Leads.
+
+**Request body:**
+
+```json
+{
+  "recipients": [
+    {
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "company": null,
+      "address": "100 Main St",
+      "address2": null,
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94103",
+      "contact_id": "ps_contact_42"
+    }
+  ]
+}
+```
+
+**All-or-nothing.** Each recipient must satisfy:
+- `first_name` OR `last_name` populated (at least one)
+- `address`, `city`, `state` (2-letter), `zip` (5 or 5+4)
+
+Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, **no DB mutation**.
+
+**Gate (fail-fast):**
+1. Pydantic validation → `422` (no handler execution if any recipient invalid)
+2. Tenant scoping → `404` if order belongs to another tenant
+3. Order not found → `404 ORDER_NOT_FOUND`
+4. Status ∉ `{scheduled, pending_payment, accepted, prep}` → `409 RECIPIENTS_LOCKED`
+5. Account `requires_payment_confirmation = FALSE` → `409 PAYMENT_GATE_NOT_ACTIVE`
+6. Order `payment_confirmed = TRUE` → `409 PAID_LOCKED`
+
+**Response 200:**
+
+```json
+{
+  "order_id": "ord_abc123",
+  "accepted": 499,
+  "previous_piece_count": 500,
+  "new_piece_count": 499,
+  "previous_unit_price_tcents": null,
+  "new_unit_price_tcents": 5050,
+  "previous_total_price_tcents": null,
+  "new_total_price_tcents": 2519950,
+  "payment_confirmed": false
+}
+```
+
+| Field | Description |
+|---|---|
+| `accepted` | Count of recipients successfully written (equals `new_piece_count`). |
+| `previous_piece_count` / `new_piece_count` | Order `piece_count` before/after this PATCH. |
+| `previous_unit_price_tcents` | integer or null. Wholesale unit price (tenth-cents) before this PATCH. **`null` for gated unconfirmed orders** — `POST /orders` does not populate pricing columns until `/confirm-payment` fires `charge_order`. Tier-aware: shrinking past a volume tier boundary changes the per-piece rate. |
+| `new_unit_price_tcents` | integer. Wholesale unit price after this PATCH. Always populated because this PATCH recomputes via the canonical `get_unit_price` helper. |
+| `previous_total_price_tcents` | integer or null. Display total before this PATCH (unit × count). **`null` for gated unconfirmed orders** for the same reason as `previous_unit_price_tcents`. |
+| `new_total_price_tcents` | integer. Display total after this PATCH (`new_unit_price_tcents` × `new_piece_count`). Always populated. |
+| `payment_confirmed` | Always `false` (endpoint gate rejects `true`). |
+
+**409 error codes:**
+
+| Code | Meaning |
+|---|---|
+| `RECIPIENTS_LOCKED` | Order status is outside the Edit Leads allowlist (`scheduled`, `pending_payment`, `accepted`, `prep`). |
+| `PAYMENT_GATE_NOT_ACTIVE` | Account does not use the partner payment confirmation gate. Edit Leads only applies to gated accounts. |
+| `PAID_LOCKED` | Order has already been confirmed (`payment_confirmed=TRUE`). Recipients are locked. |
+
+**Billing semantics:**
+
+This endpoint does NOT debit, charge, or hold balance. It updates `unit_price_tcents` and `total_price_tcents` on the order row for display, but `/confirm-payment` recomputes pricing at charge time using the (newly-updated) `piece_count` via the canonical pricing helper, so this PATCH cannot cause incorrect billing. `/confirm-payment` remains the sole billing source of truth.
+
+**Audit log:** every successful PATCH writes an `audit_log` row with `action="recipients_edit_leads"` and `detail` containing previous/new piece_count, unit_price_tcents, and total_price_tcents.
+
 ---
 
 ## 7. Status Updates via Webhooks
