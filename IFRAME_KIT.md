@@ -205,7 +205,7 @@ This is the only message that can be sent more than once (to refresh tokens). Al
 "piece_counts": {
   "property": { "dedup_off": 480, "dedup_on": 440 },
   "mailing":  { "dedup_off": 498, "dedup_on": 472 },
-  "both":     { "dedup_off": 920, "dedup_on": 850 }
+  "both":     { "dedup_off": 978, "dedup_on": 850 }
 }
 ```
 
@@ -215,8 +215,8 @@ This is the only message that can be sent more than once (to refresh tokens). Al
 | `piece_counts.property.dedup_on` | number or null | Count of distinct normalized property addresses. |
 | `piece_counts.mailing.dedup_off` | number or null | Count of leads with a mailing address, no dedup applied. |
 | `piece_counts.mailing.dedup_on` | number or null | Count of distinct normalized mailing addresses. |
-| `piece_counts.both.dedup_off` | number or null | Per-lead count of unique send addresses across property + mailing (if a lead's property and mailing addresses are equal, that lead counts as 1, not 2). Duplicate addresses across different leads are not collapsed. |
-| `piece_counts.both.dedup_on` | number or null | Count of distinct normalized send addresses across the union of property + mailing. |
+| `piece_counts.both.dedup_off` | number or null | Partner-defined count for the `Deliver To = both` + `Remove duplicates = OFF` combination. Whatever number the partner sends here is the number of pieces Ballpoint mails when this combination is selected. Ballpoint does **not** auto-collapse same-lead `property == mailing` or any other intra-list duplicate when `dedup_off` is selected — see [Same-order dedupe](#7-recipient-upload-flow) below. |
+| `piece_counts.both.dedup_on` | number or null | Partner-defined count for the `Deliver To = both` + `Remove duplicates = ON` combination. Typically the count of distinct normalized send addresses across the union of property + mailing, but the partner is the source of truth — whatever count is sent here is what Ballpoint mails when this combination is selected. |
 
 Semantics:
 
@@ -225,9 +225,11 @@ Semantics:
 - **4 KB cap** on the serialized `piece_counts` JSON. Payloads exceeding the cap are silently rejected at the postMessage boundary — the iframe logs a console warning and falls back to legacy behavior (controls hidden, `count` used as the recipient total).
 - Leads missing the relevant address contribute 0 for that option (e.g. a lead with no mailing address contributes 0 to `mailing.*`).
 
-> **`both.dedup_off` is a per-lead unique send-address count — NOT `property_count + mailing_count`.**
-> If a single lead's property address equals its mailing address, that lead contributes **1**, not 2. Duplicate addresses across *different* leads are NOT collapsed here — those are only collapsed when `dedup_on` is selected.
-> Partners must collapse same-lead `property == mailing` before counting and uploading recipients for `Deliver To = both`. See [Campaign Dedup (automatic)](#campaign-dedup-automatic) for what Ballpoint does and does not deduplicate server-side.
+> **`both.dedup_off` is partner-defined.** Ballpoint does **not** auto-collapse same-lead `property == mailing` (or any other intra-list duplicate) when `dedup_off` is selected. Whatever count the partner sends in `both.dedup_off` is the count Ballpoint mails, and the partner is expected to upload exactly that many recipient records to the order.
+>
+> Example: if `send to both = true`, `remove duplicates = false`, and a lead's property and mailing addresses are equal, the partner uploads **two** recipient records for that lead and Ballpoint mails **two** postcards. Collapsing same-lead `property == mailing` only happens when the user explicitly selects `Remove duplicates` (i.e. the partner sends a deduplicated count via `both.dedup_on` and uploads the deduplicated list).
+>
+> See [Campaign Dedup (automatic)](#campaign-dedup-automatic) for the only server-side dedupe Ballpoint performs (cross-order A/B-split guard-rail), and [Recipient Upload Flow](#7-recipient-upload-flow) for same-order behavior.
 
 #### Full `set_list` example with `piece_counts`
 
@@ -244,7 +246,7 @@ Semantics:
   "piece_counts": {
     "property": { "dedup_off": 480, "dedup_on": 440 },
     "mailing":  { "dedup_off": 498, "dedup_on": 472 },
-    "both":     { "dedup_off": 920, "dedup_on": 850 }
+    "both":     { "dedup_off": 978, "dedup_on": 850 }
   }
 }
 ```
@@ -355,8 +357,8 @@ Suppose a list of 500 leads has the following address availability and dedup mat
 - Among those 480 property addresses, 40 are duplicates → 440 distinct property addresses.
 - 2 leads have no mailing address → 498 leads have a mailing address.
 - Among those 498 mailing addresses, 26 are duplicates → 472 distinct mailing addresses.
-- For `both`, per-lead unique address count summed across all 500 leads = 920 (leads where property == mailing count as 1).
-- Distinct normalized send addresses across the union of property + mailing = 850.
+- For `both` + `Remove duplicates = OFF` (`both.dedup_off`), the partner's product chooses to send to every available address on every lead without collapsing same-lead property == mailing → 978 pieces (480 property + 498 mailing). The partner could equally choose to collapse same-lead duplicates here and send a smaller number — `both.dedup_off` is whatever the partner sends, and Ballpoint mails that exact count.
+- For `both` + `Remove duplicates = ON` (`both.dedup_on`), the partner collapses to distinct normalized send addresses across the union of property + mailing → 850.
 
 The partner sends:
 
@@ -364,11 +366,15 @@ The partner sends:
 "piece_counts": {
   "property": { "dedup_off": 480, "dedup_on": 440 },
   "mailing":  { "dedup_off": 498, "dedup_on": 472 },
-  "both":     { "dedup_off": 920, "dedup_on": 850 }
+  "both":     { "dedup_off": 978, "dedup_on": 850 }
 }
 ```
 
-If the user picks `Deliver To = both` + `Remove duplicates = on`, the iframe displays **850 pieces** and prices accordingly. On submit, `campaign_submitted.recipient_selection` carries `{ deliver_to: "both", remove_duplicate_addresses: true, piece_count: 850 }`, and each entry in `orders[].pieces` equals 850. For multi-send (sequence) and A/B split campaigns each drop carries its own `orders[].pieces` value derived from the same `recipient_selection` — each drop's recipient set is the partner's full selection for that drop, and Ballpoint does not dedupe across drops in a sequence (see [Campaign Dedup (automatic)](#campaign-dedup-automatic) for the cross-order scope rules).
+If the user picks `Deliver To = both` + `Remove duplicates = on`, the iframe displays **850 pieces** and prices accordingly. On submit, `campaign_submitted.recipient_selection` carries `{ deliver_to: "both", remove_duplicate_addresses: true, piece_count: 850 }`, and each entry in `orders[].pieces` equals 850. The partner then uploads exactly 850 recipient records.
+
+If the user instead picks `Deliver To = both` + `Remove duplicates = off`, the iframe displays **978 pieces** and the partner uploads 978 recipient records — including the second record for any lead whose property and mailing addresses happen to be identical, because the user opted out of dedupe. Ballpoint mails the 978 pieces as uploaded.
+
+For multi-send (sequence) and A/B split campaigns each drop carries its own `orders[].pieces` value derived from the same `recipient_selection` — each drop's recipient set is the partner's full selection for that drop, and Ballpoint does not dedupe across drops in a sequence (see [Campaign Dedup (automatic)](#campaign-dedup-automatic) for the cross-order scope rules).
 
 #### Backward compatibility
 
@@ -940,7 +946,7 @@ For the full `/confirm-payment` endpoint contract (request/response, fields, beh
 
 After receiving `campaign_submitted`, upload the mailing addresses for each order.
 
-> **Same-order dedupe is the partner's responsibility.** Ballpoint does **not** perform intra-order recipient dedupe. If duplicate recipient records are uploaded to the same order, Ballpoint treats them as separate recipient records unless another normal validation rule rejects the request — such as missing required fields, invalid address fields, or exceeding the order's `piece_count`. If a lead's mailing and property addresses are equal, count and upload that as **one** recipient, not two. Ballpoint's automatic [Campaign Dedup](#campaign-dedup-automatic) (`duplicate_in_campaign`) is **cross-order, same-campaign only**.
+> **Same-order dedupe is the partner's responsibility — Ballpoint never auto-collapses within an order.** If duplicate recipient records are uploaded to the same order, Ballpoint treats them as separate recipient records and mails each one (subject only to the normal validation rules: missing required fields, invalid address fields, exceeding the order's `piece_count`). Same-order dedupe — including collapsing a lead's `property == mailing` to one piece — happens only when the user explicitly selects the partner's "Remove duplicates" control (i.e. the partner sent the deduplicated count via `set_list.piece_counts.<scope>.dedup_on` and uploads a deduplicated recipient list to match). Ballpoint's automatic [Campaign Dedup](#campaign-dedup-automatic) (`duplicate_in_campaign`) is **cross-order, same-campaign only** (A/B-split guard-rail) and must **not** be relied on to override the user's same-order selection.
 
 ### Request
 
@@ -1061,11 +1067,11 @@ For cross-order duplicates within the same campaign, you don't need to handle de
 
 #### What this does NOT do
 
-`duplicate_in_campaign` is **cross-order, same-campaign only**. Ballpoint does **not** perform intra-order recipient dedupe. The partner is responsible for collapsing duplicates *before* uploading a given order. Specifically:
+`duplicate_in_campaign` is **cross-order, same-campaign only** (the A/B-split guard-rail). Ballpoint does **not** perform intra-order recipient dedupe and does **not** use `duplicate_in_campaign` (or any other server-side logic) to override the user's same-order "Remove duplicates" selection. Same-order behavior is partner-driven:
 
-- **Duplicate recipient records in the same order are treated as separate recipient records** — unless another normal validation rule rejects the request, such as missing required fields, invalid address fields, or exceeding the order's `piece_count`. This also applies to records split across an `append: true` chain on the same order.
+- **Duplicate recipient records in the same order are treated as separate recipient records and mailed as separate pieces** — unless another normal validation rule rejects the request, such as missing required fields, invalid address fields, or exceeding the order's `piece_count`. This also applies to records split across an `append: true` chain on the same order.
 - **`lead_id` and `type` (`mailing` / `property`) are not active recipient upload fields and are not used for dedupe.** Unknown fields are silently ignored at parse time and are not stored. Use [`contact_id`](#recipient-fields) for partner-side identifiers that need to round-trip.
-- **Partners must collapse same-lead `property == mailing` before count and upload for `Deliver To = both`.** If a single lead's property and mailing addresses are equal, count and upload that as one recipient, not two. This matches the [`piece_counts.both.dedup_off`](#recipient-selection-contract-piece-count--dedup) contract (per-lead unique send-address count).
+- **Same-lead `property == mailing` collapse is the partner's decision, expressed via the user's `Remove duplicates` selection.** If the user picks `Deliver To = both` + `Remove duplicates = OFF`, the partner uploads two recipient records for each lead whose property and mailing addresses are equal and Ballpoint mails two pieces. If the user picks `Remove duplicates = ON`, the partner uploads the deduplicated list and Ballpoint mails that. The uploaded recipient count must match the `piece_count` that the partner provided for the selected `(deliver_to, remove_duplicates)` combination in [`set_list.piece_counts`](#recipient-selection-contract-piece-count--dedup).
 
 #### Identifier reference — four distinct ids
 
