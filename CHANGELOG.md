@@ -7,7 +7,7 @@
 - **Singular `set_list` only.** The field is **not** part of the `set_lists` (plural) schema and is silently dropped if sent there.
 - **Strict equality.** The iframe checks for `=== true`. String `"true"`, `1`, or any other truthy value is treated as `false`.
 - **NARROW carve-out — does not introduce broader RBAC.** This field controls only the sender-info setup CTA. It does **not** introduce role gating, permission sync, dashboard role display, API/webhook enforcement, username display in the iframe UI, or any effect on other CTAs (Edit Leads, Reschedule, Cancel, etc.). `externalUserId` remains a technical identifier echoed back on outbound events and is not used as a permission key.
-- **Backward compatible.** Partners that do not send the field see existing behavior with the new default (blocked-state copy in place of "Set up now"). No API, webhook, or other postMessage contract changes. See `IFRAME_KIT.md` `set_list` field table + new "Sender-info setup gate" subsection. Source: Slack `#ballpoint-propstream` thread `1779214714.476859` (2026-05-19, Evren proposal + Armstrong accept).
+- **Schema-backward-compatible.** No required field added, no parse-breaking change — partners that don't send `externalUserIsAccountOwner` are still accepted by the schema gate. **UX change for those partners:** because missing / non-`true` defaults to `false`, their users now see the blocked-state copy in place of the prior "Set up now" CTA. No API, webhook, or other postMessage contract changes. See `IFRAME_KIT.md` `set_list` field table + new "Sender-info setup gate" subsection. Source: Slack `#ballpoint-propstream` thread `1779214714.476859` (2026-05-19, Evren proposal + Armstrong accept).
 
 ## v1.5.1 — 2026-05-19
 
