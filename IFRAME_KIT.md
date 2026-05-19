@@ -196,6 +196,7 @@ This is the only message that can be sent more than once (to refresh tokens). Al
 | `listId` | string | Your internal list identifier |
 | `externalAccountId` | string | Your account/tenant identifier |
 | `externalUserId` | string | Your user identifier |
+| `externalUserIsAccountOwner` | boolean | Optional. Gates the iframe's sender-info "Set up now" CTA for this user. `true` → CTA visible, user may set up / edit sender info. `false` or missing → CTA hidden, blocked-state copy shown instead. Default if absent or non-`true`: `false` (deny-by-default; partners who do not send the field see the same blocked state as a non-owner). Mutable on `set_list` refresh — see [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner). |
 | `piece_counts` | object | Optional. Pre-computed piece counts for the 6 combinations of `Deliver To` × `Remove duplicates`. When present, the iframe shows 2 user-facing controls on the piece-selection page (Deliver To select + Remove duplicates checkbox) and uses these values as the authoritative count + price input. When absent, the controls are hidden and the iframe falls back to `count` (legacy behavior — existing partners are unaffected). See [Recipient selection contract](#recipient-selection-contract-piece-count--dedup) for the full walkthrough. |
 | `tenantKey` | string | Optional. Tenant scope key |
 
@@ -256,7 +257,7 @@ Semantics:
 After PropStream's Edit Leads modal saves changes to the recipient list, the parent SHOULD send `set_list` again to refresh the iframe's view of the list. Rules:
 
 - **Same `listId` required.** The refresh `set_list` payload MUST carry the same `listId` as the original first-receipt `set_list`. Any other `listId` is treated as a list switch attempt and REJECTED.
-- **Updatable fields on refresh:** `count`, `name`, `piece_counts`. These are re-validated and re-applied. The iframe's count display, pricing UI, and recipient selection state refresh in place.
+- **Updatable fields on refresh:** `count`, `name`, `piece_counts`, `externalUserIsAccountOwner`. These are re-validated and re-applied. The iframe's count display, pricing UI, recipient selection state, and sender-info CTA visibility refresh in place.
 - **Preserving vs clearing `piece_counts` on refresh:** if the refresh payload OMITS the `piece_counts` key entirely, the iframe preserves the currently-active `piece_counts` table (the user's combo selection and pricing continue working). To explicitly replace the table, include `piece_counts` in the refresh payload with the new values. To explicitly clear it back to legacy single-count behavior, include `piece_counts: null`. Omitting the key is NOT the same as clearing.
 - **Pricing/display on refresh when `piece_counts` is active:** the refreshed count is applied to internal state, but the visible recipient count and price stay aligned with the user's current Deliver To + Remove duplicates selection (via the existing piece_counts lookup). If `piece_counts` is not active on the active list, the refreshed raw count drives display + price directly (legacy behavior).
 - **Immutable fields on refresh:** `externalAccountId`, `externalUserId`, `tenantKey`. The values from the first-receipt set_list are authoritative for the session. Refresh payloads attempting to change these are:
@@ -283,6 +284,30 @@ Example refresh payload (after Edit Leads modal save):
 ```
 
 See also the [`edit_leads_requested` event](#edit_leads_requested--user-clicked-edit-leads-on-a-campaign-card-v2) for the iframe → parent trigger that opens the modal.
+
+#### Sender-info setup gate (`externalUserIsAccountOwner`)
+
+Optional boolean on `set_list` (singular). Controls **only** the iframe's sender-info "Set up now" CTA on the first-time setup page.
+
+| Value sent on `set_list` | Iframe behavior |
+|--------------------------|-----------------|
+| `true` | "Set up now" CTA visible. User may complete sender-info setup and edit existing sender info. `sender_setup_requested` postMessage may be emitted on click. |
+| `false`, missing, or any non-`true` value | "Set up now" CTA hidden. A blocked-state message ("Please contact your account owner to set up sender info") is shown in its place. `sender_setup_requested` postMessage emit is suppressed. |
+
+Rules:
+
+- **Default is `false`.** Partners who do not send the field see the same blocked state as a non-owner. This is intentional (deny-by-default for backward compatibility).
+- **Mutable on `set_list` refresh.** Unlike `externalUserId` and `externalAccountId` (which are locked to the first-receipt values for the session), `externalUserIsAccountOwner` may be flipped on a same-`listId` refresh. The iframe re-applies CTA visibility immediately. PropStream should re-send `set_list` with the updated value whenever the user's account-owner status changes.
+- **Singular `set_list` only.** The field is **not** part of the `set_lists` (plural) schema. If sent there, it is silently dropped.
+- **Strict equality.** The iframe checks for `=== true`. String `"true"`, `1`, or any other truthy value is treated as `false`.
+
+Scope (what this field does **not** do):
+
+- Does **not** introduce broader RBAC, role gating, or permission sync between PropStream and the iframe.
+- Does **not** affect dashboard, API, or webhook behavior. Ballpoint's API does not read or enforce this field.
+- Does **not** change `externalUserId` semantics — `externalUserId` remains a technical identifier echoed back on outbound events; it is not used as a permission key.
+- Does **not** display a username, role label, or owner indicator anywhere in the iframe UI.
+- Does **not** affect any other CTA (Edit Leads, Reschedule, Cancel, etc.) — sender-info setup only.
 
 ### `set_lists` — Multiple lists for user selection (alternative to `set_list`)
 
@@ -636,6 +661,7 @@ No sender PII (`fullName`, `address`, `city`, `state`, `zip`, `phone`, `email`, 
 
 **Visibility / lifecycle**
 
+- **Gated by `set_list.externalUserIsAccountOwner === true`.** When the field is `false`, missing, or any non-`true` value, the "Set up now" CTA is hidden and `sender_setup_requested` is not emitted. See [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner).
 - Rendered on the iframe's first-time setup page (`page-setup`) only when no `set_sender` has been received yet. Once `set_sender` has been accepted, the CTA is suppressed and the sender form is locked per the existing `set_sender` behavior.
 - In standalone (non-embed) mode the iframe falls back to its built-in inline sender form. The CTA is suppressed.
 - **Pre-lock behavior:** queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Not broadcast to all allowlisted origins. Identical treatment to `edit_leads_requested`.
