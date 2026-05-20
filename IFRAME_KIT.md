@@ -382,7 +382,7 @@ Suppose a list of 500 leads has the following address availability and dedup mat
 - Among those 480 property addresses, 40 are duplicates → 440 distinct property addresses.
 - 2 leads have no mailing address → 498 leads have a mailing address.
 - Among those 498 mailing addresses, 26 are duplicates → 472 distinct mailing addresses.
-- For `both` + `Remove duplicates = OFF` (`both.dedup_off`), the partner's product chooses to send to every available address on every lead without collapsing same-lead property == mailing → 978 pieces (480 property + 498 mailing). The partner could equally choose to collapse same-lead duplicates here and send a smaller number — `both.dedup_off` is whatever the partner sends, and Ballpoint mails that exact count.
+- For `both` + `Remove duplicates = OFF` (`both.dedup_off`), the partner sends every available address on every lead without collapsing same-lead `property == mailing` -> 978 pieces (480 property + 498 mailing). Ballpoint does not compute this count or auto-dedupe the upload; it mails the exact recipient records the partner uploads for the user's selected combination.
 - For `both` + `Remove duplicates = ON` (`both.dedup_on`), the partner collapses to distinct normalized send addresses across the union of property + mailing → 850.
 
 The partner sends:
