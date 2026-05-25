@@ -1195,6 +1195,227 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /v1/billing/campaigns/{campaign_id}/recipients:
+    patch:
+      tags:
+      - Recipients
+      summary: Campaign-level delta recipient add/remove across editable drops
+      operationId: campaignDeltaRecipients
+      description: >-
+        Add/remove recipients across all editable drops in a campaign with one
+        call. Delta-based: `added[]` upserts by `contact_id + address_type`,
+        `removed[]` deletes by key, `remove_all` clears and replaces. Editable
+        drops: status ∈ {scheduled, pending_payment} with
+        payment_confirmed=false. Locked drops (accepted, in production, mailed,
+        delivered, terminal) are skipped and reported in the response. Gated
+        accounts only (requires_payment_confirmation=TRUE). See API_KIT.md §6o.
+      parameters:
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Ballpoint campaign ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                added:
+                  type: array
+                  maxItems: 10000
+                  description: Recipients to add/upsert on each editable drop.
+                  items:
+                    type: object
+                    required:
+                    - contact_id
+                    - address_type
+                    - address
+                    - city
+                    - state
+                    - zip
+                    properties:
+                      contact_id:
+                        type: string
+                        maxLength: 64
+                        description: Partner-side unique recipient identifier.
+                      address_type:
+                        type: string
+                        enum: [PROPERTY, MAILING]
+                        description: Combined with contact_id, forms the unique key.
+                      first_name:
+                        type: string
+                        nullable: true
+                        description: At least one of first_name or last_name required.
+                      last_name:
+                        type: string
+                        nullable: true
+                        description: At least one of first_name or last_name required.
+                      company:
+                        type: string
+                        nullable: true
+                      address:
+                        type: string
+                        description: Street address line 1.
+                      address2:
+                        type: string
+                        nullable: true
+                      city:
+                        type: string
+                      state:
+                        type: string
+                        minLength: 2
+                        maxLength: 2
+                        description: 2-letter state code (uppercase).
+                      zip:
+                        type: string
+                        description: 5 or 5+4 digit ZIP code.
+                removed:
+                  type: array
+                  maxItems: 10000
+                  description: Recipients to remove from each editable drop by unique key.
+                  items:
+                    type: object
+                    required:
+                    - contact_id
+                    - address_type
+                    properties:
+                      contact_id:
+                        type: string
+                        maxLength: 64
+                      address_type:
+                        type: string
+                        enum: [PROPERTY, MAILING]
+                remove_all:
+                  type: boolean
+                  default: false
+                  description: >-
+                    If true, clears all recipients from editable drops before
+                    applying added[]. Cannot be combined with removed[] (422).
+      responses:
+        '200':
+          description: Delta applied to all editable drops.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/X-Trace-Id'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - campaign_id
+                - added_count
+                - removed_count
+                - removed_not_found_count
+                - drops_affected
+                - drops_locked
+                properties:
+                  campaign_id:
+                    type: string
+                    description: The campaign that was modified.
+                  added_count:
+                    type: integer
+                    description: Number of recipient keys in the added[] request (includes upserts).
+                  removed_count:
+                    type: integer
+                    description: Keys from removed[] that matched at least one recipient across editable drops.
+                  removed_not_found_count:
+                    type: integer
+                    description: Keys from removed[] that matched zero recipients. removed_count + removed_not_found_count = len(removed[]).
+                  drops_affected:
+                    type: array
+                    description: Drops that were successfully mutated.
+                    items:
+                      type: object
+                      required:
+                      - order_id
+                      - previous_piece_count
+                      - new_piece_count
+                      - new_total_price_tcents
+                      - payment_confirmed
+                      properties:
+                        order_id:
+                          type: string
+                        previous_piece_count:
+                          type: integer
+                        new_piece_count:
+                          type: integer
+                          description: Per-drop source of truth for recipient count after mutation.
+                        previous_total_price_tcents:
+                          type: integer
+                          nullable: true
+                          description: Nullable for gated unconfirmed orders not yet priced.
+                        new_total_price_tcents:
+                          type: integer
+                          description: Always computed via current pricing tables. Non-null.
+                        payment_confirmed:
+                          type: boolean
+                          description: Always false (editable drops are by definition unconfirmed).
+                  drops_locked:
+                    type: array
+                    description: Drops skipped because they are past the editable window.
+                    items:
+                      type: object
+                      required:
+                      - order_id
+                      - locked_reason
+                      - current_status
+                      properties:
+                        order_id:
+                          type: string
+                        locked_reason:
+                          type: string
+                          enum: [paid_or_accepted, in_production, mailed, delivered, terminal]
+                          description: >-
+                            paid_or_accepted = payment_confirmed=true OR status=accepted.
+                            in_production = prep/printing/writing/inserting/stamping/shipping.
+                            mailed = complete. delivered = shipped/in_transit/out_for_delivery/delivered.
+                            terminal = cancelled/failed/payment_failed.
+                        current_status:
+                          type: string
+                          description: The drop's current production status.
+        '400':
+          description: >-
+            No pricing found for product/postage at the new piece count.
+            error.code = NO_PRICING.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: >-
+            Campaign not found (also returned for cross-tenant lookups).
+            error.code = CAMPAIGN_NOT_FOUND.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: >-
+            error.code values: PAYMENT_GATE_NOT_ACTIVE (account not gated),
+            NO_EDITABLE_DROPS (all orders in campaign are locked).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: >-
+            Validation failure. Empty request, remove_all+removed[] conflict,
+            duplicate keys in added[]/removed[], invalid recipient fields,
+            or invalid address_type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /v1/campaigns:
     post:
       tags:

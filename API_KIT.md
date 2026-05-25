@@ -1172,7 +1172,7 @@ Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, 
 1. Pydantic validation → `422` (no handler execution if any recipient invalid)
 2. Tenant scoping → `404` if order belongs to another tenant
 3. Order not found → `404 ORDER_NOT_FOUND`
-4. Status ∉ `{scheduled, pending_payment, accepted, prep}` → `409 RECIPIENTS_LOCKED`
+4. Status ∉ `{scheduled, pending_payment}` → `409 RECIPIENTS_LOCKED`
 5. Account `requires_payment_confirmation = FALSE` → `409 PAYMENT_GATE_NOT_ACTIVE`
 6. Order `payment_confirmed = TRUE` → `409 PAID_LOCKED`
 
@@ -1206,7 +1206,7 @@ Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, 
 
 | Code | Meaning |
 |---|---|
-| `RECIPIENTS_LOCKED` | Order status is outside the Edit Leads allowlist (`scheduled`, `pending_payment`, `accepted`, `prep`). |
+| `RECIPIENTS_LOCKED` | Order status is outside the Edit Leads allowlist (`scheduled`, `pending_payment`). `accepted`, `prep`, and production statuses are locked. |
 | `PAYMENT_GATE_NOT_ACTIVE` | Account does not use the partner payment confirmation gate. Edit Leads only applies to gated accounts. |
 | `PAID_LOCKED` | Order has already been confirmed (`payment_confirmed=TRUE`). Recipients are locked. |
 
@@ -1215,6 +1215,148 @@ Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, 
 This endpoint does NOT debit, charge, or hold balance. It updates `unit_price_tcents` and `total_price_tcents` on the order row for display, but `/confirm-payment` recomputes pricing at charge time using the (newly-updated) `piece_count` via the canonical pricing helper, so this PATCH cannot cause incorrect billing. `/confirm-payment` remains the sole billing source of truth.
 
 **Audit log:** every successful PATCH writes an `audit_log` row with `action="recipients_edit_leads"` and `detail` containing previous/new piece_count, unit_price_tcents, and total_price_tcents.
+
+### 6o. Campaign Delta Recipients — Add/Remove Across Editable Drops
+
+```
+PATCH /v1/billing/campaigns/{campaign_id}/recipients
+X-Partner-Key: pk_test_...
+Content-Type: application/json
+```
+
+Campaign-level delta add/remove endpoint. One call applies recipient changes across all editable drops in a campaign. Editable = status ∈ `{scheduled, pending_payment}` with `payment_confirmed=false`. Locked drops (accepted, in production, mailed, delivered, terminal) are skipped and reported in the response.
+
+**Gated accounts only.** Account must have `requires_payment_confirmation = TRUE`. Non-gated accounts → `409 PAYMENT_GATE_NOT_ACTIVE`.
+
+**Distinction from §6n (order-level PATCH):** §6n replaces ALL recipients on ONE order. This endpoint applies a delta (add/remove) across ALL editable orders in a campaign in one call. Use §6n for variant-specific A/B split edits; use §6o for campaign-wide multi-month changes.
+
+**Request body:**
+
+```json
+{
+  "added": [
+    {
+      "contact_id": "ps_lead_42",
+      "address_type": "PROPERTY",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "company": null,
+      "address": "100 Main St",
+      "address2": null,
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94103"
+    }
+  ],
+  "removed": [
+    { "contact_id": "ps_lead_17", "address_type": "MAILING" }
+  ],
+  "remove_all": false
+}
+```
+
+**Request fields:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `added` | array | No (default `[]`) | Recipients to add/upsert on each editable drop. Max 10,000 items. |
+| `added[].contact_id` | string (max 64) | Yes | Partner-side unique recipient identifier. |
+| `added[].address_type` | string | Yes | `"PROPERTY"` or `"MAILING"`. Combined with `contact_id`, forms the unique key. |
+| `added[].first_name` | string | At least one of first/last | Recipient first name. |
+| `added[].last_name` | string | At least one of first/last | Recipient last name. |
+| `added[].company` | string | No | Company name. |
+| `added[].address` | string | Yes | Street address line 1. |
+| `added[].address2` | string | No | Street address line 2. |
+| `added[].city` | string | Yes | City. |
+| `added[].state` | string (2-letter) | Yes | State code (uppercase). |
+| `added[].zip` | string | Yes | ZIP code (5 or 5+4 digit). |
+| `removed` | array | No (default `[]`) | Recipients to remove from each editable drop by unique key. Max 10,000 items. |
+| `removed[].contact_id` | string | Yes | Partner-side recipient identifier to remove. |
+| `removed[].address_type` | string | Yes | `"PROPERTY"` or `"MAILING"`. |
+| `remove_all` | boolean | No (default `false`) | If `true`, clears all recipients from editable drops before applying `added[]`. Cannot be combined with `removed[]` (→ 422). |
+
+**Unique key:** `contact_id + address_type`. If `added[]` includes a key that already exists on an editable drop, the recipient is updated (upsert), not duplicated.
+
+**Validation (422, no DB mutation):**
+- Empty request (no `added`, no `removed`, `remove_all=false`)
+- `remove_all=true` combined with non-empty `removed[]`
+- Duplicate `(contact_id, address_type)` pairs within `added[]`
+- Duplicate `(contact_id, address_type)` pairs within `removed[]`
+- Invalid recipient fields (missing name, bad zip/state, invalid `address_type`)
+
+**Gate (fail-fast):**
+1. Campaign not found → `404 CAMPAIGN_NOT_FOUND`
+2. Account `requires_payment_confirmation = FALSE` → `409 PAYMENT_GATE_NOT_ACTIVE`
+3. No editable drops in campaign → `409 NO_EDITABLE_DROPS`
+4. No pricing for product/postage at new count → `400 NO_PRICING`
+
+**Editable drops:** status ∈ `{scheduled, pending_payment}` AND `payment_confirmed = false`.
+
+**Locked drops:** all other orders in the campaign. Reported in `drops_locked[]` with reason.
+
+**Response 200:**
+
+```json
+{
+  "campaign_id": "camp_abc123",
+  "added_count": 25,
+  "removed_count": 8,
+  "removed_not_found_count": 1,
+  "drops_affected": [
+    {
+      "order_id": "ord_a",
+      "previous_piece_count": 500,
+      "new_piece_count": 517,
+      "previous_total_price_tcents": null,
+      "new_total_price_tcents": 2610858,
+      "payment_confirmed": false
+    }
+  ],
+  "drops_locked": [
+    {
+      "order_id": "ord_c",
+      "locked_reason": "paid_or_accepted",
+      "current_status": "accepted"
+    }
+  ]
+}
+```
+
+**Response fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `campaign_id` | string | The campaign that was modified. |
+| `added_count` | integer | Number of recipient keys in the `added[]` request (includes upserts). |
+| `removed_count` | integer | Number of unique keys from `removed[]` that matched at least one recipient across editable drops. |
+| `removed_not_found_count` | integer | Keys from `removed[]` that matched zero recipients on any editable drop. `removed_count + removed_not_found_count = len(removed[])`. |
+| `drops_affected` | array | Drops that were successfully mutated. |
+| `drops_affected[].order_id` | string | Ballpoint order ID. |
+| `drops_affected[].previous_piece_count` | integer | Piece count before this mutation. |
+| `drops_affected[].new_piece_count` | integer | Piece count after this mutation. **Per-drop source of truth.** |
+| `drops_affected[].previous_total_price_tcents` | integer or null | Total price before mutation (tenth-cents). `null` for gated unconfirmed orders that haven't been priced yet. |
+| `drops_affected[].new_total_price_tcents` | integer | Total price after mutation (tenth-cents). Always computed from the same pricing path used at `/confirm-payment`. |
+| `drops_affected[].payment_confirmed` | boolean | Always `false` (editable drops are by definition unconfirmed). |
+| `drops_locked` | array | Drops skipped because they are past the editable window. |
+| `drops_locked[].order_id` | string | Ballpoint order ID. |
+| `drops_locked[].locked_reason` | string | Why this drop was not modified. See enum below. |
+| `drops_locked[].current_status` | string | The drop's current production status. |
+
+**`locked_reason` enum:**
+
+| Value | Meaning |
+|---|---|
+| `paid_or_accepted` | `payment_confirmed=true` OR status is `accepted`. |
+| `in_production` | Status in `{prep, printing, writing, inserting, stamping, shipping}`. |
+| `mailed` | Status `complete`. |
+| `delivered` | Status in `{shipped, in_transit, out_for_delivery, delivered}`. |
+| `terminal` | Status in `{cancelled, failed, payment_failed}`. |
+
+**Idempotency:** Naturally idempotent. A repeated call: `added[]` upserts same values (no-op), `removed[]` finds nothing → all reported as `removed_not_found_count`. Response reflects current state.
+
+**Billing semantics:** Same as §6n — this endpoint does NOT charge. It recomputes `unit_price_tcents` and `total_price_tcents` on each affected order for display. `/confirm-payment` recomputes at charge time using the updated `piece_count`.
+
+**Audit log:** `action="recipients_campaign_delta"` with detail containing counts and affected/locked order IDs.
 
 ---
 
