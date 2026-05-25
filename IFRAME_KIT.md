@@ -283,7 +283,7 @@ Example refresh payload (after Edit Leads modal save):
 }
 ```
 
-See also the [`edit_leads_requested` event](#edit_leads_requested--user-clicked-edit-leads-on-a-campaign-card-v2) for the iframe → parent trigger that opens the modal.
+See also the [`edit_leads_requested` event](#edit_leads_requested--user-clicked-edit-leads-on-a-campaign-card) for the iframe → parent trigger that opens the modal.
 
 #### Sender-info setup gate (`externalUserIsAccountOwner`)
 
@@ -508,13 +508,11 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 }
 ```
 
-#### `edit_leads_requested` — User clicked "Edit Leads" on a campaign card (V2)
+#### `edit_leads_requested` — User clicked "Edit Leads" on a campaign card
 
-**Breaking change from V1 (released 2026-05-16, iframe staging-only):** the V1 list-level event (`{listId, listName, recipientCount, externalAccountId, externalUserId}` emitted from a single global header button) has been replaced with a V2 campaign-level event. The header button is removed; each multi-month campaign card in My Campaigns now has its own Edit Leads button.
+**Historical note (iframe staging-only):** the original list-level header button (`{listId, listName, recipientCount, externalAccountId, externalUserId}` emitted from a single global header button) has been replaced by per-campaign-card buttons. The header button is removed; each campaign card in My Campaigns — single send, A/B split, and multi-month — now has its own Edit Leads button when at least one of its orders is still pre-production and unbilled.
 
-**When emitted:** the user clicks the Edit Leads button inside a multi-month campaign card. Eligibility requires:
-- `campaign.orders.length > 1`
-- `campaign.type !== 'split'`
+**When emitted:** the user clicks the Edit Leads button on any campaign card (single send, A/B split, or multi-month). Eligibility requires:
 - All orders have `paymentConfirmed` not null (defense: campaigns with any null are skipped — typically non-gated accounts)
 - At least one order is "affected" (see classification below)
 
@@ -542,6 +540,7 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
       "productionStatus": "scheduled",
       "paymentConfirmed": false,
       "pieces": 500,
+      "variant": null,
       "editRecipientsEndpoint": "/v1/billing/orders/ord_abc123/recipients",
       "editRecipientsMethod": "PATCH"
     }
@@ -554,21 +553,101 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
       "productionStatus": "accepted",
       "paymentConfirmed": true,
       "pieces": 500,
+      "variant": null,
       "lockedReason": "billed"
     }
   ]
 }
 ```
 
+**Single-send example:**
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "edit_leads_requested",
+  "scope": "single_send",
+  "campaignId": "api_campaign_cmp_single_1",
+  "ballpointCampaignId": "cmp_single_1",
+  "campaignType": "single",
+  "listId": "ps_list_321",
+  "listName": "Absentee Owners",
+  "recipientCount": 250,
+  "externalAccountId": "ps_acc_42",
+  "externalUserId": "user_789",
+  "affectedOrders": [
+    {
+      "orderId": "ord_single_1",
+      "ballpointOrderId": "ord_s1",
+      "mailDate": "2026-08-01",
+      "productionStatus": "scheduled",
+      "paymentConfirmed": false,
+      "pieces": 250,
+      "variant": null,
+      "editRecipientsEndpoint": "/v1/billing/orders/ord_s1/recipients",
+      "editRecipientsMethod": "PATCH"
+    }
+  ],
+  "lockedOrders": []
+}
+```
+
+**A/B split example:** both sibling variants share the same `mailDate` and appear in `affectedOrders[]`, each tagged with its `variant` (`"a"` or `"b"`). For A/B split, PropStream's Edit Leads modal MUST allocate the new recipient list into variant-specific slices before PATCHing each variant's `editRecipientsEndpoint` separately. The `pieces` field on each item reflects the variant's current slice; preserving the original `a/b` ratio is the simplest allocation, but PropStream owns the split logic.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "edit_leads_requested",
+  "scope": "ab_split",
+  "campaignId": "api_campaign_cmp_split_1",
+  "ballpointCampaignId": "cmp_split_1",
+  "campaignType": "split",
+  "listId": "ps_list_654",
+  "listName": "Probate Leads",
+  "recipientCount": 400,
+  "externalAccountId": "ps_acc_42",
+  "externalUserId": "user_789",
+  "affectedOrders": [
+    {
+      "orderId": "ord_split_a",
+      "ballpointOrderId": "ord_sa",
+      "mailDate": "2026-09-01",
+      "productionStatus": "scheduled",
+      "paymentConfirmed": false,
+      "pieces": 200,
+      "variant": "a",
+      "editRecipientsEndpoint": "/v1/billing/orders/ord_sa/recipients",
+      "editRecipientsMethod": "PATCH"
+    },
+    {
+      "orderId": "ord_split_b",
+      "ballpointOrderId": "ord_sb",
+      "mailDate": "2026-09-01",
+      "productionStatus": "scheduled",
+      "paymentConfirmed": false,
+      "pieces": 200,
+      "variant": "b",
+      "editRecipientsEndpoint": "/v1/billing/orders/ord_sb/recipients",
+      "editRecipientsMethod": "PATCH"
+    }
+  ],
+  "lockedOrders": []
+}
+```
+
 | Field | Description |
 |---|---|
-| `scope` | Always `"multi_month_campaign"` in V1. Reserved for future scopes (e.g. split, single-send if reintroduced). |
+| `scope` | One of `multi_month_campaign` \| `single_send` \| `ab_split`. Reflects the campaign type so the parent listener can route to the right modal. `multi_month_campaign` value unchanged from prior releases for backwards compatibility. |
 | `campaignId` | Iframe-local group key (e.g. `api_campaign_<id>` for API-loaded campaigns; `cmp_<local>` for in-builder). Use `ballpointCampaignId` for cross-system reference. |
-| `ballpointCampaignId` | Server-side Ballpoint campaign ID (from API `campaign_id`). May be `null` for campaigns not yet persisted server-side (rare in multi-month flow). |
-| `campaignType` | `"multi"` (only eligible type in V1). |
+| `ballpointCampaignId` | Server-side Ballpoint campaign ID (from API `campaign_id`). May be `null` for campaigns not yet persisted server-side. |
+| `campaignType` | `"single"` \| `"multi"` \| `"split"`. Mirrors `campaign.type` in the iframe. |
 | `recipientCount` | Raw list recipient count at the time of click (not the affected/locked breakdown sum). |
 | `affectedOrders[]` | Orders eligible for edit. Each has `editRecipientsEndpoint` + `editRecipientsMethod: "PATCH"`. PropStream's Edit Leads modal should PATCH each one with the new recipient list after the user saves. |
 | `lockedOrders[]` | Orders that cannot be edited (billed, in production, mailed, delivered, terminal). Each has `lockedReason`. Use these to explain to the user which orders won't be affected. |
+| `affectedOrders[].variant` / `lockedOrders[].variant` | For A/B split campaigns: `"a"` or `"b"` identifying the sibling. For single send and multi-month: `null`. Used by PropStream to allocate per-variant recipient slices before PATCH. |
+| `affectedOrders[].pieces` / `lockedOrders[].pieces` | The order's CURRENT piece count. For A/B split orders this is the variant's slice (e.g. 200 each on a 400-total 50/50 split), not the campaign-level total. Use the top-level `recipientCount` for the full campaign list size. |
 
 **`lockedReason` enum:**
 
@@ -595,7 +674,8 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 
 1. Listen for `edit_leads_requested`.
 2. Open the Edit Leads modal (PropStream-hosted, on top of the iframe).
-3. On modal save, **PATCH each `affectedOrders[].editRecipientsEndpoint` with the updated recipient list** (`PATCH /v1/billing/orders/{order_id}/recipients`, see `API_KIT.md §6n`). All-or-nothing — invalid recipients → `422`.
+3. On modal save, **PATCH each `affectedOrders[].editRecipientsEndpoint` with the new recipient list** (`PATCH /v1/billing/orders/{order_id}/recipients`, see `API_KIT.md §6n`). All-or-nothing — invalid recipients → `422`.
+    - **A/B split:** the variant-specific slice goes to each variant's endpoint, not the full list. Use the `variant` field on each `affectedOrders[]` item to identify A vs B. PropStream's split allocation logic determines what slice goes to each.
 4. After all PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
 5. On modal close without changes, no postMessage required.
 
