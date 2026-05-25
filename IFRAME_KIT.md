@@ -541,6 +541,7 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
       "paymentConfirmed": false,
       "pieces": 500,
       "variant": null,
+      "campaignInstanceId": null,
       "editRecipientsEndpoint": "/v1/billing/orders/ord_abc123/recipients",
       "editRecipientsMethod": "PATCH"
     }
@@ -554,6 +555,7 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
       "paymentConfirmed": true,
       "pieces": 500,
       "variant": null,
+      "campaignInstanceId": null,
       "lockedReason": "billed"
     }
   ]
@@ -585,6 +587,7 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
       "paymentConfirmed": false,
       "pieces": 250,
       "variant": null,
+      "campaignInstanceId": null,
       "editRecipientsEndpoint": "/v1/billing/orders/ord_s1/recipients",
       "editRecipientsMethod": "PATCH"
     }
@@ -618,6 +621,7 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
       "paymentConfirmed": false,
       "pieces": 200,
       "variant": "a",
+      "campaignInstanceId": "ci_split_2026_09_01",
       "editRecipientsEndpoint": "/v1/billing/orders/ord_sa/recipients",
       "editRecipientsMethod": "PATCH"
     },
@@ -629,6 +633,7 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
       "paymentConfirmed": false,
       "pieces": 200,
       "variant": "b",
+      "campaignInstanceId": "ci_split_2026_09_01",
       "editRecipientsEndpoint": "/v1/billing/orders/ord_sb/recipients",
       "editRecipientsMethod": "PATCH"
     }
@@ -647,6 +652,7 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 | `affectedOrders[]` | Orders eligible for edit. Each has `editRecipientsEndpoint` + `editRecipientsMethod: "PATCH"`. PropStream's Edit Leads modal should PATCH each one with the new recipient list after the user saves. |
 | `lockedOrders[]` | Orders that cannot be edited (billed, in production, mailed, delivered, terminal). Each has `lockedReason`. Use these to explain to the user which orders won't be affected. |
 | `affectedOrders[].variant` / `lockedOrders[].variant` | For A/B split campaigns: `"a"` or `"b"` identifying the sibling. For single send and multi-month: `null`. Used by PropStream to allocate per-variant recipient slices before PATCH. |
+| `affectedOrders[].campaignInstanceId` / `lockedOrders[].campaignInstanceId` | The order's split-instance key, surfaced verbatim from the Ballpoint `campaign_instance_id` column. For A/B split sibling orders: both variants share the SAME non-null string, letting the parent verify cross-variant identity before allocating per-variant slices. For single send and multi-month: `null`. Same value the partner sent on POST `/orders` and that round-trips on GET `/orders`. |
 | `affectedOrders[].pieces` / `lockedOrders[].pieces` | The order's CURRENT piece count. For A/B split orders this is the variant's slice (e.g. 200 each on a 400-total 50/50 split), not the campaign-level total. Use the top-level `recipientCount` for the full campaign list size. |
 
 **`lockedReason` enum:**
