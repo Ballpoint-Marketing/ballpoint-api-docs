@@ -527,6 +527,8 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
   "campaignId": "api_campaign_cmp_abc",
   "ballpointCampaignId": "cmp_abc",
   "campaignType": "multi",
+  "campaignDeltaEndpoint": "/v1/billing/campaigns/cmp_abc/recipients",
+  "campaignDeltaMethod": "PATCH",
   "listId": "ps_list_123",
   "listName": "Pre-Foreclosure Leads",
   "recipientCount": 500,
@@ -554,7 +556,7 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
       "paymentConfirmed": true,
       "pieces": 500,
       "variant": null,
-      "lockedReason": "billed"
+      "lockedReason": "paid_or_accepted"
     }
   ]
 }
@@ -571,6 +573,8 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
   "campaignId": "api_campaign_cmp_single_1",
   "ballpointCampaignId": "cmp_single_1",
   "campaignType": "single",
+  "campaignDeltaEndpoint": "/v1/billing/campaigns/cmp_single_1/recipients",
+  "campaignDeltaMethod": "PATCH",
   "listId": "ps_list_321",
   "listName": "Absentee Owners",
   "recipientCount": 250,
@@ -604,6 +608,8 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
   "campaignId": "api_campaign_cmp_split_1",
   "ballpointCampaignId": "cmp_split_1",
   "campaignType": "split",
+  "campaignDeltaEndpoint": "/v1/billing/campaigns/cmp_split_1/recipients",
+  "campaignDeltaMethod": "PATCH",
   "listId": "ps_list_654",
   "listName": "Probate Leads",
   "recipientCount": 400,
@@ -643,9 +649,11 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 | `campaignId` | Iframe-local group key (e.g. `api_campaign_<id>` for API-loaded campaigns; `cmp_<local>` for in-builder). Use `ballpointCampaignId` for cross-system reference. |
 | `ballpointCampaignId` | Server-side Ballpoint campaign ID (from API `campaign_id`). May be `null` for campaigns not yet persisted server-side. |
 | `campaignType` | `"single"` \| `"multi"` \| `"split"`. Mirrors `campaign.type` in the iframe. |
+| `campaignDeltaEndpoint` | Campaign-level PATCH endpoint for delta add/remove (`/v1/billing/campaigns/{ballpointCampaignId}/recipients`). Preferred for multi-month campaigns. `null` if campaign not yet persisted server-side. See `API_KIT.md §6o`. |
+| `campaignDeltaMethod` | Always `"PATCH"`. |
 | `recipientCount` | Raw list recipient count at the time of click (not the affected/locked breakdown sum). |
 | `affectedOrders[]` | Orders eligible for edit. Each has `editRecipientsEndpoint` + `editRecipientsMethod: "PATCH"`. PropStream's Edit Leads modal should PATCH each one with the new recipient list after the user saves. |
-| `lockedOrders[]` | Orders that cannot be edited (billed, in production, mailed, delivered, terminal). Each has `lockedReason`. Use these to explain to the user which orders won't be affected. |
+| `lockedOrders[]` | Orders that cannot be edited (paid/accepted, in production, mailed, delivered, terminal). Each has `lockedReason`. Use these to explain to the user which orders won't be affected. |
 | `affectedOrders[].variant` / `lockedOrders[].variant` | For A/B split campaigns: `"a"` or `"b"` identifying the sibling. For single send and multi-month: `null`. Used by PropStream to allocate per-variant recipient slices before PATCH. |
 | `affectedOrders[].pieces` / `lockedOrders[].pieces` | The order's CURRENT piece count. For A/B split orders this is the variant's slice (e.g. 200 each on a 400-total 50/50 split), not the campaign-level total. Use the top-level `recipientCount` for the full campaign list size. |
 
@@ -653,8 +661,8 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 
 | Value | Meaning |
 |---|---|
-| `"billed"` | `paymentConfirmed === true` (partner has confirmed payment for this drop). |
-| `"in_production"` | Status in `{processing, in_production, printing, quality_check, printed}`. |
+| `"paid_or_accepted"` | `paymentConfirmed === true` OR status is `accepted` (even if `paymentConfirmed === false`). Orders past the edit window. |
+| `"in_production"` | Status in `{prep, processing, in_production, printing, quality_check, printed}`. |
 | `"mailed"` | Status `complete`. |
 | `"delivered"` | Status in `{shipped, in_transit, out_for_delivery, delivered}`. |
 | `"terminal"` | Status in `{cancelled, failed, payment_failed}`. |
@@ -663,8 +671,10 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 
 **Affected allowlist** (mirrors the backend gate on `PATCH /v1/billing/orders/{id}/recipients`):
 
-- Status ∈ `{scheduled, pending_payment, accepted, prep}` AND
+- Status ∈ `{scheduled, pending_payment}` AND
 - `paymentConfirmed === false`
+
+`accepted` and `prep` are now **locked** (moved to `lockedOrders` with reasons `paid_or_accepted` and `in_production` respectively).
 
 `submitted` and `received` are NOT in the allowlist — they appear in `lockedOrders` with `lockedReason: "unsupported_status"`.
 
@@ -674,10 +684,11 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 
 1. Listen for `edit_leads_requested`.
 2. Open the Edit Leads modal (PropStream-hosted, on top of the iframe).
-3. On modal save, **PATCH each `affectedOrders[].editRecipientsEndpoint` with the new recipient list** (`PATCH /v1/billing/orders/{order_id}/recipients`, see `API_KIT.md §6n`). All-or-nothing — invalid recipients → `422`.
+3. **Option A (campaign-level, preferred for multi-month):** PATCH `campaignDeltaEndpoint` with delta `{added, removed, remove_all}`. One call distributes to all editable drops. See `API_KIT.md §6o`.
+4. **Option B (per-order, required for A/B split variant allocation):** PATCH each `affectedOrders[].editRecipientsEndpoint` with the full replacement list. See `API_KIT.md §6n`.
     - **A/B split:** the variant-specific slice goes to each variant's endpoint, not the full list. Use the `variant` field on each `affectedOrders[]` item to identify A vs B. PropStream's split allocation logic determines what slice goes to each.
-4. After all PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
-5. On modal close without changes, no postMessage required.
+5. After all PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
+6. On modal close without changes, no postMessage required.
 
 #### `recipients_updated` — Partner finished editing recipients (parent → iframe)
 

@@ -1,11 +1,39 @@
 # Changelog
 
+## v1.6.0 — 2026-05-25
+
+- **New: `PATCH /v1/billing/campaigns/{campaign_id}/recipients` — campaign-level delta recipient endpoint (§6o).** Add/remove recipients across all editable drops in a campaign with one call. Delta-based: `added[]` upserts by `contact_id + address_type`, `removed[]` deletes by key, `remove_all` clears and replaces. Editable drops: `{scheduled, pending_payment}` with `payment_confirmed=false`. Locked drops reported in response with `locked_reason`. Gated accounts only. Response includes per-drop pricing recomputed via current pricing tables.
+- **New: `address_type` field on recipients.** Values: `PROPERTY` or `MAILING`. Used as part of the unique key (`contact_id + address_type`) for the campaign delta endpoint. Optional on existing order-level endpoints (`POST /recipients`, `PATCH /recipients`); required on the new campaign delta endpoint.
+- **New: `campaignDeltaEndpoint` + `campaignDeltaMethod` on `edit_leads_requested` postMessage.** The iframe now exposes the campaign-level PATCH endpoint alongside per-order endpoints. PropStream chooses which to call based on campaign type (campaign-level preferred for multi-month; per-order required for A/B split variant allocation).
+- **Breaking (staging-only): Edit Leads gate tightened.** `accepted` and `prep` statuses are now **locked** for both `PATCH /orders/{id}/recipients` (§6n) and the new campaign delta endpoint (§6o). Only `scheduled` and `pending_payment` orders are editable. Previously, `accepted` and `prep` were editable if `payment_confirmed=false`. This matches the intended product behavior per Ryan's specification: "edits apply only to orders that haven't billed or been accepted."
+- **Correction: `new_recipients_per_drop` field removed from the campaign delta response.** The earlier proposed spec (Slack, May 20) included this field. It has been removed because per-drop recipient counts can differ when prior order-level edits left drops in different states. Use `drops_affected[].new_piece_count` as the per-drop source of truth.
+- **Correction: `new_total_price_tcents` is non-nullable integer.** The earlier proposed spec implied this could be null. The implemented contract always computes pricing via `get_unit_price()` — if pricing is not found, the endpoint returns `400 NO_PRICING` rather than a null field.
+
 ## v1.5.4 — 2026-05-21
 
 - **Additive: `edit_leads_requested` campaign-type eligibility broadened.** The per-campaign-card button now renders on Single Send and A/B Split campaign cards in addition to multi-month, when at least one order is still pre-production and unbilled (`paymentConfirmed === false`). Backend behavior unchanged — the gate at `PATCH /v1/billing/orders/{order_id}/recipients` is already order-level and campaign-type-neutral. The `scope` field on the event, previously documented as reserved for additional enum values, is now active: `multi_month_campaign | single_send | ab_split`. The `multi_month_campaign` value is unchanged — partners that consume only that value continue to work. See `IFRAME_KIT.md` `edit_leads_requested` section. Iframe is staging-only.
 - **Additive: per-order `variant` field on `edit_leads_requested`.** Each `affectedOrders[]` / `lockedOrders[]` item now carries a `variant` field (`"a"` | `"b"` for A/B split orders, `null` for single send and multi-month). For A/B split, PropStream allocates per-variant slices of the new recipient list before PATCHing each variant separately — the full list is NOT sent to both siblings. Each order's `pieces` reflects its current slice (e.g. 200 each on a 400-total 50/50 split), not the campaign-level total; the top-level `recipientCount` continues to carry the full campaign list size. Preserving the original `a/b` ratio is the simplest allocation, but PropStream owns the split logic.
 - **Docs cleanup: PATCH `/v1/billing/orders/{order_id}/recipients` OpenAPI copy is now campaign-type-neutral.** The route summary no longer says "(V2)" and the description no longer says "multi-month campaign drops" — it now reads "future/unbilled drops. Order-level and campaign-type-neutral — applies to single send, A/B split, and multi-month equally." No behavior change; the gate is unchanged.
 - **Additive: POST `/orders` accepts `variant: "a" | "b"`** for A/B split sibling orders (case-insensitive, trimmed; persisted to `metadata.variant`). GET `/orders` and GET `/orders/{order_id}` now surface `campaign_instance_id` and round-trip `metadata.variant` so the iframe can reconstruct split identity after reload. Required for Edit Leads to correctly identify A/B split siblings on rehydrated campaigns. See `API_KIT.md` POST body schema + GET response notes.
+
+## v1.5.3 — 2026-05-20
+
+- **Partner `POST /orders` — `product_type` now canonical when supplied.** The
+  partner-compatible order create endpoint (the one consumed by the iframe and
+  by direct partner integrations following IFRAME_KIT) now accepts an optional
+  `product_type` field on the request body. When present, it is validated
+  against the canonical product list (`4x6_printed`, `4x6_handwritten`,
+  `6x9_printed`, `6x9_handwritten`, `color_letter`, `hybrid_letter`,
+  `handwritten_letter`) and used as the stored product type on the order row.
+  When absent, the server falls back to its prior internal derivation from
+  `product_id` / `product_name` (transitional behaviour — partners should
+  always send `product_type` explicitly).
+- **Idempotency hash shape note.** Because `product_type` is a new optional
+  body field, the idempotency request hash for `POST /orders` changes shape.
+  A partner retrying across the deploy with the same `Idempotency-Key` and a
+  body that previously omitted `product_type` will receive HTTP 422
+  `IDEMPOTENCY_KEY_REUSE` and must generate a new key. New requests are
+  unaffected.
 
 ## v1.5.2 — 2026-05-19
 
