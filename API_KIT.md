@@ -427,6 +427,8 @@ POST /v1/billing/orders
 | `piece_count` | integer | Yes | Number of mail pieces |
 | `envelope_style` | string | Letters only | Required for letter products, rejected for postcards |
 | `external_id` | string | No | Your internal reference ID (flows back in webhooks) |
+| `campaign_instance_id` | string | No | Optional submit/split instance key (1–64 chars, `[A-Za-z0-9_-]`). When shared across orders in the same campaign it enables cross-order recipient dedup as a guard-rail (A/B split disjoint slices). `null`/omitted bypasses cross-order dedup. Populate on A/B split sibling orders only; single-send, multi-send, and edit-leads paths leave it `null`. Round-tripped on GET responses. |
+| `variant` | string | No | A/B split variant identifier; one of `"a"` \| `"b"`. Case-insensitive (server normalizes to lowercase + trims whitespace). Required only on A/B split sibling orders so they can be reconstructed after reload. Persisted to `metadata.variant` server-side and round-tripped on GET responses. Single-send, multi-send, and edit-leads paths leave it `null`. |
 
 **Example — postcard:**
 
@@ -533,6 +535,10 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
 Tenant scoping: partners only see their own orders. Both cross-tenant and unknown `order_id` return `404` (never `403`) so existence cannot be probed across tenants.
 
 `customer_info` is `null` unless populated (object with `name`, `website`, `rma`, `phone`, `shipping_address` — only present keys returned). `envelope_style`, `print_font`, `shipping_option`, `proof_approval_status` are `null` for products that do not use them. `metadata` is returned as a JSON-encoded string; call `JSON.parse(body.metadata)` if you need nested fields. Response shape matches each element of `GET /v1/billing/orders` (§6d).
+
+**`campaign_instance_id`** (string or null): Surfaced verbatim from the stored column (previously persisted but not exposed; now round-tripped on GET). Set only on A/B split sibling orders so the iframe can reconstruct split groupings after a reload; `null` on single-send, multi-send, and edit-leads orders.
+
+**`metadata.variant`** (string `"a"` | `"b"`, or absent): Present only on A/B split sibling orders, paired with `campaign_instance_id`. To read it: `JSON.parse(body.metadata).variant`. Absent on single-send, multi-send, and edit-leads orders.
 
 **`payment_confirmed`** (boolean or null): For accounts with partner-side payment confirmation gating (`requires_payment_confirmation = TRUE`, e.g. PropStream): `true` once `POST /v1/billing/orders/{order_id}/confirm-payment` has fired with `status: success`; `false` while the order is still awaiting partner confirmation. For accounts that do not use the payment gate, the value is always `null` and the field should be ignored — their billing lifecycle does not use partner-side payment confirmation.
 
@@ -1132,9 +1138,9 @@ X-Partner-Key: pk_test_...
 Content-Type: application/json
 ```
 
-For Edit Leads campaign-level flow on multi-month future/unbilled drops. Replaces all recipients on the order, resizes `piece_count` to match the new count, and recomputes display pricing fields (`unit_price_tcents`, `total_price_tcents`) via the canonical pricing helper.
+For Edit Leads recipient replacement on future/unbilled drops. Replaces all recipients on the order, resizes `piece_count` to match the new count, and recomputes display pricing fields (`unit_price_tcents`, `total_price_tcents`) via the canonical pricing helper. Backend gate is order-level and campaign-type-neutral — applies to single send, A/B split, and multi-month equally.
 
-**Distinction from POST /recipients:** the POST endpoint is for **initial recipient upload** (or chunked append). It does NOT resize `piece_count` and is NOT the Edit Leads V2 flow. Use this PATCH instead for Edit Leads.
+**Distinction from POST /recipients:** the POST endpoint is for **initial recipient upload** (or chunked append). It does NOT resize `piece_count` and is NOT the Edit Leads PATCH flow. Use this PATCH instead for Edit Leads.
 
 **Request body:**
 
