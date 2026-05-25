@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.5.5 — 2026-05-25
+
+- **Fix: `edit_leads_requested` now fires on API-loaded campaign cards.** Tier 3 staging validation found the click handler was searching only the in-flight `campaigns` array, so cards rehydrated from `GET /v1/billing/orders` rendered the button but the click was a no-op (logged `campaign not found` and exited before emitting the postMessage). The handler now searches the union of in-flight and API-loaded campaigns (ReferenceError-safe via `typeof` guards), matching the existing `cancelOrder` pattern. In-flight click behavior unchanged.
+- **Additive: per-order `campaignInstanceId` on `edit_leads_requested`.** Each `affectedOrders[]` / `lockedOrders[]` item now carries a `campaignInstanceId` field — surfaced verbatim from the Ballpoint `campaign_instance_id` column. For A/B split sibling orders both variants share the SAME non-null string; for single send and multi-month it is `null`. Lets the parent verify cross-variant identity before allocating per-variant slices. Pairs with the existing per-order `variant` field. Schema additive only — partners ignoring it continue to work.
+
 ## v1.5.4 — 2026-05-21
 
 - **Additive: `edit_leads_requested` campaign-type eligibility broadened.** The per-campaign-card button now renders on Single Send and A/B Split campaign cards in addition to multi-month, when at least one order is still pre-production and unbilled (`paymentConfirmed === false`). Backend behavior unchanged — the gate at `PATCH /v1/billing/orders/{order_id}/recipients` is already order-level and campaign-type-neutral. The `scope` field on the event, previously documented as reserved for additional enum values, is now active: `multi_month_campaign | single_send | ab_split`. The `multi_month_campaign` value is unchanged — partners that consume only that value continue to work. See `IFRAME_KIT.md` `edit_leads_requested` section. Iframe is staging-only.
