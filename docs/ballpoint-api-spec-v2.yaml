@@ -1100,7 +1100,8 @@ paths:
         Update an order's scheduled mail date without creating a replacement
         order. Allowed only when `production_status='scheduled'` AND
         `payment_confirmed=FALSE`. The same `order_id` is preserved; the
-        backend recomputes `scheduled_production_date` from the product SLA.
+        backend recomputes `scheduled_production_date` from the product SLA
+        (in business days, Mon–Fri; see `API_KIT.md §6p` for per-product table).
         Idempotent on no-op (when the supplied `mail_date` equals the order's
         current value, the call returns 200 with no webhook/audit side-effects).
         See `API_KIT.md §6m` for the full contract and `order.rescheduled`

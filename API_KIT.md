@@ -1117,7 +1117,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/res
 | HTTP | `error.code` | When |
 |------|------|------|
 | 400 | `MAIL_DATE_INVALID_FORMAT` | Not `YYYY-MM-DD` (datetime strings, ISO-with-TZ, missing/null are all rejected) |
-| 400 | `MAIL_DATE_TOO_SOON` | `mail_date − SLA_days(product_type)` is ≤ today + 1 day (same threshold as `create_order`'s scheduling branch) |
+| 400 | `MAIL_DATE_TOO_SOON` | `mail_date − SLA_business_days(product_type)` is ≤ today + 1 day (same threshold as `create_order`'s scheduling branch). SLA is in **business days** (Mon–Fri); see §6p for the full table. |
 | 400 | `MAIL_DATE_TOO_FAR` | `mail_date` is more than 365 days in the future |
 | 409 | `PAID_LOCKED` | `payment_confirmed = TRUE` — order is locked, no reschedule |
 | 409 | `SEND_NOW_PROCESSING` | Send-now order in `pending_payment` awaiting `/confirm-payment` |
@@ -1357,6 +1357,28 @@ Campaign-level delta add/remove endpoint. One call applies recipient changes acr
 **Billing semantics:** Same as §6n — this endpoint does NOT charge. It recomputes `unit_price_tcents` and `total_price_tcents` on each affected order for display. `/confirm-payment` recomputes at charge time using the updated `piece_count`.
 
 **Audit log:** `action="recipients_campaign_delta"` with detail containing counts and affected/locked order IDs.
+
+### 6p. Product SLA Lead Times (Business Days)
+
+Ballpoint computes `scheduled_production_date` by subtracting the product's SLA lead time (in **business days**, Mon–Fri) from `mail_date`. Weekends are skipped; no holiday calendar is applied.
+
+**Partner-contract product types:**
+
+| `product_type` | SLA (business days) |
+|---|---|
+| `4x6_printed` | 2 |
+| `6x9_printed` | 2 |
+| `color_letter` | 3 |
+| `4x6_handwritten` | 4 |
+| `6x9_handwritten` | 4 |
+| `hybrid_letter` | 5 |
+| `handwritten_letter` | 5 |
+
+**Example:** `mail_date = 2026-07-13` (Monday) with `product_type = 4x6_printed` (2 business days) → `scheduled_production_date = 2026-07-09` (previous Thursday, skipping Sat+Sun).
+
+Unknown product types are rejected by validation (`INVALID_PRODUCT_CONFIG`). If an unrecognized type reaches the scheduler through a legacy path, the conservative default is 5 business days.
+
+The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date ≤ today + 1 day`.
 
 ---
 
