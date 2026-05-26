@@ -271,14 +271,14 @@ Envelope + insert. Letter orders **require** an `envelope_style` field.
 |-------------|----------|--------|---------------|-----------------|
 | `color_letter` | Printed | Printed 8.5x11 (folded) | #10 | `first_class`, `standard` |
 | `hybrid_letter` | Handwritten | Printed | 5x7 | `first_class`, `presort` |
-| `handwritten_letter` | Handwritten | Handwritten | 5x7 | `first_class`, `presort` |
+| `greeting_letter` | Handwritten | Handwritten | 5x7 | `first_class`, `presort` |
 
 #### Envelope Styles
 
 Available styles: `candy`, `party`, `pastel`, `confetti`, `desert`, `floral`, `stone`, `retro`, `deco`, `doodle`, `plain_white`
 
 - **`color_letter`** uses #10 envelopes — only `plain_white` is supported.
-- **`hybrid_letter`** and **`handwritten_letter`** use 5x7 envelopes — all decorative styles available.
+- **`hybrid_letter`** and **`greeting_letter`** use 5x7 envelopes — all decorative styles available.
 - **Postcards** — do not include `envelope_style` (the API will reject it).
 
 ### Pricing Table
@@ -297,8 +297,8 @@ Prices are in **tenth-cents** (tcents). Divide by 10,000 for dollars: `5054 tcen
 | Color Letter (#10) | Standard | 5,730 | $0.5730 | $286.50 |
 | Hybrid Letter (5x7) | First Class | 10,500 | $1.0500 | $525.00 |
 | Hybrid Letter (5x7) | Presort | 7,800 | $0.7800 | $390.00 |
-| Handwritten Letter (5x7) | First Class | 14,500 | $1.4500 | $725.00 |
-| Handwritten Letter (5x7) | Presort | 9,500 | $0.9500 | $475.00 |
+| Greeting Letter (5x7) | First Class | 14,500 | $1.4500 | $725.00 |
+| Greeting Letter (5x7) | Presort | 9,500 | $0.9500 | $475.00 |
 
 Total cost = `unit_price_tcents × piece_count`. No minimums, no surcharges.
 
@@ -1372,7 +1372,7 @@ Ballpoint computes `scheduled_production_date` by subtracting the product's SLA 
 | `4x6_handwritten` | 4 |
 | `6x9_handwritten` | 4 |
 | `hybrid_letter` | 5 |
-| `handwritten_letter` | 5 |
+| `greeting_letter` | 5 |
 
 **Example:** `mail_date = 2026-07-13` (Monday) with `product_type = 4x6_printed` (2 business days) → `scheduled_production_date = 2026-07-09` (previous Thursday, skipping Sat+Sun).
 

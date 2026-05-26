@@ -1,8 +1,13 @@
 # Changelog
 
+## v1.6.2 — 2026-05-26
+
+- **Breaking (staging-only): `handwritten_letter` removed from partner contract.** `greeting_letter` replaces it as the canonical partner-sendable type (same product, same SLA, same pricing). Explicit `product_type: "handwritten_letter"` on `POST /orders` now returns `400 INVALID_PRODUCT_CONFIG`. Existing DB rows with `handwritten_letter` remain readable and reschedulable (SLA lookup preserved). Migration 027 copies pricing.
+- **New partner product type: `greeting_letter`.** 5x7 handwritten envelope + handwritten insert, `first_class` and `presort` postage, 5 business-day SLA. Replaces `handwritten_letter` in all partner docs, OpenAPI, and validation.
+
 ## v1.6.1 — 2026-05-26
 
-- **Fix: SLA scheduling now uses business days (Mon–Fri).** Previously used calendar-day subtraction, which could place `scheduled_production_date` on weekends. Updated to Ryan-confirmed product SLA buckets: 2 business days (postcards), 3 (printed/color letters), 4 (handwritten/cursive postcards), 5 (hybrid/handwritten letters). See `API_KIT.md` §6p for the full table.
+- **Fix: SLA scheduling now uses business days (Mon–Fri).** Previously used calendar-day subtraction, which could place `scheduled_production_date` on weekends. Updated to Ryan-confirmed product SLA buckets: 2 business days (postcards), 3 (printed/color letters), 4 (handwritten/cursive postcards), 5 (hybrid/greeting letters). See `API_KIT.md` §6p for the full table.
 - **Correction: SLA bucket values updated.** Several product types had incorrect lead times (e.g. `color_letter` was 2, now 3; `hybrid_letter` was 4, now 5). No change to partner API contract shape — `scheduled_production_date` and `MAIL_DATE_TOO_SOON` behavior unchanged except for corrected date math.
 - **Internal: unknown product_type SLA fallback changed from 2 to 5.** Conservative default — starts production earlier if an unrecognized type somehow reaches the scheduler. Should never fire in practice (validation rejects unknown types).
 
