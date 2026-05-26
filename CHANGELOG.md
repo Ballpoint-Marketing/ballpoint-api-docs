@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.6.1 — 2026-05-26
+
+- **Fix: SLA scheduling now uses business days (Mon–Fri).** Previously used calendar-day subtraction, which could place `scheduled_production_date` on weekends. Updated to Ryan-confirmed product SLA buckets: 2 business days (postcards), 3 (printed/color letters), 4 (handwritten/cursive postcards), 5 (hybrid/handwritten letters). See `API_KIT.md` §6p for the full table.
+- **Correction: SLA bucket values updated.** Several product types had incorrect lead times (e.g. `color_letter` was 2, now 3; `hybrid_letter` was 4, now 5). No change to partner API contract shape — `scheduled_production_date` and `MAIL_DATE_TOO_SOON` behavior unchanged except for corrected date math.
+- **Internal: unknown product_type SLA fallback changed from 2 to 5.** Conservative default — starts production earlier if an unrecognized type somehow reaches the scheduler. Should never fire in practice (validation rejects unknown types).
+
 ## v1.6.0 — 2026-05-25
 
 - **New: `PATCH /v1/billing/campaigns/{campaign_id}/recipients` — campaign-level delta recipient endpoint (§6o).** Add/remove recipients across all editable drops in a campaign with one call. Delta-based: `added[]` upserts by `contact_id + address_type`, `removed[]` deletes by key, `remove_all` clears and replaces. Editable drops: `{scheduled, pending_payment}` with `payment_confirmed=false`. Locked drops reported in response with `locked_reason`. Gated accounts only. Response includes per-drop pricing recomputed via current pricing tables.

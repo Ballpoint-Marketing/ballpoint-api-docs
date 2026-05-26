@@ -970,7 +970,7 @@ Notes:
 - **Suppressed on no-op.** If the user re-submits the same `newMailDate` as the order's current value, the event is **not** re-emitted (the underlying API treats it as idempotent and writes no audit row).
 - **Casing.** Payload keys are camelCase to match sibling events (`order_cancelled`, `order_added`, `list_selected`). The corresponding **webhook** event (`order.rescheduled` — see `API_KIT.md §7`) uses **snake_case** keys (`previous_mail_date`/`new_mail_date`) to match the existing `order.status_changed` envelope. This snake-vs-camel split is intentional — consume the channel that matches your client style.
 - `campaignId` is the local iframe campaign identifier captured at campaign creation time. It can be `null` for single-order canvas-builder paths where no campaign id was generated client-side.
-- The Ballpoint webhook (`order.rescheduled`) carries the canonical `previous_scheduled_production_date` / `new_scheduled_production_date` recomputed from the product SLA. The iframe postMessage intentionally omits these (the parent app rarely needs them; if you do, consume the webhook).
+- The Ballpoint webhook (`order.rescheduled`) carries the canonical `previous_scheduled_production_date` / `new_scheduled_production_date` recomputed from the product SLA (in business days, Mon–Fri; see `API_KIT.md §6p`). The iframe postMessage intentionally omits these (the parent app rarely needs them; if you do, consume the webhook).
 
 #### `campaign_complete` — Entire campaign flow finished
 
