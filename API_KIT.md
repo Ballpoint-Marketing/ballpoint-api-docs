@@ -250,7 +250,7 @@ For the full iframe integration contract — embed setup, parent ↔ iframe mess
 
 ### Products
 
-Ballpoint produces 9 product types:
+Ballpoint produces 7 product types:
 
 #### Postcards
 
@@ -259,10 +259,8 @@ No envelope. Handwriting is always blue ink.
 | Product Type | Description | Postage Options |
 |-------------|-------------|-----------------|
 | `4x6_printed` | Standard 4x6 printed postcard | `first_class`, `standard` |
-| `4x6_handwritten` | 4x6 pen-written postcard (non-cursive) | `first_class` only |
 | `4x6_cursive` | 4x6 pen-written postcard (cursive) | `first_class` only |
 | `6x9_printed` | Large 6x9 printed postcard | `first_class`, `standard` |
-| `6x9_handwritten` | 6x9 pen-written postcard (non-cursive) | `first_class` only |
 | `6x9_cursive` | 6x9 pen-written postcard (cursive) | `first_class` only |
 
 #### Letters
@@ -291,11 +289,9 @@ Prices are in **tenth-cents** (tcents). Divide by 10,000 for dollars: `5054 tcen
 |---------|---------|-------------------|---------------|------------|
 | 4x6 Printed Postcard | First Class | 5,054 | $0.5054 | $252.70 |
 | 4x6 Printed Postcard | Standard | 4,910 | $0.4910 | $245.50 |
-| 4x6 Handwritten Postcard | First Class | 7,554 | $0.7554 | $377.70 |
 | 4x6 Cursive Postcard | First Class | 7,554 | $0.7554 | $377.70 |
 | 6x9 Printed Postcard | First Class | 5,810 | $0.5810 | $290.50 |
 | 6x9 Printed Postcard | Standard | 5,510 | $0.5510 | $275.50 |
-| 6x9 Handwritten Postcard | First Class | 8,310 | $0.8310 | $415.50 |
 | 6x9 Cursive Postcard | First Class | 8,310 | $0.8310 | $415.50 |
 | Color Letter (#10) | First Class | 8,210 | $0.8210 | $410.50 |
 | Color Letter (#10) | Standard | 5,730 | $0.5730 | $286.50 |
@@ -426,7 +422,7 @@ POST /v1/billing/orders
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `campaign_id` | string | Yes | Campaign to fulfill (provided by Ballpoint) |
-| `product_type` | string | Yes | One of the 9 product types |
+| `product_type` | string | Yes | One of the 7 product types |
 | `postage_type` | string | Yes | `first_class`, `standard`, or `presort` |
 | `piece_count` | integer | Yes | Number of mail pieces |
 | `envelope_style` | string | Letters only | Required for letter products, rejected for postcards |
@@ -1373,9 +1369,7 @@ Ballpoint computes `scheduled_production_date` by subtracting the product's SLA 
 | `4x6_printed` | 2 |
 | `6x9_printed` | 2 |
 | `color_letter` | 3 |
-| `4x6_handwritten` | 4 |
 | `4x6_cursive` | 4 |
-| `6x9_handwritten` | 4 |
 | `6x9_cursive` | 4 |
 | `hybrid_letter` | 5 |
 | `greeting_letter` | 5 |
