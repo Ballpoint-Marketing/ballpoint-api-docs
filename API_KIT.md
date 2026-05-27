@@ -259,9 +259,11 @@ No envelope. Handwriting is always blue ink.
 | Product Type | Description | Postage Options |
 |-------------|-------------|-----------------|
 | `4x6_printed` | Standard 4x6 printed postcard | `first_class`, `standard` |
-| `4x6_handwritten` | 4x6 pen-plotted postcard | `first_class` only |
+| `4x6_handwritten` | 4x6 pen-written postcard (non-cursive) | `first_class` only |
+| `4x6_cursive` | 4x6 pen-written postcard (cursive) | `first_class` only |
 | `6x9_printed` | Large 6x9 printed postcard | `first_class`, `standard` |
-| `6x9_handwritten` | 6x9 pen-plotted postcard | `first_class` only |
+| `6x9_handwritten` | 6x9 pen-written postcard (non-cursive) | `first_class` only |
+| `6x9_cursive` | 6x9 pen-written postcard (cursive) | `first_class` only |
 
 #### Letters
 
@@ -1370,7 +1372,9 @@ Ballpoint computes `scheduled_production_date` by subtracting the product's SLA 
 | `6x9_printed` | 2 |
 | `color_letter` | 3 |
 | `4x6_handwritten` | 4 |
+| `4x6_cursive` | 4 |
 | `6x9_handwritten` | 4 |
+| `6x9_cursive` | 4 |
 | `hybrid_letter` | 5 |
 | `greeting_letter` | 5 |
 

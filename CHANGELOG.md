@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.3 — 2026-05-27
+
+- **New partner product types: `4x6_cursive`, `6x9_cursive`.** Pen-written postcards in cursive script. Same lifecycle as handwritten postcards (includes `writing` step), `first_class` postage only, 4 business-day SLA. Pricing matches handwritten postcards. Migration 028 seeds pricing.
+
 ## v1.6.2 — 2026-05-26
 
 - **Breaking (staging-only): `handwritten_letter` removed from partner contract.** `greeting_letter` replaces it as the canonical partner-sendable type (same product, same SLA, same pricing). Explicit `product_type: "handwritten_letter"` on `POST /orders` now returns `400 INVALID_PRODUCT_CONFIG`. Existing DB rows with `handwritten_letter` remain readable and reschedulable (SLA lookup preserved). Migration 027 copies pricing.

@@ -269,9 +269,13 @@ components:
 
             - `6x9_printed` - Large 6"×9" printed postcard
 
-            - `4x6_handwritten` - 4"×6" with handwritten message
+            - `4x6_handwritten` - 4"×6" pen-written postcard (non-cursive)
 
-            - `6x9_handwritten` - 6"×9" with handwritten message
+            - `4x6_cursive` - 4"×6" pen-written postcard (cursive)
+
+            - `6x9_handwritten` - 6"×9" pen-written postcard (non-cursive)
+
+            - `6x9_cursive` - 6"×9" pen-written postcard (cursive)
 
 
             **Letters:**
@@ -296,7 +300,9 @@ components:
           - 4x6_printed
           - 6x9_printed
           - 4x6_handwritten
+          - 4x6_cursive
           - 6x9_handwritten
+          - 6x9_cursive
           - color_letter
           - greeting_letter
           - hybrid_letter
@@ -495,7 +501,9 @@ components:
           - 4x6_printed
           - 6x9_printed
           - 4x6_handwritten
+          - 4x6_cursive
           - 6x9_handwritten
+          - 6x9_cursive
           - color_letter
           - greeting_letter
           - hybrid_letter
