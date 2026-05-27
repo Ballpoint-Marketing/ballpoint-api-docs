@@ -15,6 +15,7 @@ This guide explains how to embed the Ballpoint direct mail campaign builder into
 7. [Recipient Upload Flow](#7-recipient-upload-flow)
 8. [URL Parameters (Alternative Bootstrap)](#8-url-parameters-alternative-bootstrap)
 9. [Security Notes](#9-security-notes)
+10. [Troubleshooting](#10-troubleshooting)
 
 ---
 
@@ -36,7 +37,7 @@ This guide explains how to embed the Ballpoint direct mail campaign builder into
 - [ ] **postMessage handler** — listen for events from the iframe and send configuration on `ready` (see [Section 4](#4-bootstrap-flow))
 - [ ] **Recipient upload** — after a campaign is submitted, POST the mailing addresses to the Ballpoint API (see [Section 7](#7-recipient-upload-flow))
 
-> **Minimum viable integration:** embed the iframe, send `set_api_config` + `set_list` on ready, and handle recipient upload on `campaign_submitted`. Everything else is optional.
+> **Minimum viable integration:** embed the iframe, send `set_api_config` + `set_list` on ready, resolve sender info (either send `set_sender` directly, or include `externalUserIsAccountOwner: true` in `set_list` and handle the `sender_setup_requested` → `set_sender` flow), and handle recipient upload on `campaign_submitted`.
 
 ---
 
@@ -142,7 +143,8 @@ function sendConfig() {
     name: 'Pre-Foreclosure Leads',
     listId: 'your_list_id',
     externalAccountId: 'your_account_id',
-    externalUserId: 'your_user_id'
+    externalUserId: 'your_user_id',
+    externalUserIsAccountOwner: true  // Optional — gates sender-info setup CTA visibility
   }, origin);
 
   // Optional: Pre-fill sender information
@@ -244,6 +246,7 @@ Semantics:
   "listId": "your_list_id",
   "externalAccountId": "your_account_id",
   "externalUserId": "your_user_id",
+  "externalUserIsAccountOwner": true,
   "piece_counts": {
     "property": { "dedup_off": 480, "dedup_on": 440 },
     "mailing":  { "dedup_off": 498, "dedup_on": 472 },
@@ -1256,6 +1259,22 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 - **First-write-wins:** `set_sender` and `set_tenant` are accepted once per session. Duplicates are ignored. `set_api_config` can be resent to refresh the token. `set_list` may be resent with the SAME `listId` to refresh `count` / `name` / `piece_counts` after PropStream's Edit Leads modal saves (see [`set_list` refresh](#set_list-refresh-post-modal-sync)); a different `listId` is still rejected as a list-switch attempt.
 - **Rate limiting:** Inbound messages are rate-limited to 20 messages per 5 seconds per origin.
 - **CSP:** The iframe is served with a strict Content Security Policy. Your domain must be listed in the `frame-ancestors` directive. Contact Ballpoint if you receive CSP errors.
+
+---
+
+## 10. Troubleshooting
+
+### "Classic templates unavailable (API not configured)"
+
+**Cause:** `set_api_config` was not sent, or the `apiToken` value is empty/invalid.
+
+**Fix:** Ensure the parent sends `set_api_config` with a valid `apiBaseUrl` and `apiToken` before the user reaches the product selection page. The iframe queues actions until config arrives, but the Classic tab requires a configured API client to fetch templates. Verify the token is a valid `pk_...` key and that `apiBaseUrl` points to the correct [environment](#3-environments).
+
+### "Please contact your account owner to set up sender information"
+
+**Cause:** The iframe is in embed (iframe) mode, sender information has not been resolved (`set_sender` not received), and `externalUserIsAccountOwner` is missing or `false` in the `set_list` payload.
+
+**Fix:** Either send [`set_sender`](#set_sender--pre-fill-sender-info-optional) with the user's sender data (which skips the setup page entirely), or include `externalUserIsAccountOwner: true` in [`set_list`](#set_list--recipient-list-info-required) so the user sees the "Set up now" CTA and can request setup via [`sender_setup_requested`](#sender_setup_requested--user-requested-sender-info-setup). Once `set_sender` is received, the owner flag no longer matters. See [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner) for full details.
 
 ---
 
