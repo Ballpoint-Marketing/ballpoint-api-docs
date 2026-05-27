@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.4 — 2026-05-27
+
+- **Breaking (staging-only): `4x6_handwritten` and `6x9_handwritten` removed from partner contract.** For current PropStream/staging scope, pen-written postcards are cursive-only. Explicit `product_type: "4x6_handwritten"` or `"6x9_handwritten"` on `POST /orders` now returns `400 INVALID_PRODUCT_CONFIG`. Legacy DB rows preserved for read/reschedule/SLA.
+- **Active pen-written postcards: `4x6_cursive`, `6x9_cursive` only.** 7 total partner-sendable product types.
+
 ## v1.6.3 — 2026-05-27
 
 - **New partner product types: `4x6_cursive`, `6x9_cursive`.** Pen-written postcards in cursive script. Same lifecycle as handwritten postcards (includes `writing` step), `first_class` postage only, 4 business-day SLA. Pricing matches handwritten postcards. Migration 028 seeds pricing.
