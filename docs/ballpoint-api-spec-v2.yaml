@@ -278,7 +278,7 @@ components:
 
             - `color_letter` - Printed #10 envelope + printed 8.5×11 insert (folded)
 
-            - `handwritten_letter` - Handwritten 5×7 envelope + handwritten insert
+            - `greeting_letter` - Handwritten 5×7 envelope + handwritten insert
 
             - `hybrid_letter` - Handwritten 5×7 envelope + printed insert
 
@@ -298,7 +298,7 @@ components:
           - 4x6_handwritten
           - 6x9_handwritten
           - color_letter
-          - handwritten_letter
+          - greeting_letter
           - hybrid_letter
         postage_type:
           type: string
@@ -319,12 +319,12 @@ components:
         envelope_style:
           type: string
           description: 'Envelope design for letter products. Required for color_letter,
-            hybrid_letter, and handwritten_letter. Postcards must not include this field.
+            hybrid_letter, and greeting_letter. Postcards must not include this field.
 
 
             color_letter only supports `plain_white` (#10 envelope format).
 
-            5×7 products (hybrid_letter, handwritten_letter) support all styles.
+            5×7 products (hybrid_letter, greeting_letter) support all styles.
 
             '
           enum:
@@ -497,7 +497,7 @@ components:
           - 4x6_handwritten
           - 6x9_handwritten
           - color_letter
-          - handwritten_letter
+          - greeting_letter
           - hybrid_letter
         postage_type:
           type: string
