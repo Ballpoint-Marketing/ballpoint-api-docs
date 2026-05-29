@@ -32,7 +32,20 @@ Classification key (Head's 4 categories):
 | `GET /v1/campaigns` · `GET /v1/campaigns/{id}` | List / get campaign | **3 — DECISION REQUIRED** | partial: only orders are listable (`GET /v1/billing/partner/orders`) | No campaign-level read API for partners |
 | `POST /v1/campaigns/{id}/submit` · `/cancel` | Submit / cancel campaign | 1 — Roadmap | submit/cancel happen via order flow today | Explicit campaign lifecycle = v2 model |
 
-## What to do with this
-- **DECISION REQUIRED** rows: product/eng must decide implement-now (gap) vs defer (roadmap). Do not delete the draft until decided.
-- The public spec (`docs/ballpoint-api-spec-v2.yaml`) stays staging-truthful regardless — these do not go back in until a real, tested route exists.
-- The local gate `tools/contract-check/check-spec.sh` only validates the PUBLIC spec, not this draft.
+## Final decisions (Head, 2026-05-29) — RESOLVED, do not reopen this round
+
+This round closes WITHOUT putting any deferred endpoint back into the public OpenAPI.
+The public contract stays staging/v1-real only (commit `36da6d2`). Resolutions:
+
+| Group | Decision | Rationale | Status |
+|---|---|---|---|
+| **Webhook management / rotate-secret** (`POST/GET /v1/webhooks`, `rotate-secret`, pause/resume/health, sandbox trigger/test-signature) | **Do NOT expose as public API now.** Stays manual / out-of-band via Ballpoint. | Sensitive security surface — needs its own design for permissions, audit, ownership, retries, and secret rotation before becoming a contract. | **Backlog P1 — security/product** |
+| **Reconciliation** (`GET reconciliation/campaigns/{id}`, `lookup`, `webhooks/replay`) | **Do NOT expose lookup/replay as public API now.** For v1/staging, partners use the real documented endpoints: orders, events, mail-tracking. Reconciliation/replay stays an internal support runbook. | Needs a safe design with idempotency + audit before exposure. | **Backlog P1 — partner-ops** |
+| **Campaign read / CRUD** (`GET /v1/campaigns`, `/{id}`, create/submit/cancel) | **Do NOT expose campaign read/CRUD now.** Public contract stays order-centric; campaign remains an internal/derived concept until an explicit product decision. | Current model is order-centric (campaigns form implicitly via `list_id`). | **Backlog P2 — product** |
+
+### Standing rules (until a future explicit product decision)
+- The public spec (`docs/ballpoint-api-spec-v2.yaml`) stays staging-truthful — deferred endpoints do NOT go back in until a real, tested staging route exists.
+- Do not add production. Do not add v2. Do not implement these endpoints as a side effect.
+- Published material (PDF / CHANGELOG) and any partner reply must use ONLY endpoints present in the current OpenAPI (`36da6d2`); never cite a deferred endpoint.
+- The local gate `tools/contract-check/check-spec.sh` validates only the PUBLIC spec, not this draft.
+- This draft + table are the durable record; do not delete until product reopens with a decision.
