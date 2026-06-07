@@ -207,7 +207,7 @@ components:
         metadata:
           type: string
           nullable: true
-          description: JSON-encoded metadata object string; parse as JSON if you need nested metadata. Matches GET /v1/billing/orders list behavior.
+          description: JSON-encoded metadata object string; parse as JSON if you need nested metadata. Matches GET /v1/billing/orders list behavior. May include `variant` (`"a"`/`"b"`, A/B split sibling orders only — see `PartnerOrderCreateRequest.variant`), `deliver_to` (`"mailing"`/`"property"`/`"both"`, recipient routing selection from POST /orders), and `remove_duplicate_addresses` (boolean, recipient dedupe selection from POST /orders). All three are optional and additive — absent when the corresponding POST field was not supplied.
         customer_info:
           type: object
           nullable: true
@@ -450,6 +450,22 @@ components:
           - type: 'null'
           title: External User Metadata
           description: Opaque per-end-user attribution dict — echoed verbatim on outbound webhooks. Max 8 keys, keys 64 chars, values 256 chars, no nested objects/arrays, ≤2KB total. Captured at creation only (not mutable via PATCH).
+        deliver_to:
+          anyOf:
+          - type: string
+            enum:
+            - mailing
+            - property
+            - both
+          - type: 'null'
+          title: Deliver To
+          description: Optional, additive. Recipient address routing the user selected on the iframe's piece-selection page when a `piece_counts` table was active. One of `mailing`, `property`, `both`. Case-insensitive and trimmed server-side (`"MAILING"`, `" both "` → `"mailing"`, `"both"`); any other value is rejected with 422. Sent only when a validated recipient selection exists; single-send/multi-send/edit-leads paths without `piece_counts` leave it `null`. Persisted to the order's metadata JSONB as `metadata.deliver_to` and round-tripped on GET /orders and GET /orders/{order_id}. Iframe-driven persistence — no PropStream action required.
+        remove_duplicate_addresses:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Remove Duplicate Addresses
+          description: Optional, additive. Whether the user enabled the "Remove duplicates" checkbox on the iframe's piece-selection page (paired with `deliver_to`). Persisted to the order's metadata JSONB as `metadata.remove_duplicate_addresses` (round-tripped on GET /orders and GET /orders/{order_id}) even when `false`, so partners can read back the user's exact selection. `null`/absent when no recipient-selection UI was shown. Iframe-driven persistence — no PropStream action required.
       type: object
       required:
       - product_id

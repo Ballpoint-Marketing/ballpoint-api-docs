@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.6.5 — 2026-06-07
+
+- **Additive: `POST /orders` accepts two new optional fields — `deliver_to` and `remove_duplicate_addresses`.** Captures the iframe's recipient-selection state (from the `piece_counts` Deliver To + Remove duplicates controls) on the order itself.
+  - `deliver_to` — string enum `"mailing" | "property" | "both"`. Case-insensitive and trimmed server-side (`"MAILING"`, `" both "` → `"mailing"`, `"both"`); any other value is rejected with 422. Sent only when a validated recipient selection exists; paths without `piece_counts` leave it `null`.
+  - `remove_duplicate_addresses` — boolean. Whether the user enabled the "Remove duplicates" checkbox. Persisted even when `false` so partners can read back the user's exact selection.
+  - **Round-tripped on GET responses.** Both surface inside the `metadata` JSON string on `GET /v1/billing/orders` and `GET /v1/billing/orders/{order_id}` as `metadata.deliver_to` / `metadata.remove_duplicate_addresses` (alongside the existing `metadata.variant`). Parse via `JSON.parse(body.metadata)`.
+  - **Iframe-driven persistence — no PropStream action required.** These are available optional fields; partners that don't consume or emit them are unaffected. No breaking change to required lists, existing field semantics, or response shape.
+
 ## v1.6.4 — 2026-05-27
 
 - **Breaking (staging-only): `4x6_handwritten` and `6x9_handwritten` removed from partner contract.** For current PropStream/staging scope, pen-written postcards are cursive-only. Explicit `product_type: "4x6_handwritten"` or `"6x9_handwritten"` on `POST /orders` now returns `400 INVALID_PRODUCT_CONFIG`. Legacy DB rows preserved for read/reschedule/SLA.
