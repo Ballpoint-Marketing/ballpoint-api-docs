@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.6 — 2026-06-13
+
+- **Iframe checkout flow: review-before-pay.** `campaign_created` and `order_added` now fire at the user's **Continue to Payment** click on the Order Summary (same payload shapes — timing only). Per-piece order creation during scheduling is removed; orders exist only after the user reviews the Order Summary and continues to checkout. This is consistent with the long-standing contract that `campaign_submitted.orders[].ballpointOrderId` is the authoritative order id; `campaign_created.orderIds` remain local pre-API ids and no Ballpoint order exists at that point. **Partners must not depend on `GET /v1/billing/orders` returning orders before `campaign_submitted`.** No field, endpoint, or webhook shape changes.
+- **Iframe terminal copy in a partner embed.** After `campaign_submitted` is emitted, the iframe shows a neutral hand-off ("Opening secure checkout…") and defers final campaign completion to the partner billing flow. There is no internal "Campaign Submitted!" confirmation page in partner embeds — the campaign is not "submitted/complete" until billing succeeds on the partner side. Event semantics unchanged: `campaign_submitted` remains the authoritative billing trigger and the source of `orders[].ballpointOrderId`.
+
 ## v1.6.5 — 2026-06-07
 
 - **Additive: `POST /orders` accepts two new optional fields — `deliver_to` and `remove_duplicate_addresses`.** Captures the iframe's recipient-selection state (from the `piece_counts` Deliver To + Remove duplicates controls) on the order itself.
