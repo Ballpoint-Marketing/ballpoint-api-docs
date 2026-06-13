@@ -852,9 +852,13 @@ Possible `reason` values: `user_back`, `user_cancel`.
 
 `campaignType` values: `single`, `multi`, `split`.
 
+> **Timing (v1.6.6).** In the review-before-pay checkout flow, `campaign_created` now fires when the user clicks **Continue to Payment** on the Order Summary, not per-piece during scheduling. Payload shape is unchanged. `orderIds` continue to be local pre-API ids — no Ballpoint order exists at this point. Key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
+
 #### `campaign_submitted` — Campaign submitted to Ballpoint
 
 This is the most important event. It confirms the order(s) were sent to Ballpoint for processing. It fires from two paths — the campaigns flow (single / split / multi-send) and the canvas builder (single ad-hoc order). Both emit the same field shape; the canvas builder sets `campaignId: null` because it does not own a multi-order campaign concept on the iframe side.
+
+> **Terminal in a partner embed (v1.6.6).** After this event is emitted, the iframe shows a neutral hand-off ("Opening secure checkout…") and defers final completion to the partner's billing flow — there is no internal "Campaign Submitted!" confirmation page in a partner embed. The campaign is not "submitted/complete" until billing succeeds on the partner side. Event semantics are unchanged: `campaign_submitted` remains the authoritative billing trigger, and partners should continue to key off `orders[].ballpointOrderId` as the server-assigned order id.
 
 ```json
 {
@@ -937,6 +941,8 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
   "pieceIndex": 1
 }
 ```
+
+> **Timing (v1.6.6).** For multi-month and A/B-split campaigns, the per-drop `order_added` events now fire alongside `campaign_created` at the user's **Continue to Payment** click on the Order Summary, not per-piece during scheduling. Payload shape is unchanged. `orderId` is still a local pre-API id; key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
 
 #### `order_cancelled` — User cancelled an order
 
