@@ -991,6 +991,10 @@ Notes:
 - `campaignId` is the local iframe campaign identifier captured at campaign creation time. It can be `null` for single-order canvas-builder paths where no campaign id was generated client-side.
 - The Ballpoint webhook (`order.rescheduled`) carries the canonical `previous_scheduled_production_date` / `new_scheduled_production_date` recomputed from the product SLA (in business days, Mon–Fri; see `API_KIT.md §6p`). The iframe postMessage intentionally omits these (the parent app rarely needs them; if you do, consume the webhook).
 
+**How to Test.** The order must be in `scheduled` status and **unbilled** (`payment_confirmed = false`). Open it on the Campaign Detail page, click **Reschedule**, pick a new mail date, and Save — you'll receive one `order_rescheduled` (suppressed if the date is unchanged). Paid (`payment_confirmed = true`), `accepted`, `prep`, in-production, and terminal orders do **not** offer Reschedule.
+
+**Blocked attempts.** Paid rows (`payment_confirmed = true`) show a locked note in place of the Reschedule button; `accepted` / `prep` / in-production / terminal rows simply do not render a Reschedule button. If a reschedule is submitted on an order the backend no longer permits (e.g. it advanced or was paid after the row rendered → `409 PAID_LOCKED` / `SEND_NOW_PROCESSING` / `IN_PRODUCTION`, see `API_KIT.md §6m`), the iframe surfaces a **"Can't Modify Order"** modal and emits **no** `order_rescheduled`.
+
 #### `campaign_complete` — Entire campaign flow finished
 
 ```json
