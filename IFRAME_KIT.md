@@ -1100,7 +1100,8 @@ Content-Type: application/json
       "city": "Phoenix",
       "state": "AZ",
       "zip": "85001",
-      "contact_id": "ps_contact_8123"
+      "contact_id": "ps_contact_8123",
+      "address_type": "PROPERTY"
     }
   ],
   "append": false
@@ -1119,7 +1120,10 @@ Content-Type: application/json
 | `city` | Yes | City |
 | `state` | Yes | Two-letter state code (e.g. `AZ`) |
 | `zip` | Yes | ZIP code — 5-digit (`85001`) or ZIP+4 (`85001-1234`) |
-| `contact_id` | No | Opaque partner-side identifier (e.g. PropStream contact id), max 64 chars. Stored verbatim, never interpreted by Ballpoint, round-tripped on the corresponding `GET .../recipients` response, and echoed verbatim on per-piece RTS push-back events so you can map returned pieces directly to the CRM contact. **For partners using the per-piece RTS push-back, `contact_id` must be populated on every recipient** — the V1 RTS payload carries `contact_id` only (no name/address fields). |
+| `contact_id` | No | Stable partner-side contact/lead identifier (e.g. PropStream contact id), max 64 chars. Stored verbatim, never interpreted by Ballpoint, round-tripped on the corresponding `GET .../recipients` response, and echoed verbatim on per-piece RTS push-back events so you can map returned pieces directly to the CRM contact. **For partners using the per-piece RTS push-back, `contact_id` must be populated on every recipient** — the V1 RTS payload carries `contact_id` only (no name/address fields). |
+| `address_type` | No | `PROPERTY` or `MAILING`. Optional for order-level upload; pair with `contact_id` when you need to distinguish a contact's property vs mailing address records. On the campaign-level Edit Leads / delta endpoint it is **required** and, together with `contact_id`, forms the upsert/remove key. |
+
+> For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6o`](API_KIT.md#6o-campaign-delta-recipients--addremove-across-editable-drops).
 
 ### Batching Large Lists
 
@@ -1202,7 +1206,7 @@ For cross-order duplicates within the same campaign, you don't need to handle de
 `duplicate_in_campaign` is **cross-order, same-campaign only** (the A/B-split guard-rail). Ballpoint does **not** perform intra-order recipient dedupe and does **not** use `duplicate_in_campaign` (or any other server-side logic) to override the user's same-order "Remove duplicates" selection. Same-order behavior is partner-driven:
 
 - **Duplicate recipient records in the same order are treated as separate recipient records and mailed as separate pieces** — unless another normal validation rule rejects the request, such as missing required fields, invalid address fields, or exceeding the order's `piece_count`. This also applies to records split across an `append: true` chain on the same order.
-- **`lead_id` and `type` (`mailing` / `property`) are not active recipient upload fields and are not used for dedupe.** Unknown fields are silently ignored at parse time and are not stored. Use [`contact_id`](#recipient-fields) for partner-side identifiers that need to round-trip.
+- **`lead_id` and `type` (`mailing` / `property`) are not active recipient upload fields and are not used for dedupe.** Unknown fields are silently ignored at parse time and are not stored. Use [`contact_id` and `address_type`](#recipient-fields) instead — `contact_id` for the partner-side identifier that needs to round-trip, and `address_type` (`PROPERTY` / `MAILING`) when you need to distinguish a contact's property vs mailing record.
 - **Same-lead `property == mailing` collapse is the partner's decision, expressed via the user's `Remove duplicates` selection.** If the user picks `Deliver To = both` + `Remove duplicates = OFF`, the partner uploads two recipient records for each lead whose property and mailing addresses are equal and Ballpoint mails two pieces. If the user picks `Remove duplicates = ON`, the partner uploads the deduplicated list and Ballpoint mails that. The uploaded recipient count must match the `piece_count` that the partner provided for the selected `(deliver_to, remove_duplicates)` combination in [`set_list.piece_counts`](#recipient-selection-contract-piece-count--dedup).
 
 #### Identifier reference — four distinct ids
