@@ -519,6 +519,8 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 - All orders have `paymentConfirmed` not null (defense: campaigns with any null are skipped — typically non-gated accounts)
 - At least one order is "affected" (see classification below)
 
+**Eligibility (v1.6.0).** Edit Leads is available **only** for payment-gated campaigns/orders that are still `scheduled` or `pending_payment` and unbilled (`paymentConfirmed === false`) — i.e. pre-production and not yet paid. Once an order is paid, `accepted`, in production, mailed, delivered, or terminal, it is **locked** and its Edit Leads button is hidden (the underlying `PATCH .../recipients` returns `409 RECIPIENTS_LOCKED` / `PAID_LOCKED`). **Non-gated accounts do not expose Edit Leads** because the payment gate is not active. Full per-order classification is in "Affected allowlist" below; see also `API_KIT.md §6n/§6o`. Tightened in CHANGELOG v1.6.0.
+
 **Payload:**
 
 ```json
@@ -698,6 +700,8 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
     - **A/B split:** the variant-specific slice goes to each variant's endpoint, not the full list. Use the `variant` field on each `affectedOrders[]` item to identify A vs B. PropStream's split allocation logic determines what slice goes to each.
 5. After all PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
 6. On modal close without changes, no postMessage required.
+
+**Testing this flow.** Use a payment-gated staging account (`requires_payment_confirmation = true`). Create a campaign but **do not confirm payment** — the order stays `pending_payment` (send-now) or `scheduled` with `paymentConfirmed = false` (future-dated), and the **Edit Leads button is available** on the campaign card. After payment is confirmed (or the order moves to `accepted` / production), the button disappears and the order shows in `lockedOrders`.
 
 #### `recipients_updated` — Partner finished editing recipients (parent → iframe)
 
