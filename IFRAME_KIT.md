@@ -935,6 +935,8 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 
 #### `order_added` — New order added (multi-month campaigns)
 
+> **This event ONLY fires during the creation of Multi-Month campaigns. It does not fire for Single Send or A/B Split campaigns.**
+
 ```json
 {
   "source": "ballpoint-mailer",
@@ -946,7 +948,11 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 }
 ```
 
-> **Timing (v1.6.6).** For multi-month and A/B-split campaigns, the per-drop `order_added` events now fire alongside `campaign_created` at the user's **Continue to Payment** click on the Order Summary, not per-piece during scheduling. Payload shape is unchanged. `orderId` is still a local pre-API id; key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
+> **Timing (v1.6.6).** `order_added` fires **only for multi-month campaigns** — once per drop, at the user's **Continue to Payment** click on the Order Summary (not per-piece during scheduling). For *all* campaign types `campaign_created` also fires at that same click; **Single Send and A/B Split create their orders via `campaign_created` only and never emit `order_added`.** Payload shape is unchanged. `orderId` is still a local pre-API id; key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
+
+**How to Test.** Create a Multi-Month campaign with 2+ drops, schedule the drops, then click **Continue to Payment** on the Order Summary — you'll observe one `order_added` per drop. Single Send and A/B Split campaigns emit `campaign_created` + `campaign_submitted` but **never** `order_added`.
+
+**Ownership.** Ballpoint emits this iframe postMessage; PropStream (the embedding parent) consumes it.
 
 #### `order_cancelled` — User cancelled an order
 
