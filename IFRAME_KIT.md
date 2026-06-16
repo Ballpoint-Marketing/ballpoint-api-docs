@@ -905,7 +905,7 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `campaignId` | string or null | Iframe-side campaign id; `null` when the canvas builder emits a single ad-hoc order. |
+| `campaignId` | string or null | Iframe-local, **event-stream** id for this Direct Mail instance (stable across a multi-send's drops). Use it to **separate Direct Mail instances** in your UI / event stream. **Do not join it against the backend `campaign_id`** returned by Get/List Orders — they are different ids (see [API_KIT.md Get Orders → ID reconciliation](API_KIT.md#6c-get-order)). For per-order API reconciliation, use `orders[].ballpointOrderId`. `null` when the canvas builder emits a single ad-hoc order. |
 | `campaignType` | string | `"single"`, `"split"`, or `"multi"`. |
 | `orderIds` | string[] | All iframe-side order ids in this submission batch. |
 | `listId` | string or null | Verbatim echo of the `listId` the parent app passed via `set_list`. Use this as the join key when reconciling on the parent side — Ballpoint also echoes the same value as `list_id` on `order.status_changed` webhooks. |

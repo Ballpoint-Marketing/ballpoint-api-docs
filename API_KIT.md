@@ -546,6 +546,8 @@ Tenant scoping: partners only see their own orders. Both cross-tenant and unknow
 
 **`payment_confirmed`** (boolean or null): For accounts with partner-side payment confirmation gating (`requires_payment_confirmation = TRUE`, e.g. PropStream): `true` once `POST /v1/billing/orders/{order_id}/confirm-payment` has fired with `status: success`; `false` while the order is still awaiting partner confirmation. For accounts that do not use the payment gate, the value is always `null` and the field should be ignored — their billing lifecycle does not use partner-side payment confirmation.
 
+**ID reconciliation.** The `campaign_id` returned here (and on `GET /v1/billing/orders`, §6d) is Ballpoint's backend **grouping key**, derived from your account + `list_id` — one Ballpoint campaign per `list_id`. It is **not** the iframe `campaignId` from `campaign_created`/`campaign_submitted` (that one is an iframe-local, per-Direct-Mail id with no backend relationship). For **per-order** reconciliation, use **`campaign_submitted.orders[].ballpointOrderId`**, which equals the `id` on this response. Note: Get Orders does not return a standalone `list_id` field — it is encoded in `campaign_id`.
+
 ---
 
 ### 6d. List Orders
