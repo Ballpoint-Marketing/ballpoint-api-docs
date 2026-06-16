@@ -461,9 +461,36 @@ All messages from the iframe have this shape:
   "type": "ready",
   "iframeVersion": 1,
   "maxVersion": 1,
-  "buildStamp": "20260318.1"
+  "buildStamp": "b88d6fd",
+  "build": {
+    "environment": "staging",
+    "buildId": "b88d6fd",
+    "releaseTag": "",
+    "deployedAt": "2026-06-16T21:21:51Z"
+  },
+  "contractVersions": {
+    "iframe": "1",
+    "api": "3.1",
+    "partner": "1.6.7"
+  }
 }
 ```
+
+##### `build` and `contractVersions` (diagnostic, optional)
+
+Both blocks are additive (v1.6.7+) and carry the same shape returned by `GET /v1/billing/partner/health` so parents and dashboards can correlate the iframe build with the API build using a single parser.
+
+- `build.environment` — `"production"`, `"staging"`, or a local-dev label.
+- `build.buildId` — git short SHA at deploy. `"dev"` / `"unknown"` for local serves.
+- `build.releaseTag` — git tag on production deploys; `""` on staging and local.
+- `build.deployedAt` — ISO-8601 UTC timestamp at deploy; `""` when not built by CI.
+- `contractVersions.iframe` — matches the `version:1` envelope and `iframeVersion`.
+- `contractVersions.api` — kept in lockstep with the API's `API_VERSION`.
+- `contractVersions.partner` — kept in lockstep with this CHANGELOG's top entry.
+
+These fields are diagnostic and non-sensitive. Partners may ignore them — they do not affect handshake, ordering, billing, or any contract behavior. Existing `iframeVersion`, `maxVersion`, and `buildStamp` are unchanged.
+
+The example above shows the values from a **staging** deploy (`environment: "staging"`, `releaseTag: ""`), which is the currently deployed environment. On a production deploy, `environment` reads `"production"` and `releaseTag` carries the release git tag — the field shapes are identical.
 
 #### `resize` — Iframe content height changed
 

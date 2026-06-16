@@ -1075,6 +1075,54 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/orders?days=30&li
 
 Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders or billing configurations where no partner-facing amount is set.
 
+#### `GET /v1/billing/partner/health`
+
+Operational health snapshot scoped to your partner account. Use this to power a dashboard health tile (API status, last error within scope, current rate-limit headroom, daily piece cap) and to correlate the iframe build with the API build at a glance.
+
+**Authentication:** `X-Partner-Key` (same as other partner endpoints).
+
+**Example:** Set `PARTNER_KEY` to your staging or live partner key before running.
+
+```bash
+curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
+  -H "X-Partner-Key: $PARTNER_KEY"
+```
+
+**Response (`200`):**
+
+```json
+{
+  "api_status": "ok",
+  "last_error": null,
+  "rate_limit": {
+    "rpm_limit": 60,
+    "rpd_limit": 10000,
+    "rpd_used_today": 142
+  },
+  "daily_piece_cap": {
+    "used": 1850,
+    "limit": 50000
+  },
+  "build": {
+    "environment": "staging",
+    "buildId": "3450452",
+    "releaseTag": "",
+    "deployedAt": "2026-06-16T21:01:49Z"
+  },
+  "contractVersions": {
+    "iframe": "1",
+    "api": "3.1",
+    "partner": "1.6.7"
+  }
+}
+```
+
+- `api_status` — `"ok"` or `"degraded"`. Reflects the partner-scoped error state, not global API availability.
+- `last_error` — `null` when there is no recent failure within your scope; otherwise `{code, action, at}` summarizing the most recent error logged for the account.
+- `rate_limit` — current per-minute and per-day limits plus today's usage. `rpm_used` is intentionally omitted (process-local; not reliably aggregable across instances).
+- `daily_piece_cap` — pieces accepted today vs. the configured daily cap.
+- `build` and `contractVersions` (v1.6.7+) — same shape as the iframe `ready` event. See [IFRAME_KIT.md → `ready`](IFRAME_KIT.md#ready--iframe-is-loaded-and-ready-for-configuration) for field-level notes. Diagnostic and non-sensitive — partners may ignore them. The `build` values above are from a **staging** deploy (`environment: "staging"`, `releaseTag: ""`), the currently deployed environment; on production, `environment` is `"production"` and `releaseTag` carries the release tag (field shapes identical).
+
 ---
 
 ### 6m. Reschedule Order

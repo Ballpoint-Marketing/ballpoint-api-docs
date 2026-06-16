@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.6.7 — 2026-06-16
+
+- **Additive: build + contract-version metadata standardized across iframe `ready` and `GET /v1/billing/partner/health`.** Both surfaces now return a `build` object (`environment`, `buildId`, `releaseTag`, `deployedAt`) and a `contractVersions` object (`iframe`, `api`, `partner`) with an identical shape. Partners (and Ballpoint dashboards) can read either source to correlate the iframe build with the API build using the same parser. Field names are camelCase on both sides intentionally — they match byte-for-byte across iframe and API.
+- **No removed or renamed fields.** The `ready` event keeps `iframeVersion`, `maxVersion`, `buildStamp` and the `version:1` envelope unchanged. `GET /v1/billing/partner/health` keeps `api_status`, `last_error`, `rate_limit`, `daily_piece_cap` unchanged. The new blocks are appended; partners that don't read them are unaffected.
+- **Diagnostic, non-sensitive.** `build.*` values reflect deploy-time metadata (CI-rewritten on the iframe; environment-injected on the API). They are safe to log and surface in partner dashboards. Partners may ignore them.
+
 ## v1.6.6 — 2026-06-13
 
 - **Iframe checkout flow: review-before-pay.** `campaign_created` and `order_added` now fire at the user's **Continue to Payment** click on the Order Summary (same payload shapes — timing only). Per-piece order creation during scheduling is removed; orders exist only after the user reviews the Order Summary and continues to checkout. This is consistent with the long-standing contract that `campaign_submitted.orders[].ballpointOrderId` is the authoritative order id; `campaign_created.orderIds` remain local pre-API ids and no Ballpoint order exists at that point. **Partners must not depend on `GET /v1/billing/orders` returning orders before `campaign_submitted`.** No field, endpoint, or webhook shape changes.
