@@ -488,6 +488,8 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
 
 Fetch a single order by ID — use this to check current status.
 
+> **Not a mid-flow drop-discovery API.** `GET /v1/billing/orders/{order_id}` (and the List variant in §6d) return **persisted Ballpoint orders only**. For iframe-driven campaigns — Single Send, Multi Send, and A/B Split — individual drops do **not** exist server-side until the end-user clicks **Continue to Payment** and the iframe emits `campaign_submitted` (see [IFRAME_KIT.md `campaign_created` timing note](IFRAME_KIT.md#campaign_created--campaign-created-before-submission)). Use `campaign_submitted.orders[].ballpointOrderId` as the reconciliation trigger; **do not poll `GET /orders` for individual drops during scheduling / mid-flow** — the ids carried on `campaign_created.orderIds` and `order_added.orderId` are local pre-API ids and have no server-side row to fetch yet.
+
 ```
 GET /v1/billing/orders/{order_id}
 ```
@@ -547,6 +549,8 @@ Tenant scoping: partners only see their own orders. Both cross-tenant and unknow
 **`payment_confirmed`** (boolean or null): For accounts with partner-side payment confirmation gating (`requires_payment_confirmation = TRUE`, e.g. PropStream): `true` once `POST /v1/billing/orders/{order_id}/confirm-payment` has fired with `status: success`; `false` while the order is still awaiting partner confirmation. For accounts that do not use the payment gate, the value is always `null` and the field should be ignored — their billing lifecycle does not use partner-side payment confirmation.
 
 **ID reconciliation.** The `campaign_id` returned here (and on `GET /v1/billing/orders`, §6d) is Ballpoint's backend **grouping key**, derived from your account + `list_id` — one Ballpoint campaign per `list_id`. It is **not** the iframe `campaignId` from `campaign_created`/`campaign_submitted` (that one is an iframe-local, per-Direct-Mail id with no backend relationship). For **per-order** reconciliation, use **`campaign_submitted.orders[].ballpointOrderId`**, which equals the `id` on this response. Note: Get Orders does not return a standalone `list_id` field — it is encoded in `campaign_id`.
+
+> **Reminder — `campaign_submitted` is the discovery trigger, not a poll loop.** For Multi Send and A/B Split, do not call `GET /v1/billing/orders` or `GET /v1/billing/orders/{order_id}` per drop during the scheduling step looking for orders to appear — they won't, because no Ballpoint order is created until the end-user clicks **Continue to Payment**. Consume `campaign_submitted.orders[].ballpointOrderId` for each drop's authoritative id (one event covers all drops in the submission). If `orders[].ballpointOrderId` is `null` on an entry, that single drop is pending retry — only then is it appropriate to poll `GET /v1/billing/orders` (scoped to the same `external_user_id` / campaign) to discover the server-assigned id once the retry succeeds. See [IFRAME_KIT.md `campaign_submitted` field notes](IFRAME_KIT.md#campaign_submitted--campaign-submitted-to-ballpoint).
 
 ---
 

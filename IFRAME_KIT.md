@@ -884,6 +884,8 @@ Possible `reason` values: `user_back`, `user_cancel`.
 `campaignType` values: `single`, `multi`, `split`.
 
 > **Timing (v1.6.6).** In the review-before-pay checkout flow, `campaign_created` now fires when the user clicks **Continue to Payment** on the Order Summary, not per-piece during scheduling. Payload shape is unchanged. `orderIds` continue to be local pre-API ids — no Ballpoint order exists at this point. Key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
+>
+> **Do not poll `GET /v1/billing/orders` for individual drops mid-flow (Multi Send / A/B Split).** During scheduling and before `campaign_submitted` fires, the per-drop orders do **not** exist server-side — `campaign_created.orderIds` (and any `order_added.orderId`, see below) are local pre-API ids. Polling `GET /v1/billing/orders` or `GET /v1/billing/orders/{order_id}` for these ids will return nothing / 404 because there is no Ballpoint order yet. Wait for `campaign_submitted` and consume `orders[].ballpointOrderId` as the authoritative server-assigned id. If `orders[].ballpointOrderId` is `null` for a given entry, that drop's submission is pending retry — see the field note in the [`campaign_submitted` table](#campaign_submitted--campaign-submitted-to-ballpoint) below; in that case poll `GET /v1/billing/orders` only **after** `campaign_submitted`, scoped to the campaign / `external_user_id`.
 
 #### `campaign_submitted` — Campaign submitted to Ballpoint
 
@@ -976,6 +978,8 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 ```
 
 > **Timing (v1.6.6).** `order_added` fires **only for multi-month campaigns** — once per drop, at the user's **Continue to Payment** click on the Order Summary (not per-piece during scheduling). For *all* campaign types `campaign_created` also fires at that same click; **Single Send and A/B Split create their orders via `campaign_created` only and never emit `order_added`.** Payload shape is unchanged. `orderId` is still a local pre-API id; key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
+>
+> **Do not poll `GET /v1/billing/orders` for these per-drop ids mid-flow.** As with `campaign_created.orderIds`, `order_added.orderId` is a **local pre-API id** — the drop does not exist server-side until `campaign_submitted` fires. Polling `GET /v1/billing/orders` (or `GET /v1/billing/orders/{order_id}`) against this id mid-flow will not find it. Wait for `campaign_submitted` and reconcile via the matching `orders[].ballpointOrderId`; if that field is `null` for a drop, see the pending-retry caveat in the [`campaign_submitted` field note](#campaign_submitted--campaign-submitted-to-ballpoint) and only poll `GET /orders` **after** submission.
 
 **How to Test.** Create a Multi-Month campaign with 2+ drops, schedule the drops, then click **Continue to Payment** on the Order Summary — you'll observe one `order_added` per drop. Single Send and A/B Split campaigns emit `campaign_created` + `campaign_submitted` but **never** `order_added`.
 
@@ -1109,7 +1113,7 @@ End-to-end timeline:
 
 **Important distinction.** After `campaign_submitted`, the iframe lifecycle and payment lifecycle are separate. The iframe may emit `campaign_complete` / `done` once the iframe submission flow finishes, independent of the payment popup. That does not mean production is complete and does not replace `/confirm-payment`. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
 
-For payment, reconciliation, or backend workflows, key off `campaign_submitted.orders[].ballpointOrderId` — not `campaign_created.orderIds` (those are pre-API local IDs).
+For payment, reconciliation, or backend workflows, key off `campaign_submitted.orders[].ballpointOrderId` — not `campaign_created.orderIds` (those are pre-API local IDs). Equivalently: **don't poll `GET /v1/billing/orders` mid-flow** to discover per-drop ids for Multi Send or A/B Split; orders only exist server-side after Continue to Payment fires `campaign_submitted`. See the [`campaign_created`](#campaign_created--campaign-created-before-submission) and [`order_added`](#order_added--new-order-added-multi-month-campaigns) timing notes for details.
 
 For the full `/confirm-payment` endpoint contract (request/response, fields, behavior, error codes), see [API_KIT.md §6k](https://github.com/Ballpoint-Marketing/ballpoint-api-docs/blob/main/API_KIT.md#6k-confirm-payment-partner-payment-gate).
 

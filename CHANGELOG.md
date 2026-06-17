@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.8 — 2026-06-16
+
+- **Docs clarification only — no behavior, field, endpoint, webhook, or contract-version change.** `IFRAME_KIT.md` and `API_KIT.md` now state explicitly that for Multi Send and A/B Split, partners must **not** poll `GET /v1/billing/orders` (or `GET /v1/billing/orders/{order_id}`) for individual drops during the scheduling step / mid-flow — those drops do not exist server-side until the end-user clicks **Continue to Payment** and the iframe emits `campaign_submitted`. The ids on `campaign_created.orderIds` and `order_added.orderId` are local pre-API ids; reconcile via `campaign_submitted.orders[].ballpointOrderId`. If a particular `orders[].ballpointOrderId` is `null`, that drop's submission is pending retry — only then is it appropriate to poll `GET /v1/billing/orders`, scoped to the campaign / `external_user_id`. This documents the shipped v1.6.6 review-before-pay architecture; nothing in the wire contract changes.
+
 ## v1.6.7 — 2026-06-16
 
 - **Additive: build + contract-version metadata standardized across iframe `ready` and `GET /v1/billing/partner/health`.** Both surfaces now return a `build` object (`environment`, `buildId`, `releaseTag`, `deployedAt`) and a `contractVersions` object (`iframe`, `api`, `partner`) with an identical shape. Partners (and Ballpoint dashboards) can read either source to correlate the iframe build with the API build using the same parser. Field names are camelCase on both sides intentionally — they match byte-for-byte across iframe and API.
