@@ -364,6 +364,52 @@ This message has no required payload fields. On success, the iframe reuses its i
 
 `set_api_config` should still be sent during bootstrap. Missing API config does not block opening this screen because the iframe already queues submit actions until API config arrives, but partners should send `set_api_config` before the user submits.
 
+### `payment_result` — Payment popup outcome (parent → iframe)
+
+> **Current staging contract — pending PropStream wiring.** This is the iframe-side contract for the in-iframe Payment Successful / Payment Failed result screens. The payment popup and the charge itself remain partner-owned (see [Partner Payment Gate Flow](#partner-payment-gate-flow-send-now-walkthrough)); after the partner's popup resolves, the partner should send `payment_result` to the iframe so the iframe can render the matching result screen. PropStream's listener / sender is not yet wired — this section documents what the iframe expects today on staging.
+
+The iframe does **not** observe the payment popup directly. The parent app owns the popup lifecycle and is responsible for telling the iframe whether the charge succeeded, failed, or was cancelled.
+
+```json
+{
+  "source": "propstream",
+  "version": 1,
+  "type": "payment_result",
+  "tenantKey": "ps_acc_42",
+  "status": "success",
+  "campaignId": "camp_abc123",
+  "ballpointCampaignId": "cmp_abc",
+  "orderIds": ["ord_local_001"],
+  "ballpointOrderIds": ["ord_abc123"],
+  "reason": null
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `source` | string | Yes | Must be `"propstream"` (the same source identifier required on all parent → iframe messages). |
+| `version` | number | Yes | Must be `1`. The iframe supports the version set `[1]`; other values are ignored. |
+| `type` | string | Yes | Always `"payment_result"`. |
+| `tenantKey` | string | Yes | Must match the active tenant the iframe was scoped to. Mismatched or missing `tenantKey` causes the entire message to be **rejected and ignored** — no result screen is rendered and **no tenant state is mutated** by this message. The check is read-only (this event cannot be used to establish or change tenant scope). |
+| `status` | string | Yes | One of `"success"`, `"failed"`, `"failure"`, `"cancelled"`. The iframe normalizes `"failure"` → `"failed"`. `"success"` renders the success screen; `"failed"` and `"cancelled"` render the failure screen. Any other value is ignored (no screen change). |
+| `campaignId` | string | Optional | Iframe-local campaign handle (the same `campaignId` previously emitted on `campaign_created` / `campaign_submitted`). Echoed back on `payment_retry_requested` if present. |
+| `ballpointCampaignId` | string | Optional | Server-side campaign id. Send only if the parent has it from its own API / order-history reconciliation state — note that `campaign_submitted` does **not** expose `ballpointCampaignId` (only `campaignId` and `orders[].ballpointOrderId`). Echoed back on `payment_retry_requested` if present. |
+| `orderIds` | array of strings | Optional | Iframe-local order ids (e.g. those returned in `campaign_created.orderIds`). Echoed back on `payment_retry_requested` if present. |
+| `ballpointOrderIds` | array of strings | Optional | Server-side `ballpointOrderId` values (from `campaign_submitted.orders[].ballpointOrderId`). Echoed back on `payment_retry_requested` if present. |
+| `reason` | string | Optional | Failure context (e.g. card-decline reason). Surfaced in the failure screen copy when present. Ignored on `status: "success"`. |
+
+#### Status normalization and ignore behavior
+
+- `"failure"` is normalized to `"failed"` internally — partners may send either; the iframe treats them identically.
+- Any `status` value outside `{success, failed, failure, cancelled}` is ignored: the iframe does not change screens and does not emit a follow-up event. This is intentional, so an unknown future-status string (or a partner typo) cannot put the user on the wrong screen.
+- Missing `tenantKey`, or `tenantKey` that does not match the active scope, also causes the entire message to be ignored before any other field is read.
+
+#### Iframe behavior on receipt
+
+- **`status: "success"`** — iframe shows the in-iframe **Payment Successful** screen and treats the campaign's payment as resolved on the iframe side. Production status continues to be driven by `order.status_changed` webhooks (see [API_KIT.md](API_KIT.md)) — this message only updates the iframe UI.
+- **`status: "failed"` / `"failure"` / `"cancelled"`** — iframe shows the in-iframe **Payment Failed** screen. The screen offers a **Try Again** action that, when clicked, emits [`payment_retry_requested`](#payment_retry_requested--user-clicked-try-again-on-the-failure-screen) back to the parent. The optional `reason` field is surfaced inline as additional context.
+- The iframe does **not** retry the payment itself, does **not** call `POST /orders` again, and does **not** call `/confirm-payment`. The parent owns the charge — this contract is UI handoff only.
+
 ### Recipient selection contract (piece count + dedup)
 
 When `set_list.piece_counts` (or `set_lists[].piece_counts`) is present, the iframe surfaces two user-facing controls on the piece-selection page and emits the user's final choice back to the parent on `campaign_submitted`. End-to-end:
@@ -1025,6 +1071,46 @@ Notes:
 **How to Test.** The order must be in `scheduled` status and **unbilled** (`payment_confirmed = false`). Open it on the Campaign Detail page, click **Reschedule**, pick a new mail date, and Save — you'll receive one `order_rescheduled` (suppressed if the date is unchanged). Paid (`payment_confirmed = true`), `accepted`, `prep`, in-production, and terminal orders do **not** offer Reschedule.
 
 **Blocked attempts.** Paid rows (`payment_confirmed = true`) show a locked note in place of the Reschedule button; `accepted` / `prep` / in-production / terminal rows simply do not render a Reschedule button. If a reschedule is submitted on an order the backend no longer permits (e.g. it advanced or was paid after the row rendered → `409 PAID_LOCKED` / `SEND_NOW_PROCESSING` / `IN_PRODUCTION`, see `API_KIT.md §6m`), the iframe surfaces a **"Can't Modify Order"** modal and emits **no** `order_rescheduled`.
+
+#### `payment_retry_requested` — User clicked "Try Again" on the failure screen
+
+> **Current staging contract — pending PropStream wiring.** Companion to the parent → iframe [`payment_result`](#payment_result--payment-popup-outcome-parent--iframe) message. The iframe expects the parent (PropStream) to listen for this event and **reopen its payment popup** for the same campaign / order. PropStream's handler is not yet wired — this section documents what the iframe emits today on staging.
+
+Emitted when the user clicks **Try Again** on the iframe's in-iframe **Payment Failed** screen in partner-embedded mode. The iframe is asking the parent to reopen the payment popup so the user can retry the charge.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "payment_retry_requested",
+  "campaignId": "camp_abc123",
+  "ballpointCampaignId": "cmp_abc",
+  "orderIds": ["ord_local_001"],
+  "ballpointOrderIds": ["ord_abc123"],
+  "reason": "card_declined"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source` | string | Always `"ballpoint-mailer"`. |
+| `version` | number | Always `1`. |
+| `type` | string | Always `"payment_retry_requested"`. |
+| `campaignId` | string or omitted | Iframe-local campaign handle, echoed back **only if it was provided on the original `payment_result`**. The iframe does **not** fall back to a prior `campaign_submitted` value. Omitted when `payment_result` did not carry it. |
+| `ballpointCampaignId` | string or omitted | Server-side campaign id, echoed back **only if it was provided on the original `payment_result`**. Omitted otherwise. |
+| `orderIds` | array of strings or omitted | Iframe-local order ids, echoed back **only if provided on the original `payment_result`**. Omitted otherwise. |
+| `ballpointOrderIds` | array of strings or omitted | Server-side `ballpointOrderId` values, echoed back **only if provided on the original `payment_result`**. Omitted otherwise. |
+| `reason` | string or omitted | The `reason` carried on the original `payment_result` (e.g. card-decline reason; trimmed and capped to 300 chars by the iframe), echoed back so the parent's payment popup can prefill / surface the previous failure context. Omitted otherwise. |
+
+**No duplicate orders.** This event is a UI-level request to the parent to reopen its payment popup. The iframe does **not** call `POST /orders`, does **not** create or clone a Ballpoint order, and does **not** call `/confirm-payment` in response to the Try Again click. The retry of the underlying charge is entirely owned by the partner. The `ballpointOrderIds` / `campaignId` echoed in this payload reference the **existing** Ballpoint order/campaign from the original submission — the same ids the parent already debited (or attempted to debit) against.
+
+**Expected PropStream behavior**
+
+1. Listen for `payment_retry_requested`.
+2. Reopen the payment popup for the campaign / order referenced by the echoed ids.
+3. When the popup resolves again, send a fresh [`payment_result`](#payment_result--payment-popup-outcome-parent--iframe) back to the iframe with the new outcome.
+
+**Standalone mode.** In standalone (non-embedded) mode, the failure screen's Try Again action stays internal — `payment_retry_requested` is not emitted because there is no parent to receive it.
 
 #### `campaign_complete` — Entire campaign flow finished
 
