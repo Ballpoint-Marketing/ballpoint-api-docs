@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.10 — 2026-06-18
+
+- **`payment_result status: "cancelled"` now renders its own "Payment Not Completed" UI state — no longer "Payment Failed" (current staging contract).** Cancelled uses the same failure-screen visual shell but distinct copy (*"Your payment was not completed. You can try again when you're ready."*), no support phone, and no decline-reason chip. `failed`/`failure` keep the "Payment Failed" copy. **Try Again behavior is unchanged** for both (emits `payment_retry_requested`; no duplicate order).
+- **Backend distinction documented.** `cancelled` is a UI signal only — the user closed / did not complete the payment flow; it is **not** a card/payment failure. Reserve backend `POST .../confirm-payment` `status: "failed"` for an actual failed payment outcome, not a user cancellation (unless that is your chosen billing policy). No API/webhook change; iframe-side copy/UI only.
+
 ## v1.6.9 — 2026-06-17
 
 - **Added `payment_result` parent → iframe contract and `payment_retry_requested` iframe → parent event (current staging contract; pending PropStream wiring).** Documents the in-iframe Payment Successful / Payment Failed result screens for the partner payment gate. The payment popup and the charge itself stay PropStream-owned (unchanged from prior versions); after the popup resolves, PropStream should send `payment_result` so the iframe renders the matching result screen. If the user clicks **Try Again** on the failure screen in partner-embedded mode, the iframe emits `payment_retry_requested` asking PropStream to reopen its payment popup.
