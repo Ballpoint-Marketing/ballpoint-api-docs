@@ -391,12 +391,12 @@ The iframe does **not** observe the payment popup directly. The parent app owns 
 | `version` | number | Yes | Must be `1`. The iframe supports the version set `[1]`; other values are ignored. |
 | `type` | string | Yes | Always `"payment_result"`. |
 | `tenantKey` | string | Yes | Must match the active tenant the iframe was scoped to. Mismatched or missing `tenantKey` causes the entire message to be **rejected and ignored** — no result screen is rendered and **no tenant state is mutated** by this message. The check is read-only (this event cannot be used to establish or change tenant scope). |
-| `status` | string | Yes | One of `"success"`, `"failed"`, `"failure"`, `"cancelled"`. The iframe normalizes `"failure"` → `"failed"`. `"success"` renders the success screen; `"failed"` and `"cancelled"` render the failure screen. Any other value is ignored (no screen change). |
+| `status` | string | Yes | One of `"success"`, `"failed"`, `"failure"`, `"cancelled"`. The iframe normalizes `"failure"` → `"failed"`. `"success"` → **Payment Successful** screen; `"failed"`/`"failure"` → **Payment Failed** screen; `"cancelled"` → **Payment Not Completed** screen (its own copy variant on the same visual shell — **not** "Payment Failed"). Any other value is ignored (no screen change). |
 | `campaignId` | string | Optional | Iframe-local campaign handle (the same `campaignId` previously emitted on `campaign_created` / `campaign_submitted`). Echoed back on `payment_retry_requested` if present. |
 | `ballpointCampaignId` | string | Optional | Server-side campaign id. Send only if the parent has it from its own API / order-history reconciliation state — note that `campaign_submitted` does **not** expose `ballpointCampaignId` (only `campaignId` and `orders[].ballpointOrderId`). Echoed back on `payment_retry_requested` if present. |
 | `orderIds` | array of strings | Optional | Iframe-local order ids (e.g. those returned in `campaign_created.orderIds`). Echoed back on `payment_retry_requested` if present. |
 | `ballpointOrderIds` | array of strings | Optional | Server-side `ballpointOrderId` values (from `campaign_submitted.orders[].ballpointOrderId`). Echoed back on `payment_retry_requested` if present. |
-| `reason` | string | Optional | Failure context (e.g. card-decline reason). Surfaced in the failure screen copy when present. Ignored on `status: "success"`. |
+| `reason` | string | Optional | Decline context for an actual **failure** (e.g. card-decline reason), surfaced inline on the **Payment Failed** screen (plain text, ~300-char cap). Ignored on `status: "success"` **and on `"cancelled"`** (a cancellation has no failure reason). |
 
 #### Status normalization and ignore behavior
 
@@ -407,8 +407,11 @@ The iframe does **not** observe the payment popup directly. The parent app owns 
 #### Iframe behavior on receipt
 
 - **`status: "success"`** — iframe shows the in-iframe **Payment Successful** screen and treats the campaign's payment as resolved on the iframe side. Production status continues to be driven by `order.status_changed` webhooks (see [API_KIT.md](API_KIT.md)) — this message only updates the iframe UI.
-- **`status: "failed"` / `"failure"` / `"cancelled"`** — iframe shows the in-iframe **Payment Failed** screen. The screen offers a **Try Again** action that, when clicked, emits [`payment_retry_requested`](#payment_retry_requested--user-clicked-try-again-on-the-failure-screen) back to the parent. The optional `reason` field is surfaced inline as additional context.
+- **`status: "failed"` / `"failure"`** — iframe shows the in-iframe **Payment Failed** screen (an actual payment failure, e.g. card declined). The optional `reason` is surfaced inline. Offers a **Try Again** action that emits [`payment_retry_requested`](#payment_retry_requested--user-clicked-try-again-on-the-failure-screen) back to the parent.
+- **`status: "cancelled"`** — iframe shows a distinct **Payment Not Completed** screen (same visual shell as Payment Failed, different copy: *"Your payment was not completed. You can try again when you're ready."*). This represents the user **closing / not completing** the payment flow — it is **not** a card/payment failure, and no `reason` is shown. Also offers **Try Again** → emits [`payment_retry_requested`](#payment_retry_requested--user-clicked-try-again-on-the-failure-screen).
 - The iframe does **not** retry the payment itself, does **not** call `POST /orders` again, and does **not** call `/confirm-payment`. The parent owns the charge — this contract is UI handoff only.
+
+> **Backend distinction (important).** `status: "cancelled"` is a **UI signal to the iframe only** — the user closed or did not complete the payment flow. It does **not** imply a card/payment failure. Reserve the backend `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: "failed"` for an **actual** failed payment outcome (e.g. a declined charge), not for a user cancellation — unless that is your deliberate billing policy. A cancellation usually means no charge was attempted, so the order can remain `pending_payment` (the user retries later) or be cancelled via `PATCH /v1/billing/orders/{order_id}/status`.
 
 ### Recipient selection contract (piece count + dedup)
 
