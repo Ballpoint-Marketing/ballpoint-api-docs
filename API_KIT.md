@@ -565,9 +565,12 @@ GET /v1/billing/orders
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `external_user_id` | string | — | Filter to a specific platform user |
+| `list_id` | string (repeatable) | — | Filter to one or more campaign lists. **Repeat the param** to span several: `?list_id=a&list_id=b`. A single `?list_id=a` is unchanged (backward compatible). These are the same `list_id` values you pass when creating orders; each maps to one `campaign_id` server-side. **Max 100 per request** — more returns `422 LIST_ID_LIMIT_EXCEEDED` (no truncation). Omit for all lists. A **present-but-empty** `?list_id=` returns **zero results** (never account-wide). |
 | `status` | string | — | Filter by order status (e.g., `accepted`, `printing`, `complete`, `delivered`) |
 | `limit` | integer | 20 | Results per page (1–100) |
 | `offset` | integer | 0 | Pagination offset |
+
+> The same repeated `list_id` filter (1–100 values, `422 LIST_ID_LIMIT_EXCEEDED` over the cap, present-but-empty = zero results) is also accepted on the partner dashboard reads `GET /v1/billing/partner/stats`, `GET /v1/billing/partner/orders`, and the insights endpoint `GET /v1/mail-tracking/account-summary`. The iframe's `set_dashboard_filter` postMessage drives these under the hood (see [IFRAME_KIT.md](IFRAME_KIT.md)).
 
 **Example:**
 

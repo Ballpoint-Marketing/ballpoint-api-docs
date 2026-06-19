@@ -364,6 +364,43 @@ This message has no required payload fields. On success, the iframe reuses its i
 
 `set_api_config` should still be sent during bootstrap. Missing API config does not block opening this screen because the iframe already queues submit actions until API config arrives, but partners should send `set_api_config` before the user submits.
 
+### `set_dashboard_filter` — Scope the My Campaigns dashboard to a marketing group (parent → iframe)
+
+> **Current staging contract — pending PropStream wiring.** A **view-only** filter for the iframe's **My Campaigns** dashboard (the campaign list, the insights header, and the status tab counts). It is **separate from** `set_list` (which locks the active list for *creating* an order) and `set_lists` (the deprecated list-selector): sending it never changes the active creation list and never opens the selector.
+
+Use this when your app wants the user to see, in My Campaigns, only the direct-mail campaigns belonging to a specific marketing group they clicked in your UI. Your app stays the source of truth for which list IDs belong to a group; the iframe applies them as a view filter and asks the API to return the matching subset (no `group_id` is stored Ballpoint-side).
+
+```json
+{
+  "source": "propstream",
+  "version": 1,
+  "type": "set_dashboard_filter",
+  "listIds": ["list_abc", "list_def"],
+  "tenantKey": "ps_acc_42"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `source` | string | Yes | Must be `"propstream"`. |
+| `version` | number | Yes | Must be `1`. |
+| `type` | string | Yes | Always `"set_dashboard_filter"`. |
+| `listIds` | array of strings \| null | Yes | The list IDs of the marketing group to scope the dashboard to (the same `listId` values you pass on `set_list`). See the semantics table below — `null` (or omitting it) is the explicit *clear* signal. |
+| `tenantKey` | string | Optional | If present, must match the active tenant scope — a mismatch **rejects** the whole message (no filter applied, no tenant state changed). If omitted, the filter is applied. Real security is still enforced server-side by your partner/account scope; `listIds` are an **advisory view filter, not an authorization grant**. |
+
+**`listIds` semantics:**
+
+| Value | Meaning |
+|-------|---------|
+| `["a", "b", …]` (1–100 ids) | Scope the dashboard to those lists. The campaign list, insights header, **and** tab counts all narrow together. Ids are sanitized + de-duplicated. |
+| `[]` (empty array) | **Zero-results** — the dashboard renders empty (empty list, zeroed insights, all tab counts `0`). This is **not** "show all"; use it when the selected group has no lists. |
+| `null` or field omitted | **Clear** the filter — the dashboard returns to the full account-wide view. |
+| more than 100 ids | **Rejected** with no truncation — the whole message is ignored (a warning is logged). Send ≤ 100. |
+
+**Re-appliable:** unlike `set_list` (which locks on first receipt), `set_dashboard_filter` is a live view filter — send it again any time (e.g. when the user clicks a different group) and it **replaces** the prior `listIds` wholesale.
+
+Backed by the repeated `list_id` query parameter on the dashboard read endpoints — see [`GET /v1/billing/orders` in API_KIT.md](API_KIT.md).
+
 ### `payment_result` — Payment popup outcome (parent → iframe)
 
 > **Current staging contract — pending PropStream wiring.** This is the iframe-side contract for the in-iframe Payment Successful / Payment Failed result screens. The payment popup and the charge itself remain partner-owned (see [Partner Payment Gate Flow](#partner-payment-gate-flow-send-now-walkthrough)); after the partner's popup resolves, the partner should send `payment_result` to the iframe so the iframe can render the matching result screen. PropStream's listener / sender is not yet wired — this section documents what the iframe expects today on staging.
