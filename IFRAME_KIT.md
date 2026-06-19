@@ -385,7 +385,7 @@ Use this when your app wants the user to see, in My Campaigns, only the direct-m
 | `source` | string | Yes | Must be `"propstream"`. |
 | `version` | number | Yes | Must be `1`. |
 | `type` | string | Yes | Always `"set_dashboard_filter"`. |
-| `listIds` | array of strings \| null | Yes | The list IDs of the marketing group to scope the dashboard to (the same `listId` values you pass on `set_list`). See the semantics table below — `null` (or omitting it) is the explicit *clear* signal. |
+| `listIds` | array of strings \| null | No | The list IDs of the marketing group to scope the dashboard to (the same `listId` values you pass on `set_list`). **Optional** — omitting the field (or sending `null`) is the explicit *clear* signal (full account-wide view). See the semantics table below. |
 | `tenantKey` | string | Optional | If present, must match the active tenant scope — a mismatch **rejects** the whole message (no filter applied, no tenant state changed). If omitted, the filter is applied. Real security is still enforced server-side by your partner/account scope; `listIds` are an **advisory view filter, not an authorization grant**. |
 
 **`listIds` semantics:**
