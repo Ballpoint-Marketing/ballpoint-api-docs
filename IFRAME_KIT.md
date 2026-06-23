@@ -1033,11 +1033,11 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 | `orders[].pieces` | number | Recipient count for this order. |
 | `orders[].mailDate` | string or null | ISO date this specific drop is scheduled for. Canonical scheduled-mail-date field for each submitted order. For `single` and `split` campaigns all entries carry the same date; for `multi` campaigns each entry carries its own per-drop date — partners reading multi-send schedules MUST iterate `orders[].mailDate`. |
 | `orders[].unit_price_tcents` | number | Marked-up unit price in tenth-cents. |
-| `orders[].total_tcents` | number | Marked-up total for this order in tenth-cents. |
+| `orders[].total_tcents` | number | Marked-up total for this order in tenth-cents. UX/display only for payment-gated partner flows. |
 | `orders[].recipientsEndpoint` | string or null | API path to POST recipients (null if pending). |
 | `orders[].campaignInstanceId` | string or null | Opaque submit/split instance key. `null` for `single` and `multi` campaigns (no cross-order dedup expected). For `split` campaigns, all sibling orders in the same `campaign_submitted` payload share the same opaque string value — Ballpoint uses this server-side as a guard-rail to enforce disjoint slices across A/B variants (see [Campaign Dedup (automatic)](#campaign-dedup-automatic)). Treat as opaque on the partner side; do not parse, mutate, or echo back. |
-| `total_tcents` | number | Marked-up total across all orders, in tenth-cents — what the end user pays. |
-| `total_dollars` | string | Same total as a fixed-2 dollar string. **UX/display only.** Before charging the end-user on the partner side, refetch the authoritative amount from Ballpoint server-side via `GET /v1/billing/partner/orders`. |
+| `total_tcents` | number | Marked-up total across all orders, in tenth-cents. UX/display only for payment-gated partner flows. |
+| `total_dollars` | string | Same total as a fixed-2 dollar string. **UX/display only.** After `campaign_submitted`, refetch the authoritative Ballpoint debit amount server-side with `POST /v1/billing/orders/preview` and read `partner_cost_total_tcents`. |
 | `pendingSubmissionCount` | number | Orders still waiting to submit (usually 0). |
 | `submittedNowCount` | number | Orders submitted in this batch. |
 | `pendingOrderIds` | string[] | Iframe order ids still waiting to submit (empty in the happy path). |
@@ -1232,7 +1232,7 @@ End-to-end timeline:
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /orders` on the API base URL. For payment-gated accounts, Ballpoint creates the order in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated). No charge yet in either case.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX). This is the trigger to start the payment popup on the parent side.
-7. Parent backend refetches the authoritative amount from `GET /v1/billing/partner/orders` before charging. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.
+7. Parent backend calls `POST /v1/billing/orders/preview` once per order/drop using that order's `product_type`, `postage_type`, and `piece_count`; read `partner_cost_total_tcents` as the authoritative Ballpoint debit amount. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.
 8. Parent shows the payment popup; end-user pays via the parent's payment provider.
 9. Parent backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
 10. On success, Ballpoint debits the partner balance and moves the order to `accepted`. Production proceeds.

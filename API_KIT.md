@@ -381,11 +381,18 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/preview \
 
 ```json
 {
+  "product_type": "4x6_printed",
+  "postage_type": "first_class",
+  "piece_count": 500,
   "unit_price_tcents": 5054,
   "total_tcents": 2527000,
-  "piece_count": 500,
+  "total_dollars": "$252.7000",
+  "partner_cost_unit_price_tcents": 5054,
+  "partner_cost_total_tcents": 2527000,
+  "partner_cost_total_dollars": "$252.7000",
   "billing_mode": "none",
   "balance_cents": null,
+  "balance_after_cents": null,
   "limits": {
     "passed": true,
     "checks": [
@@ -399,6 +406,8 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/preview \
 The preview runs the same limit checks as real order creation but reports results as warnings. If `limits.passed` is `false`, the real order would fail — show the user why before they submit.
 
 > **Note:** For accounts with `billing_mode: none`, `balance_cents` is `null` and balance checks always pass. The preview still validates product type, postage, and piece count.
+
+> **Payment-gate amount source:** After `campaign_submitted`, payment-gated partners should call this endpoint once per Ballpoint order/drop using the same `product_type`, `postage_type`, and `piece_count` used to create that order. Use `partner_cost_total_tcents` as the authoritative Ballpoint debit amount. `total_tcents` / `total_dollars` are partner-display fields and may include markup; browser-side totals are UX/display only.
 
 ---
 
@@ -844,7 +853,7 @@ For accounts where Ballpoint waits for the partner to debit the end-user before 
 
 - The end-user payment is captured **on the partner side** using the partner's own payment provider. Ballpoint never sees card data, payment-method data, or any PCI-relevant payload.
 - `/confirm-payment` is a **server-to-server** call by integration contract. It must be issued from the partner backend after the partner has confirmed the payment outcome with its payment provider. The customer browser must **not** call this endpoint directly — the partner key would be exposed.
-- Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. Before charging the end-user, the partner backend must call `GET /v1/billing/partner/orders` and use the server-side amount as the billing source of truth. Browser-provided values must never be treated as authoritative.
+- Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. After `campaign_submitted` and before reporting payment success, the partner backend must call `POST /v1/billing/orders/preview` once per order/drop using that order's `product_type`, `postage_type`, and `piece_count`. Use `partner_cost_total_tcents` as the authoritative Ballpoint debit amount. Browser-provided values must never be treated as authoritative.
 
 **User-flow timing**
 
@@ -856,7 +865,7 @@ Where this call sits in the end-user journey for an iframe-driven order:
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /orders` on the API base URL. For payment-gated accounts, Ballpoint creates the order in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated). No charge yet in either case.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger to start the payment popup. For partners that sent `piece_counts` on `set_list`, this event also carries `recipient_selection.piece_count` — per-drop, matches each `orders[].pieces`, useful for reconciliation. See [IFRAME_KIT.md](IFRAME_KIT.md#recipient-selection-contract-piece-count--dedup) for the full input/output contract.
-7. Partner backend refetches the authoritative amount from `GET /v1/billing/partner/orders` before charging.
+7. Partner backend calls `POST /v1/billing/orders/preview` once per order/drop using that order's `product_type`, `postage_type`, and `piece_count`; read `partner_cost_total_tcents` as the authoritative Ballpoint debit amount.
 8. Partner shows the payment popup; end-user pays via the partner's payment provider.
 9. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
 10. On success, Ballpoint debits the partner balance and moves the order from `pending_payment` to `accepted`. Production proceeds.
@@ -969,7 +978,7 @@ Payment retry logic lives **on the partner side**. Ballpoint does not retry the 
 
 These endpoints power partner-side operational dashboards (per-account aggregate stats, paginated order list with SLA, drill-down by user or campaign list). Both require an `X-Partner-Key` header and are scoped to your `source` + `external_account_id`.
 
-> **For payment flows:** refetch the relevant order from `GET /v1/billing/partner/orders` server-side before charging the end-user. Browser-side values like `campaign_submitted.total_dollars` are UX/display only. See [§6k](#6k-confirm-payment-partner-payment-gate) and [IFRAME_KIT.md](IFRAME_KIT.md) for the full payment-gate context.
+> **For payment-gate flows:** do not use these dashboard endpoints for pre-confirmation pricing. After `campaign_submitted`, call `POST /v1/billing/orders/preview` once per order/drop and use `partner_cost_total_tcents` as the authoritative Ballpoint debit amount. Browser-side values like `campaign_submitted.total_dollars` are UX/display only. See [§6k](#6k-confirm-payment-partner-payment-gate) and [IFRAME_KIT.md](IFRAME_KIT.md) for the full payment-gate context.
 
 #### `GET /v1/billing/partner/stats`
 
@@ -1080,7 +1089,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/orders?days=30&li
 }
 ```
 
-Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders or billing configurations where no partner-facing amount is set.
+Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders or billing configurations where no partner-facing amount is set. For payment-gated accounts, this endpoint is for dashboard/post-confirmation reads, not for pre-confirmation charge authorization; use `POST /v1/billing/orders/preview` for that flow.
 
 #### `GET /v1/billing/partner/health`
 
