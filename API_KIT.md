@@ -1693,7 +1693,7 @@ In addition to order-level updates, you may receive campaign-level tracking even
 | `campaign.mail_tracking.in_transit` | First USPS scans detected for the campaign |
 | `campaign.mail_tracking.out_for_delivery` | ≥51% of campaign pieces at destination facility |
 | `campaign.mail_tracking.delivered` | ≥80% of campaign pieces delivered |
-| `campaign.mail_tracking.rts_update` | Return-to-sender pieces found (includes addresses for suppression) |
+| `campaign.mail_tracking.rts_update` | Return-to-sender pieces found (per-piece payload with recipient PII for suppression + `contact_id`/`contact_type` for CRM reconciliation) |
 | `campaign.mail_tracking.stalled` | No scans in 72+ hours with pieces still in transit |
 
 #### Example Payloads
@@ -1736,15 +1736,34 @@ In addition to order-level updates, you may receive campaign-level tracking even
   "type": "campaign.mail_tracking.rts_update",
   "data": {
     "campaign_id": "camp_spring_2026",
-    "rts_count": 14,
-    "rts_addresses": [
-      { "line1": "123 Main St", "city": "Austin", "state": "TX", "zip": "78701" },
-      { "line1": "456 Oak Ave", "city": "Dallas", "state": "TX", "zip": "75201" }
-    ],
-    "suppression_recommended": true
+    "new_rts_pieces": [
+      {
+        "piece_id": "pc_4a7f2b",
+        "status": "RTS",
+        "recipient_name": "Jane Doe",
+        "recipient_address": "123 Main St",
+        "recipient_city": "Austin",
+        "recipient_state": "TX",
+        "recipient_zip": "78701",
+        "last_scan_at": "2026-03-05T18:22:00Z",
+        "contact_id": "ps_contact_42",
+        "contact_type": "PROPERTY"
+      }
+    ]
   }
 }
 ```
+
+Per-piece fields:
+
+- `piece_id` — string — Opaque hash of the IMb + campaign — stable per piece.
+- `status` — string — Always `RTS` on this event.
+- `recipient_name` / `recipient_address` / `recipient_city` / `recipient_state` / `recipient_zip` — string — Mailed PII, exactly as mailed. Retained for suppression.
+- `last_scan_at` — string | null — ISO 8601 timestamp of the last scan associated with the returned piece.
+- `contact_id` — string | null — Partner-side recipient identifier, echoed verbatim from the `/recipients` upload. `null` when none was supplied (Ballpoint-direct uploads).
+- `contact_type` — string | null — `PROPERTY` or `MAILING`. Disambiguates two pieces with the same `contact_id` (one contact may have both a property and a mailing address mailed in the same campaign). `null` when no address-type was supplied.
+
+Note: the unique recipient key is `(contact_id, contact_type)`. A single `contact_id` may appear twice in one payload (both PROPERTY and MAILING came back RTS). These are **pass-through** — Ballpoint does not address-match; the partner pre-resolves the key at manifest-upload time. The existing `recipient_*` PII is unchanged (kept for suppression).
 
 **`campaign.mail_tracking.stalled`**
 
@@ -1810,14 +1829,22 @@ When the USPS scan pipeline detects a returned-to-sender piece, Ballpoint emits 
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `contact_id` | string | yes | The same `contact_id` the partner supplied in the original `POST /v1/billing/orders/{id}/recipients` upload. Echoed verbatim. |
-| `reason` | string | yes | Return-to-sender reason (e.g. `vacant`, `moved_no_forwarding`, `insufficient_address`). |
-| `last_scan_date` | string | yes | ISO 8601 date of the last scan associated with the returned piece. |
+| `piece_id` | string | yes | Opaque hash of the IMb + campaign — stable per piece. |
+| `status` | string | yes | Always `RTS` on this event. |
+| `recipient_name` | string | yes | Mailed recipient name. |
+| `recipient_address` | string | yes | Street address as mailed. |
+| `recipient_city` | string | yes | City as mailed. |
+| `recipient_state` | string | yes | 2-letter state as mailed. |
+| `recipient_zip` | string | yes | 5 or 5+4 zip as mailed. |
+| `last_scan_at` | string \| null | yes | ISO 8601 timestamp of the last scan associated with the returned piece. |
+| `contact_id` | string \| null | yes | Opaque partner-side contact identifier (e.g. PropStream `contact_id`). Echoed verbatim from the `/recipients` upload. `null` when no partner contact was supplied (Ballpoint-direct uploads). |
+| `contact_type` | string \| null | yes | `PROPERTY` or `MAILING` — disambiguates two pieces with the same `contact_id` (one contact may have both a property address and a separate mailing address mailed in the same campaign). `null` when no partner address-type was supplied. |
 
 **Notes**
 
-- `name`, `address`, `city`, `state`, `zip` are **not** included in the V1 payload. Reconciliation is by `contact_id` only.
-- Every recipient that should be eligible for RTS push-back must include `contact_id` in the original `/recipients` upload. Ballpoint persists the value verbatim and echoes it back unchanged on the RTS event.
+- The unique recipient key is `(contact_id, contact_type)`. A single `contact_id` may appear twice in a single payload when both a PROPERTY and a MAILING address for the same contact were mailed and both came back RTS.
+- Recipient PII (`recipient_name`/`recipient_address`/`recipient_city`/`recipient_state`/`recipient_zip`) is included on every entry so partners can suppress by mailed address even when no CRM key is present.
+- Both `contact_id` and `contact_type` are pass-through. Ballpoint does not interpret or address-match — the partner pre-resolves the recipient key at manifest-upload time. Manifests without these columns ingest cleanly — they just emit `null` for both fields on the RTS event.
 - This event is distinct from `order.status_changed`. The two events use the same delivery channel but carry different payloads.
 
 ---
