@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.12 — 2026-06-22
+
+- **RTS Push-Back webhook — `contact_id` + `contact_type` (corrects earlier V1 description).** Each `data.new_rts_pieces[]` item in `campaign.mail_tracking.rts_update` now carries `contact_id` + `contact_type` (`PROPERTY`|`MAILING`) for CRM reconciliation, **in addition to** the existing recipient PII (`recipient_name`/`address`/`city`/`state`/`zip`) and `piece_id`/`status`/`last_scan_at`. Unique recipient key is `(contact_id, contact_type)`. Additive and non-breaking — both new fields are nullable; older clients ignore them. Supersedes the earlier "`contact_id` + `reason` + `last_scan_date`, no PII, reconciliation by `contact_id` only" description.
+
 ## v1.6.11 — 2026-06-19
 
 - **Added a repeated `list_id` filter on the dashboard read endpoints + the `set_dashboard_filter` iframe contract (current staging contract; pending PropStream wiring).** Lets a partner scope the iframe **My Campaigns** dashboard (campaign list, insights header, and status tab counts) to a specific marketing group's lists, without Ballpoint storing any `group_id` — the partner stays source of truth for which `list_id`s belong to a group.
