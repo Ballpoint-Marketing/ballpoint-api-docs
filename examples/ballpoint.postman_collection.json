@@ -1,335 +1,1571 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API.\n\nImport the matching environment file (sandbox or production) to set your base_url and partner_key.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.6.12 and OpenAPI 3.1.0 (docs commit f1e713c). Import the matching environment (sandbox or production) to set base_url and partner_key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "function futureDate(days){",
+          "  var d = new Date(Date.now() + days*86400000);",
+          "  function p(n){ return String(n).padStart(2,'0'); }",
+          "  return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate());",
+          "}",
+          "if(!pm.environment.get('mail_date')) pm.environment.set('mail_date', futureDate(30));",
+          "pm.environment.set('new_mail_date', futureDate(45));"
+        ]
+      }
+    }
+  ],
   "variable": [],
   "item": [
     {
-      "name": "Quick Start",
+      "name": "Tier A - Safe reads and preview",
+      "description": "Read-only and preview requests. Safe to browse and (A1) to smoke-run.",
       "item": [
         {
-          "name": "Health check",
+          "name": "A1 - No setup required",
+          "description": "Runnable cold - the default Newman smoke subset.",
+          "item": [
+            {
+              "name": "Health check",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/health",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
+                },
+                "description": "Liveness check. No authentication required. The documented public health endpoint.",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has expected fields', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b).to.have.property('status');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List pricing catalog",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/pricing",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "pricing"
+                  ]
+                },
+                "description": "Full pricing catalog (tenth-cents). Divide unit_price_tcents by 10000 for dollars per piece."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('is a non-empty array', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b).to.be.an('array');",
+                      "  if (b.length) { pm.expect(b[0]).to.have.property('product_type'); pm.expect(b[0]).to.have.property('unit_price_tcents'); }",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Filter pricing by product_type",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/pricing?product_type={{product_type}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "pricing"
+                  ],
+                  "query": [
+                    {
+                      "key": "product_type",
+                      "value": "{{product_type}}"
+                    }
+                  ]
+                },
+                "description": "Pricing rows for a single product_type (e.g. 4x6_printed)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Preview order cost",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-External-User-ID",
+                    "value": "{{external_user_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/orders/preview",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "orders",
+                    "preview"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"product_type\": \"{{product_type}}\",\n  \"postage_type\": \"{{postage_type}}\",\n  \"piece_count\": 500\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Preview cost WITHOUT creating an order. partner_cost_total_tcents is the authoritative Ballpoint debit amount for payment-gate flows. total_tcents/total_dollars are partner-display only."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has expected fields', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b).to.have.property('partner_cost_total_tcents');",
+                      "  pm.expect(b).to.have.property('total_tcents');",
+                      "  pm.expect(b).to.have.property('unit_price_tcents');",
+                      "  pm.expect(b).to.have.property('limits');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/orders?limit=20&offset=0",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Partner-scoped order list. You only see your own orders."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has expected fields', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b).to.have.property('orders');",
+                      "  pm.expect(b).to.have.property('total');",
+                      "  pm.expect(b).to.have.property('limit');",
+                      "  pm.expect(b).to.have.property('offset');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List orders by external_user_id",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/orders?external_user_id={{external_user_id}}&limit=20&offset=0",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "external_user_id",
+                      "value": "{{external_user_id}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Filter the order list to a single platform user."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has expected fields', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b).to.have.property('orders');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List orders by list_id",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/orders?list_id={{list_id}}&limit=20&offset=0",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "list_id",
+                      "value": "{{list_id}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Filter by campaign list. list_id is repeatable (?list_id=a&list_id=b), max 100 per request (else 422 LIST_ID_LIMIT_EXCEEDED). A present-but-empty list_id returns zero results, never account-wide."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List orders by status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/orders?status={{status}}&limit=20&offset=0",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "{{status}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Filter by production status (e.g. accepted, prep, printing, complete). This filters on production status; USPS delivery state is exposed via the mail-tracking endpoints, not here."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Partner dashboard stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/partner/stats?days={{days}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "partner",
+                    "stats"
+                  ],
+                  "query": [
+                    {
+                      "key": "days",
+                      "value": "{{days}}"
+                    }
+                  ]
+                },
+                "description": "Aggregate counts for a dashboard top panel: totals, status breakdown, SLA buckets, RTS summary. Optional external_user_id and list_id narrow the scope."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has expected fields', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b).to.have.property('total_orders');",
+                      "  pm.expect(b).to.have.property('orders_by_status');",
+                      "  pm.expect(b).to.have.property('sla_summary');",
+                      "  pm.expect(b).to.have.property('rts_summary');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Partner dashboard orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/partner/orders?days={{days}}&limit=100&offset=0",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "partner",
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "days",
+                      "value": "{{days}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "100"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Paginated partner-scoped order list with computed sla_status. Supports status, product_type, sla, search, list_id, external_user_id filters (AND)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has expected fields', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b).to.have.property('orders');",
+                      "  pm.expect(b).to.have.property('total');",
+                      "  pm.expect(b).to.have.property('has_more');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Partner account health",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/partner/health",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "partner",
+                    "health"
+                  ]
+                },
+                "description": "Operational health snapshot scoped to your account: api_status, last_error, rate_limit, daily_piece_cap, plus build + contractVersions (v1.6.7+)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has expected fields', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b).to.have.property('api_status');",
+                      "  pm.expect(b).to.have.property('rate_limit');",
+                      "  pm.expect(b).to.have.property('daily_piece_cap');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Account mail-tracking summary (shape not modeled in docs)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/mail-tracking/account-summary?days={{days}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "mail-tracking",
+                    "account-summary"
+                  ],
+                  "query": [
+                    {
+                      "key": "days",
+                      "value": "{{days}}"
+                    }
+                  ]
+                },
+                "description": "Account-level mail-tracking insights. Documented in the partner API kit as a partner read that accepts a repeatable list_id filter. Response shape is NOT modeled in the API kit or OpenAPI spec - static/source reviewed; test asserts status only."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "A2 - Safe but requires seeded order_id or campaign_id",
+          "description": "Safe reads that need a seeded id. Each auto-skips (test passes) when its id var is empty.",
+          "item": [
+            {
+              "name": "Get order by id (requires seeded order_id)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/orders/{{order_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "orders",
+                    "{{order_id}}"
+                  ]
+                },
+                "description": "Single order by id. Tenant-scoped: cross-tenant or unknown id both return 404 (never 403). display_status is the field to show users."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.environment.get('order_id')) {",
+                      "  if (pm.execution && pm.execution.skipRequest) { pm.execution.skipRequest(); }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var v = pm.environment.get('order_id');",
+                      "if (!v) {",
+                      "  pm.test('skipped: requires seeded order_id', function () { return true; });",
+                      "} else {",
+                      "  pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "  pm.test('body has expected fields', function () {",
+                      "    var b = pm.response.json();",
+                      "    pm.expect(b).to.have.property('id');",
+                      "    pm.expect(b).to.have.property('display_status');",
+                      "    pm.expect(b).to.have.property('production_status');",
+                      "  });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Order mail-tracking (requires seeded order_id)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/orders/{{order_id}}/mail-tracking",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "orders",
+                    "{{order_id}}",
+                    "mail-tracking"
+                  ]
+                },
+                "description": "USPS delivery tracking for one order. Empty zero-count summary before the first scan (1-2 business days after drop)."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.environment.get('order_id')) {",
+                      "  if (pm.execution && pm.execution.skipRequest) { pm.execution.skipRequest(); }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var v = pm.environment.get('order_id');",
+                      "if (!v) {",
+                      "  pm.test('skipped: requires seeded order_id', function () { return true; });",
+                      "} else {",
+                      "  pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "  pm.test('body has expected fields', function () {",
+                      "    var b = pm.response.json();",
+                      "    pm.expect(b).to.have.property('mail_status');",
+                      "    pm.expect(b).to.have.property('total_pieces');",
+                      "  });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Campaign mail-tracking (requires seeded campaign_id)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/campaigns/{{campaign_id}}/mail-tracking",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "campaigns",
+                    "{{campaign_id}}",
+                    "mail-tracking"
+                  ]
+                },
+                "description": "Aggregate USPS tracking across all orders in a campaign. Same shape as order tracking."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.environment.get('campaign_id')) {",
+                      "  if (pm.execution && pm.execution.skipRequest) { pm.execution.skipRequest(); }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var v = pm.environment.get('campaign_id');",
+                      "if (!v) {",
+                      "  pm.test('skipped: requires seeded campaign_id', function () { return true; });",
+                      "} else {",
+                      "  pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "  pm.test('body has expected fields', function () {",
+                      "    var b = pm.response.json();",
+                      "    pm.expect(b).to.have.property('mail_status');",
+                      "    pm.expect(b).to.have.property('total_pieces');",
+                      "  });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Campaign pieces (requires seeded campaign_id)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/campaigns/{{campaign_id}}/mail-tracking/pieces?limit=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "campaigns",
+                    "{{campaign_id}}",
+                    "mail-tracking",
+                    "pieces"
+                  ],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Paginated piece-level tracking list. Supports status filter, cursor pagination, include_total."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.environment.get('campaign_id')) {",
+                      "  if (pm.execution && pm.execution.skipRequest) { pm.execution.skipRequest(); }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var v = pm.environment.get('campaign_id');",
+                      "if (!v) {",
+                      "  pm.test('skipped: requires seeded campaign_id', function () { return true; });",
+                      "} else {",
+                      "  pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Campaign RTS suppression (requires seeded campaign_id)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/campaigns/{{campaign_id}}/mail-tracking/rts?limit=1000",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "campaigns",
+                    "{{campaign_id}}",
+                    "mail-tracking",
+                    "rts"
+                  ],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "1000"
+                    }
+                  ]
+                },
+                "description": "Return-to-sender suppression list with pagination. include_forwarded defaults true."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.environment.get('campaign_id')) {",
+                      "  if (pm.execution && pm.execution.skipRequest) { pm.execution.skipRequest(); }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var v = pm.environment.get('campaign_id');",
+                      "if (!v) {",
+                      "  pm.test('skipped: requires seeded campaign_id', function () { return true; });",
+                      "} else {",
+                      "  pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Campaign scan events (requires seeded campaign_id)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/campaigns/{{campaign_id}}/mail-tracking/events?limit=100&days=90",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "campaigns",
+                    "{{campaign_id}}",
+                    "mail-tracking",
+                    "events"
+                  ],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "100"
+                    },
+                    {
+                      "key": "days",
+                      "value": "90"
+                    }
+                  ]
+                },
+                "description": "Paginated USPS scan event export. Cursor pagination; days up to 365; sort_by id|scan_datetime."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.environment.get('campaign_id')) {",
+                      "  if (pm.execution && pm.execution.skipRequest) { pm.execution.skipRequest(); }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var v = pm.environment.get('campaign_id');",
+                      "if (!v) {",
+                      "  pm.test('skipped: requires seeded campaign_id', function () { return true; });",
+                      "} else {",
+                      "  pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mint SSE token (requires seeded order_id)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/sse-token",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "billing",
+                    "orders",
+                    "{{order_id}}",
+                    "sse-token"
+                  ]
+                },
+                "description": "Mint a short-lived HMAC token for a browser EventSource connection (browsers cannot send custom auth headers). Non-mutating. Captures sse_token + sse_connect_url for the SSE stream request."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.environment.get('order_id')) {",
+                      "  if (pm.execution && pm.execution.skipRequest) { pm.execution.skipRequest(); }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var v = pm.environment.get('order_id');",
+                      "if (!v) {",
+                      "  pm.test('skipped: requires seeded order_id', function () { return true; });",
+                      "} else {",
+                      "  pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "  var b = pm.response.json();",
+                      "  pm.test('has token and connect_url', function () { pm.expect(b).to.have.property('token'); pm.expect(b).to.have.property('connect_url'); });",
+                      "  pm.environment.set('sse_token', b.token);",
+                      "  pm.environment.set('sse_connect_url', b.connect_url);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tier B - Manual partner flows",
+      "description": "Creates data. Run manually; not part of the smoke subset.",
+      "item": [
+        {
+          "name": "Create order - postcard (billing format)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-External-User-ID",
+                "value": "{{external_user_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"4x6_printed\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 25,\n  \"external_id\": \"demo_postcard_001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create a postcard order (billing format). Idempotency-Key is REQUIRED and a FRESH {{$guid}} is generated each send - do not reuse a stale key. Returns 202. Saves order_id to the environment."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 202', function () { pm.response.to.have.status(202); });",
+                  "pm.test('body has expected fields', function () {",
+                  "  var b = pm.response.json();",
+                  "  pm.expect(b).to.have.property('order_id');",
+                  "});",
+                  "var b = pm.response.json();",
+                  "if (b && b.order_id) { pm.environment.set('order_id', b.order_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create order - letter (billing format)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-External-User-ID",
+                "value": "{{external_user_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"hybrid_letter\",\n  \"postage_type\": \"presort\",\n  \"piece_count\": 25,\n  \"envelope_style\": \"confetti\",\n  \"external_id\": \"demo_letter_001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create a letter order (billing format). Letters REQUIRE envelope_style; postcards reject it. color_letter supports only plain_white. Returns 202."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 202', function () { pm.response.to.have.status(202); });",
+                  "pm.test('body has expected fields', function () {",
+                  "  var b = pm.response.json();",
+                  "  pm.expect(b).to.have.property('order_id');",
+                  "});",
+                  "var b = pm.response.json();",
+                  "if (b && b.order_id) { pm.environment.set('order_id', b.order_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create order - partner iframe format",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"4x6_printed\",\n  \"product_type\": \"4x6_printed\",\n  \"pieces\": 25,\n  \"list_id\": \"{{list_id}}\",\n  \"external_user_id\": \"{{external_user_id}}\",\n  \"external_id\": \"demo_partner_001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create an order in the partner/iframe format (PartnerOrderCreateRequest). Orders sharing a list_id are stitched into one Ballpoint campaign. Returns 200; the order id is under 'id' (not 'order_id'). Response shape is not strictly modeled - capture is tolerant."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "// Informational, non-failing: capture the order id under whichever key is present.",
+                  "pm.test('order id capture (informational - tolerant)', function () {",
+                  "  var d = pm.response.json();",
+                  "  var id = d.order_id || d.id || (d.data && (d.data.order_id || d.data.id));",
+                  "  if (id) { pm.environment.set('order_id', id); }",
+                  "  return true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SSE stream connect (EventSource - not Postman native)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/health",
-              "host": ["{{base_url}}"],
-              "path": ["health"]
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/events?token={{sse_token}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders",
+                "{{order_id}}",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{sse_token}}"
+                }
+              ]
             },
-            "description": "Verify the API is reachable. No authentication required."
-          }
-        },
-        {
-          "name": "Preview cost",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"4x6_printed\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 10\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/v1/billing/orders/preview",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders", "preview"]
-            },
-            "description": "Preview the cost of an order without creating it."
-          }
-        },
-        {
-          "name": "Create test order",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"4x6_printed\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 10\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/v1/billing/orders",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders"]
-            },
-            "description": "Create an order. Save the order_id from the response."
+            "description": "Server-Sent Events stream (text/event-stream). Postman does NOT render SSE natively - open connect_url (from Mint SSE token) in a browser EventSource. Auth is the query token, not X-Partner-Key. Requires a seeded sse_token. Manual only.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code === 202) {",
-                  "  const data = pm.response.json();",
-                  "  pm.environment.set('order_id', data.order_id);",
-                  "}"
-                ],
-                "type": "text/javascript"
+                  "pm.test('SSE is a text/event-stream; open connect_url in a browser', function () { return true; });"
+                ]
               }
             }
           ]
-        },
-        {
-          "name": "Get order status",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders", "{{order_id}}"]
-            },
-            "description": "Check the current status of an order."
-          }
         }
       ]
     },
     {
-      "name": "Orders",
+      "name": "Tier C - Destructive and gated - manual only",
+      "description": "Mutating or payment-gated. Run manually one at a time against an order you own. Excluded from any Newman run. Tolerant tests.",
       "item": [
         {
-          "name": "Create postcard order",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"4x6_printed\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 25\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/v1/billing/orders",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 202) {",
-                  "  const data = pm.response.json();",
-                  "  pm.environment.set('order_id', data.order_id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Create letter order",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-External-User-ID", "value": "{{external_user_id}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"campaign_id\": \"{{campaign_id}}\",\n  \"product_type\": \"handwritten_card\",\n  \"postage_type\": \"first_class\",\n  \"piece_count\": 10,\n  \"envelope_style\": \"plain\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/v1/billing/orders",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 202) {",
-                  "  const data = pm.response.json();",
-                  "  pm.environment.set('order_id', data.order_id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "List orders",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/v1/billing/orders?limit=20&offset=0",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders"],
-              "query": [
-                { "key": "limit", "value": "20" },
-                { "key": "offset", "value": "0" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "List orders by user",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/v1/billing/orders?external_user_id={{external_user_id}}&limit=20&offset=0",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders"],
-              "query": [
-                { "key": "external_user_id", "value": "{{external_user_id}}" },
-                { "key": "limit", "value": "20" },
-                { "key": "offset", "value": "0" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Get order",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders", "{{order_id}}"]
-            },
-            "description": "Get a single order by ID. Tenant-scoped (partners see only their own orders). Cross-tenant or missing order_id return 404."
-          }
-        },
-        {
-          "name": "Cancel order",
+          "name": "[DESTRUCTIVE] Cancel order",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"cancelled\",\n  \"note\": \"Cancelled via Postman\"\n}"
-            },
             "url": {
               "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/status",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders", "{{order_id}}", "status"]
-            },
-            "description": "Cancel an order. Only works while order is in 'accepted' status."
-          }
-        }
-      ]
-    },
-    {
-      "name": "Tracking",
-      "item": [
-        {
-          "name": "Order tracking",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/v1/orders/{{order_id}}/mail-tracking",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "orders", "{{order_id}}", "mail-tracking"]
-            },
-            "description": "Get USPS delivery tracking for a specific order."
-          }
-        },
-        {
-          "name": "Campaign tracking",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/v1/campaigns/{{campaign_id}}/mail-tracking",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "campaigns", "{{campaign_id}}", "mail-tracking"]
-            },
-            "description": "Get USPS delivery tracking for all orders in a campaign."
-          }
-        }
-      ]
-    },
-    {
-      "name": "Pricing",
-      "item": [
-        {
-          "name": "List all pricing",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/v1/billing/pricing",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "pricing"]
-            }
-          }
-        },
-        {
-          "name": "Filter by product type",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/v1/billing/pricing?product_type=4x6_printed",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "pricing"],
-              "query": [
-                { "key": "product_type", "value": "4x6_printed" }
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders",
+                "{{order_id}}",
+                "status"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelled\",\n  \"note\": \"Cancelled via Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "DESTRUCTIVE. Cancels an order. Allowed only while status is accepted or scheduled. Refund behavior depends on billing mode. Manual only - excluded from smoke runs."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 404, 409]', function () {",
+                  "  pm.expect([200, 404, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
             }
-          }
-        }
-      ]
-    },
-    {
-      "name": "SSE (iframe)",
-      "item": [
+          ]
+        },
         {
-          "name": "Mint SSE token",
+          "name": "[STATE-CHANGE] Reschedule order",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-Partner-Key", "value": "{{partner_key}}" }
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
-              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/sse-token",
-              "host": ["{{base_url}}"],
-              "path": ["v1", "billing", "orders", "{{order_id}}", "sse-token"]
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/reschedule",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders",
+                "{{order_id}}",
+                "reschedule"
+              ]
             },
-            "description": "Mint a short-lived SSE token for browser-side EventSource connections."
-          }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mail_date\": \"{{new_mail_date}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "STATE-CHANGE. Updates the scheduled mail date in place (same order_id). Allowed only when production_status=scheduled AND payment_confirmed=false. Recomputes scheduled_production_date from the product SLA. new_mail_date is auto-set ~45 days ahead by the collection pre-request. Manual only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 400, 404, 409]', function () {",
+                  "  pm.expect([200, 400, 404, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GATED] Confirm payment - success",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/confirm-payment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders",
+                "{{order_id}}",
+                "confirm-payment"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"success\",\n  \"payment_date\": \"2026-08-01T15:30:00Z\",\n  \"transaction_id\": \"{{transaction_id}}\",\n  \"amount_charged_to_user_cents\": 12500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "GATED, server-to-server ONLY (never from a browser - exposes the key). Gated accounts only (requires_payment_confirmation=TRUE). status:success debits the partner balance and advances pending_payment -> accepted. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 404, 409]', function () {",
+                  "  pm.expect([200, 404, 409]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('success body has payment_confirmed', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('payment_confirmed');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GATED] Confirm payment - failed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/confirm-payment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders",
+                "{{order_id}}",
+                "confirm-payment"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"failed\",\n  \"transaction_id\": \"{{transaction_id}}\",\n  \"failure_reason\": \"card declined\",\n  \"failure_code\": \"CARD_DECLINED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "GATED, server-to-server only. status:failed moves the order to payment_failed (terminal); no balance debit. Replaying the opposite status returns 409. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 404, 409]', function () {",
+                  "  pm.expect([200, 404, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GATED] Edit Leads - replace recipients",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/recipients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders",
+                "{{order_id}}",
+                "recipients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipients\": [\n    {\n      \"first_name\": \"Jane\",\n      \"last_name\": \"Doe\",\n      \"company\": null,\n      \"address\": \"100 Main St\",\n      \"address2\": null,\n      \"city\": \"San Francisco\",\n      \"state\": \"CA\",\n      \"zip\": \"94103\",\n      \"contact_id\": \"{{contact_id}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "GATED. Replaces all recipients on the order, resizes piece_count, and reprices. Gated accounts only; order status must be scheduled or pending_payment and payment_confirmed=false. Does not debit. Tolerant test. Manual only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 404, 409, 422]', function () {",
+                  "  pm.expect([200, 404, 409, 422]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[GATED] Campaign delta recipients",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/campaigns/{{campaign_id}}/recipients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "campaigns",
+                "{{campaign_id}}",
+                "recipients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"added\": [\n    {\n      \"contact_id\": \"{{contact_id}}\",\n      \"address_type\": \"MAILING\",\n      \"first_name\": \"Jane\",\n      \"last_name\": \"Doe\",\n      \"address\": \"100 Main St\",\n      \"city\": \"San Francisco\",\n      \"state\": \"CA\",\n      \"zip\": \"94103\"\n    }\n  ],\n  \"removed\": [],\n  \"remove_all\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "GATED. Campaign-level delta add/remove across all editable drops (status scheduled/pending_payment, payment_confirmed=false). Locked drops are skipped and reported. Gated accounts only. Tolerant test. Manual only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 404, 409, 422]', function () {",
+                  "  pm.expect([200, 404, 409, 422]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     }
