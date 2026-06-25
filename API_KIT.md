@@ -36,6 +36,7 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
 |----------|----------|
 | 5-minute quickstart | [`START_HERE.md`](START_HERE.md) |
 | Postman collection | [`examples/ballpoint.postman_collection.json`](examples/ballpoint.postman_collection.json) |
+| Postman staging environment (PropStream integration testing) | [`examples/ballpoint-staging.postman_environment.json`](examples/ballpoint-staging.postman_environment.json) |
 | Postman sandbox environment | [`examples/ballpoint-sandbox.postman_environment.json`](examples/ballpoint-sandbox.postman_environment.json) |
 | Postman production environment | [`examples/ballpoint-production.postman_environment.json`](examples/ballpoint-production.postman_environment.json) |
 | Express integration example | [`examples/express-integration/`](examples/express-integration/) |
