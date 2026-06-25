@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.13 — 2026-06-25
+
+- **New iframe → parent `create_direct_mail_requested` event.** When a user clicks the iframe-owned **Create Direct Mail** CTA with an active concrete list context, the iframe now emits `create_direct_mail_requested` before opening the create flow. Payload includes `listId`, `listName`, `recipientCount`, and `entryPoint` (`campaign_home` today; `products` is reserved with no current iframe CTA) so PropStream can pre-create its own Direct Mail Campaign record and respond with any needed parent-side state. The event is suppressed for demo/default context without an accepted `set_list` or selected `set_lists` item.
+- **No API or webhook changes.** The existing parent → iframe `open_create_direct_mail` command is unchanged and does not echo `create_direct_mail_requested`; it still either opens the create flow or emits `open_create_direct_mail_failed`.
+
 ## v1.6.12 — 2026-06-22
 
 - **RTS Push-Back webhook — `contact_id` + `contact_type` (corrects earlier V1 description).** Each `data.new_rts_pieces[]` item in `campaign.mail_tracking.rts_update` now carries `contact_id` + `contact_type` (`PROPERTY`|`MAILING`) for CRM reconciliation, **in addition to** the existing recipient PII (`recipient_name`/`address`/`city`/`state`/`zip`) and `piece_id`/`status`/`last_scan_at`. Unique recipient key is `(contact_id, contact_type)`. Additive and non-breaking — both new fields are nullable; older clients ignore them. Supersedes the earlier "`contact_id` + `reason` + `last_scan_date`, no PII, reconciliation by `contact_id` only" description.
