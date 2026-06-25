@@ -625,7 +625,7 @@ paths:
       tags:
       - Orders
       summary: Reschedule order (same-order)
-      description: Update an order's scheduled mail date without creating a replacement order. Allowed only when `production_status='scheduled'` AND `payment_confirmed=FALSE`. The same `order_id` is preserved; the backend recomputes `scheduled_production_date` from the product SLA (in business days, Mon–Fri; see `API_KIT.md §6p` for per-product table). Idempotent on no-op (when the supplied `mail_date` equals the order's current value, the call returns 200 with no webhook/audit side-effects). See `API_KIT.md §6m` for the full contract and `order.rescheduled` webhook event payload.
+      description: Update an order's scheduled mail date without creating a replacement order. Allowed only when `production_status='scheduled'` AND `payment_confirmed=FALSE`. The same `order_id` is preserved; the backend recomputes `scheduled_production_date` from the product SLA (in business days, Mon–Fri; see `API_KIT.md §6q` for per-product table). Idempotent on no-op (when the supplied `mail_date` equals the order's current value, the call returns 200 with no webhook/audit side-effects). See `API_KIT.md §6m` for the full contract and `order.rescheduled` webhook event payload.
       operationId: rescheduleOrder
       parameters:
       - name: order_id
@@ -708,7 +708,7 @@ paths:
       - Recipients
       summary: Campaign-level delta recipient add/remove across editable drops
       operationId: campaignDeltaRecipients
-      description: 'Add/remove recipients across all editable drops in a campaign with one call. Delta-based: `added[]` upserts by `contact_id + address_type`, `removed[]` deletes by key, `remove_all` clears and replaces. Editable drops: status ∈ {scheduled, pending_payment} with payment_confirmed=false. Locked drops (accepted, in production, mailed, delivered, terminal) are skipped and reported in the response. Gated accounts only (requires_payment_confirmation=TRUE). See API_KIT.md §6o.'
+      description: 'Add/remove recipients across all editable drops in a campaign with one call. Delta-based: `added[]` upserts by `contact_id + address_type`, `removed[]` deletes by key, `remove_all` clears and replaces. Editable drops: status ∈ {scheduled, pending_payment} with payment_confirmed=false. Locked drops (accepted, in production, mailed, delivered, terminal) are skipped and reported in the response. Gated accounts only (requires_payment_confirmation=TRUE). See API_KIT.md §6p.'
       parameters:
       - name: campaign_id
         in: path

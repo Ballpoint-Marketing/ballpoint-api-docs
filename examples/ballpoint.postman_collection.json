@@ -1204,6 +1204,65 @@
           ]
         },
         {
+          "name": "Upload recipients - initial (replace; requires seeded order_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/billing/orders/{{order_id}}/recipients",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "orders",
+                "{{order_id}}",
+                "recipients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipients\": [\n    {\n      \"first_name\": \"Jane\",\n      \"last_name\": \"Doe\",\n      \"company\": null,\n      \"address\": \"100 Main St\",\n      \"address2\": null,\n      \"city\": \"San Francisco\",\n      \"state\": \"CA\",\n      \"zip\": \"94103\",\n      \"contact_id\": \"{{contact_id}}\",\n      \"address_type\": \"MAILING\"\n    }\n  ],\n  \"append\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Initial recipient upload for an order. PropStream flow: create the order first (with piece_count), then upload addresses here. append=false (default) REPLACES all existing recipients (idempotent re-upload); append=true APPENDS (chunked uploads). Max 10,000 recipients/request. Required per recipient: address, city, state (2-letter), zip (5 or 5+4); at least one of first_name/last_name (rows missing both are soft-rejected into rejected_details - partial acceptance). placeHolders (camelCase) carries PropStream merge tags (render personalization only, never the delivery address). Allowed order statuses: scheduled, pending_payment, accepted, prep. Distinct from Edit Leads (PATCH /recipients), which resizes piece_count + reprices on gated drops. Requires a seeded order_id in an uploadable status; tolerant test."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 400, 404, 409, 422]', function () {",
+                  "  pm.expect([200, 400, 404, 409, 422]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('upload body has accepted and ready', function () {",
+                  "    var b = pm.response.json();",
+                  "    pm.expect(b).to.have.property('accepted');",
+                  "    pm.expect(b).to.have.property('ready');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "SSE stream connect (EventSource - not Postman native)",
           "request": {
             "method": "GET",

@@ -1187,7 +1187,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/res
 | HTTP | `error.code` | When |
 |------|------|------|
 | 400 | `MAIL_DATE_INVALID_FORMAT` | Not `YYYY-MM-DD` (datetime strings, ISO-with-TZ, missing/null are all rejected) |
-| 400 | `MAIL_DATE_TOO_SOON` | `mail_date − SLA_business_days(product_type)` is ≤ today + 1 day (same threshold as `create_order`'s scheduling branch). SLA is in **business days** (Mon–Fri); see §6p for the full table. |
+| 400 | `MAIL_DATE_TOO_SOON` | `mail_date − SLA_business_days(product_type)` is ≤ today + 1 day (same threshold as `create_order`'s scheduling branch). SLA is in **business days** (Mon–Fri); see §6q for the full table. |
 | 400 | `MAIL_DATE_TOO_FAR` | `mail_date` is more than 365 days in the future |
 | 409 | `PAID_LOCKED` | `payment_confirmed = TRUE` — order is locked, no reschedule |
 | 409 | `SEND_NOW_PROCESSING` | Send-now order in `pending_payment` awaiting `/confirm-payment` |
@@ -1200,7 +1200,79 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/res
 
 **On success.** Ballpoint emits the `order.rescheduled` webhook (see §7 Payload Format) and — when initiated from the embedded iframe — an `order_rescheduled` postMessage to the parent (see `IFRAME_KIT.md §6`). Webhook delivery is scoped to subscriptions owned by the order's `external_account_id` (existing routing property of the outbox routing layer).
 
-### 6n. Edit Leads — Replace + Resize + Reprice (Recipients PATCH)
+### 6n. Upload Recipients (Initial Upload)
+
+```
+POST /v1/billing/orders/{order_id}/recipients
+X-Partner-Key: pk_test_...
+Content-Type: application/json
+```
+
+The PropStream flow is create the order first (with `piece_count`, via `POST /orders` or `POST /v1/billing/orders`), then upload the mailing addresses with this endpoint. This is the initial recipient-upload endpoint; it is distinct from the Edit Leads PATCH below.
+
+**Request body:**
+
+```json
+{
+  "recipients": [
+    {
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "company": null,
+      "address": "100 Main St",
+      "address2": null,
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94103",
+      "contact_id": "ps_contact_42",
+      "address_type": "MAILING",
+      "placeHolders": { "OwnerFirstName": "Jane" }
+    }
+  ],
+  "append": false
+}
+```
+
+- `recipients[]` — max 10,000 per request. For larger orders, chunk with multiple calls using `append=true`.
+- Required per recipient: `address`, `city`, `state` (2-letter), `zip` (5 or 5+4).
+- At least one of `first_name` / `last_name` (enforced per-row — see partial acceptance below).
+- Optional: `company`, `address2`, `contact_id` (<=64; partner-side recipient id, stored verbatim and round-tripped, never interpreted by Ballpoint), `address_type` (`PROPERTY` | `MAILING`; optional for order-level upload), `placeHolders` (camelCase; PropStream V1 merge-tag values; used for render personalization only, never as the delivery address).
+- `append` (default `false`): `false` REPLACES all existing recipients on the order (idempotent re-upload); `true` APPENDS to existing recipients (for chunked uploads of large orders).
+
+**Response (`200`):**
+
+```json
+{
+  "order_id": "ord_7f3a2b",
+  "accepted": 499,
+  "rejected": 1,
+  "rejected_details": [ { "index": 12, "reason": "At least first_name or last_name is required" } ],
+  "total_recipients": 499,
+  "piece_count": 500,
+  "ready": false
+}
+```
+
+- `accepted` / `rejected` — counts of rows written vs soft-rejected. `rejected_details` — `[{index, reason}]`.
+- `total_recipients` — existing (if `append`) + accepted. `piece_count` — the order's current piece_count.
+- `ready` — `true` when `total_recipients == piece_count` (the order has all of its addresses).
+
+**Allowed order statuses:** `scheduled`, `pending_payment`, `accepted`, `prep`. Any other status → `409 RECIPIENTS_LOCKED`.
+
+**Partial acceptance:** rows missing BOTH `first_name` and `last_name` are rejected per-row into `rejected_details`, and the request still succeeds with the valid rows. (Malformed REQUIRED fields — bad zip, non-2-letter state, missing address/city/state/zip — fail validation for the whole request: `422`.)
+
+**Errors:**
+
+| HTTP | `error.code` | When |
+|------|------|------|
+| 404 | `ORDER_NOT_FOUND` | Order does not exist OR belongs to another tenant (never 403, to prevent existence probing). |
+| 409 | `RECIPIENTS_LOCKED` | Order status not in `{scheduled, pending_payment, accepted, prep}`. |
+| 400 | `RECIPIENT_COUNT_EXCEEDS_PIECE_COUNT` | Existing (if `append`) + accepted exceeds the order's `piece_count`. |
+| 422 | — | Malformed recipient fields. |
+
+**Distinction from Edit Leads (`PATCH /v1/billing/orders/{order_id}/recipients`, the next section):** this POST is the INITIAL (and chunked) upload — it does NOT resize `piece_count` and does NOT reprice, and it works on ANY account when the order is in `scheduled` / `pending_payment` / `accepted` / `prep`. The Edit Leads PATCH replaces recipients on GATED future/unbilled drops and additionally RESIZES `piece_count` and REPRICES.
+
+### 6o. Edit Leads — Replace + Resize + Reprice (Recipients PATCH)
 
 ```
 PATCH /v1/billing/orders/{order_id}/recipients
@@ -1286,7 +1358,7 @@ This endpoint does NOT debit, charge, or hold balance. It updates `unit_price_tc
 
 **Audit log:** every successful PATCH writes an `audit_log` row with `action="recipients_edit_leads"` and `detail` containing previous/new piece_count, unit_price_tcents, and total_price_tcents.
 
-### 6o. Campaign Delta Recipients — Add/Remove Across Editable Drops
+### 6p. Campaign Delta Recipients — Add/Remove Across Editable Drops
 
 ```
 PATCH /v1/billing/campaigns/{campaign_id}/recipients
@@ -1298,7 +1370,7 @@ Campaign-level delta add/remove endpoint. One call applies recipient changes acr
 
 **Gated accounts only.** Account must have `requires_payment_confirmation = TRUE`. Non-gated accounts → `409 PAYMENT_GATE_NOT_ACTIVE`.
 
-**Distinction from §6n (order-level PATCH):** §6n replaces ALL recipients on ONE order. This endpoint applies a delta (add/remove) across ALL editable orders in a campaign in one call. Use §6n for variant-specific A/B split edits; use §6o for campaign-wide multi-month changes.
+**Distinction from §6o (order-level PATCH):** §6o replaces ALL recipients on ONE order. This endpoint applies a delta (add/remove) across ALL editable orders in a campaign in one call. Use §6o for variant-specific A/B split edits; use §6p for campaign-wide multi-month changes.
 
 **Request body:**
 
@@ -1424,11 +1496,11 @@ Campaign-level delta add/remove endpoint. One call applies recipient changes acr
 
 **Idempotency:** Naturally idempotent. A repeated call: `added[]` upserts same values (no-op), `removed[]` finds nothing → all reported as `removed_not_found_count`. Response reflects current state.
 
-**Billing semantics:** Same as §6n — this endpoint does NOT charge. It recomputes `unit_price_tcents` and `total_price_tcents` on each affected order for display. `/confirm-payment` recomputes at charge time using the updated `piece_count`.
+**Billing semantics:** Same as §6o — this endpoint does NOT charge. It recomputes `unit_price_tcents` and `total_price_tcents` on each affected order for display. `/confirm-payment` recomputes at charge time using the updated `piece_count`.
 
 **Audit log:** `action="recipients_campaign_delta"` with detail containing counts and affected/locked order IDs.
 
-### 6p. Product SLA Lead Times (Business Days)
+### 6q. Product SLA Lead Times (Business Days)
 
 Ballpoint computes `scheduled_production_date` by subtracting the product's SLA lead time (in **business days**, Mon–Fri) from `mail_date`. Weekends are skipped; no holiday calendar is applied.
 
