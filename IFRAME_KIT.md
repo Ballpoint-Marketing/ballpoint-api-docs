@@ -901,6 +901,37 @@ No sender PII (`fullName`, `address`, `city`, `state`, `zip`, `phone`, `email`, 
 }
 ```
 
+#### `create_direct_mail_requested` — User clicked Create Direct Mail
+
+Sent when the user clicks the iframe-owned **Create Direct Mail** CTA after the iframe has an active, concrete list context from `set_list` or a selected `set_lists` item. The event is emitted before the iframe opens the create flow, so the parent can pre-create its own Direct Mail Campaign record if needed.
+
+**Fire-and-forget semantics (not a blocking handshake).** This event is a one-way notification. The iframe emits `create_direct_mail_requested` and then IMMEDIATELY opens its create flow using the CURRENT active list context (the `listId` already accepted via `set_list` or selected from `set_lists`). The iframe does NOT pause, await an ack, or wait for any parent response before proceeding into the create flow.
+
+The iframe also does NOT switch `listId` mid-session in response to this event. If PropStream wants the new campaign to use a new or permanent `listId` (for example, promoting a temporary working list to a saved list), it should start a FRESH iframe session — remount the iframe element or reload its `src` — and send a new `set_list` with that id at session start. This matches PropStream's own stated plan ("create a new list_id and pass it in a fresh iframe session"); the same `set_list` value will be honored only at the beginning of a session, not as a live swap on top of an already-open create flow.
+
+If a future integration genuinely needs blocking behavior (iframe waits for a fresh `set_list` from the parent before continuing into the create flow), that is a separate contract change and must be agreed and versioned first — today's contract is notification-only.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "create_direct_mail_requested",
+  "listId": "your_list_id",
+  "listName": "Pre-Foreclosure Leads",
+  "recipientCount": 847,
+  "entryPoint": "campaign_home"
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `listId` | string | Active PropStream list id accepted by `set_list`, or selected from `set_lists`. |
+| `listName` | string | Active list display name. |
+| `recipientCount` | number | Original concrete count supplied by the parent for the active list. |
+| `entryPoint` | string | Today the iframe emits ONLY `"campaign_home"`, fired from the Direct Mail dashboard / My Campaigns CTA (this includes the empty-state "create your first direct mail" button). `"products"` is a RESERVED value reflecting a possible future product-page entry point; there is no product-page "Create Direct Mail" CTA in the iframe today, so partner integrators should NOT expect to receive a `"products"` value from the current iframe build. |
+
+This event is not emitted for demo/default context without a real `set_list` / selected `set_lists` item. It is also not emitted when the parent sends [`open_create_direct_mail`](#open_create_direct_mail--open-the-create-direct-mail-flow-optional); that command remains parent-initiated and either opens the flow or emits [`open_create_direct_mail_failed`](#open_create_direct_mail_failed--create-direct-mail-command-rejected).
+
 #### `open_create_direct_mail_failed` — Create Direct Mail command rejected
 
 Sent when the parent sends `open_create_direct_mail` before the iframe has the required active list context, or if the internal create-flow handler is unavailable. No navigation occurs when this event is emitted.
