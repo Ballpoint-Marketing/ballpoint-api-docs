@@ -624,17 +624,49 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 }
 ```
 
-#### `edit_leads_requested` — User clicked "Edit Leads" on a campaign card
+#### `edit_leads_requested` — User clicked "Edit Leads"
 
 **Historical note (iframe staging-only):** the original list-level header button (`{listId, listName, recipientCount, externalAccountId, externalUserId}` emitted from a single global header button) has been replaced by per-campaign-card buttons. The header button is removed; each campaign card in My Campaigns — single send, A/B split, and multi-month — now has its own Edit Leads button when at least one of its orders is still pre-production and unbilled.
 
-**When emitted:** the user clicks the Edit Leads button on any campaign card (single send, A/B split, or multi-month). Eligibility requires:
+**Current placements:**
+- **Creation flow:** the Mailing List panel on the Customize step exposes **Edit Leads** for single send, A/B split, and multi-month before the campaign is submitted.
+- **My Campaigns:** campaign cards / campaign details expose **Edit Leads** after creation when at least one order is still editable.
+
+**When emitted (creation flow):** the user clicks **Edit Leads** while building a campaign, before any Ballpoint order exists. The iframe emits the same event type with `scope: "creation_flow"`, active list context, and empty `affectedOrders[]` / `lockedOrders[]`. There are no order ids or PATCH endpoints yet. This placement requires a concrete active list from an accepted `set_list` or selected `set_lists` item; demo/default context does not emit.
+
+**Creation-flow payload:**
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "edit_leads_requested",
+  "scope": "creation_flow",
+  "creationStage": "customize",
+  "campaignId": null,
+  "ballpointCampaignId": null,
+  "campaignType": "split",
+  "campaignDeltaEndpoint": null,
+  "campaignDeltaMethod": null,
+  "listId": "ps_list_654",
+  "listName": "Probate Leads",
+  "recipientCount": 400,
+  "externalAccountId": "ps_acc_42",
+  "externalUserId": "user_789",
+  "affectedOrders": [],
+  "lockedOrders": []
+}
+```
+
+For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, on save, send a same-list [`set_list` refresh](#set_list-refresh-post-modal-sync) with the updated `count`, `name`, and optional `piece_counts`. Do **not** PATCH recipients or send `recipients_updated` for this pre-submission path, because no Ballpoint orders exist yet. For A/B split creation, update the campaign-level list/count first; variant allocation happens later when the submitted orders are created.
+
+**When emitted (post-creation):** the user clicks the Edit Leads button on any campaign card (single send, A/B split, or multi-month). Eligibility requires:
 - All orders have `paymentConfirmed` not null (defense: campaigns with any null are skipped — typically non-gated accounts)
 - At least one order is "affected" (see classification below)
 
 **Eligibility (v1.6.0).** Edit Leads is available **only** for payment-gated campaigns/orders that are still `scheduled` or `pending_payment` and unbilled (`paymentConfirmed === false`) — i.e. pre-production and not yet paid. Once an order is paid, `accepted`, in production, mailed, delivered, or terminal, it is **locked** and its Edit Leads button is hidden (the underlying `PATCH .../recipients` returns `409 RECIPIENTS_LOCKED` / `PAID_LOCKED`). **Non-gated accounts do not expose Edit Leads** because the payment gate is not active. Full per-order classification is in "Affected allowlist" below; see also `API_KIT.md §6n/§6o`. Tightened in CHANGELOG v1.6.0.
 
-**Payload:**
+**Post-creation payload:**
 
 ```json
 {
@@ -768,7 +800,8 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 
 | Field | Description |
 |---|---|
-| `scope` | One of `multi_month_campaign` \| `single_send` \| `ab_split`. Reflects the campaign type so the parent listener can route to the right modal. `multi_month_campaign` value unchanged from prior releases for backwards compatibility. |
+| `scope` | One of `creation_flow` \| `multi_month_campaign` \| `single_send` \| `ab_split`. `creation_flow` is pre-submission and has no Ballpoint orders yet. Other values are post-creation and reflect the campaign type so the parent listener can route to the right modal. `multi_month_campaign` value unchanged from prior releases for backwards compatibility. |
+| `creationStage` | Present for `scope: "creation_flow"`; currently `"customize"`. Omitted on post-creation campaign-card events. |
 | `campaignId` | Iframe-local group key (e.g. `api_campaign_<id>` for API-loaded campaigns; `cmp_<local>` for in-builder). Use `ballpointCampaignId` for cross-system reference. |
 | `ballpointCampaignId` | Server-side Ballpoint campaign ID (from API `campaign_id`). May be `null` for campaigns not yet persisted server-side. |
 | `campaignType` | `"single"` \| `"multi"` \| `"split"`. Mirrors `campaign.type` in the iframe. |
@@ -802,17 +835,18 @@ Sent when the user picks a list from the `set_lists` selector. Just FYI — you 
 
 `submitted` and `received` are NOT in the allowlist — they appear in `lockedOrders` with `lockedReason: "unsupported_status"`.
 
-**Emit-only-when-affected:** the iframe does NOT emit this event when `affectedOrders.length === 0`. The button is hidden in that case.
+**Emit rules:** for post-creation campaign cards, the iframe does NOT emit this event when `affectedOrders.length === 0`; the button is hidden in that case. For `scope: "creation_flow"`, `affectedOrders[]` is intentionally empty because the campaign has not been submitted yet; emission is gated by concrete active list context instead.
 
 **Expected PropStream behavior**
 
 1. Listen for `edit_leads_requested`.
 2. Open the Edit Leads modal (PropStream-hosted, on top of the iframe).
-3. **Option A (campaign-level, preferred for multi-month):** PATCH `campaignDeltaEndpoint` with delta `{added, removed, remove_all}`. One call distributes to all editable drops. See `API_KIT.md §6o`.
-4. **Option B (per-order, required for A/B split variant allocation):** PATCH each `affectedOrders[].editRecipientsEndpoint` with the full replacement list. See `API_KIT.md §6n`.
+3. **Creation flow (`scope: "creation_flow"`):** after modal save, send a same-list [`set_list` refresh](#set_list-refresh-post-modal-sync). Do not PATCH recipients and do not send `recipients_updated`.
+4. **Post-creation Option A (campaign-level, preferred for multi-month):** PATCH `campaignDeltaEndpoint` with delta `{added, removed, remove_all}`. One call distributes to all editable drops. See `API_KIT.md §6o`.
+5. **Post-creation Option B (per-order, required for A/B split variant allocation):** PATCH each `affectedOrders[].editRecipientsEndpoint` with the full replacement list. See `API_KIT.md §6n`.
     - **A/B split:** the variant-specific slice goes to each variant's endpoint, not the full list. Use the `variant` field on each `affectedOrders[]` item to identify A vs B. PropStream's split allocation logic determines what slice goes to each.
-5. After all PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
-6. On modal close without changes, no postMessage required.
+6. After all post-creation PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
+7. On modal close without changes, no postMessage required.
 
 **Testing this flow.** Use a payment-gated staging account (`requires_payment_confirmation = true`). Create a campaign but **do not confirm payment** — the order stays `pending_payment` (send-now) or `scheduled` with `paymentConfirmed = false` (future-dated), and the **Edit Leads button is available** on the campaign card. After payment is confirmed (or the order moves to `accepted` / production), the button disappears and the order shows in `lockedOrders`.
 

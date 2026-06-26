@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.14 — 2026-06-25
+
+- **Creation-flow Edit Leads placement added.** The Customize step's Mailing List panel now exposes **Edit Leads** before submission for single send, A/B split, and multi-month campaigns. It reuses `edit_leads_requested` with `scope: "creation_flow"`, `creationStage: "customize"`, active list context, and empty `affectedOrders[]` / `lockedOrders[]` because no Ballpoint orders exist yet. On modal save, PropStream should return a same-list `set_list` refresh; no recipients PATCH or `recipients_updated` is expected for this pre-submission path.
+
 ## v1.6.13 — 2026-06-25
 
 - **New iframe → parent `create_direct_mail_requested` event.** When a user clicks the iframe-owned **Create Direct Mail** CTA with an active concrete list context, the iframe now emits `create_direct_mail_requested` before opening the create flow. Payload includes `listId`, `listName`, `recipientCount`, and `entryPoint` (`campaign_home` today; `products` is reserved with no current iframe CTA) so PropStream can pre-create its own Direct Mail Campaign record and respond with any needed parent-side state. The event is suppressed for demo/default context without an accepted `set_list` or selected `set_lists` item.
