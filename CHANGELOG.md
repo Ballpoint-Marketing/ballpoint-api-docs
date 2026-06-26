@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.7.1 — 2026-06-26
+
+- **Additive: `GET /v1/campaigns/{id}/mail-tracking/rts` now returns per-piece `contact_id` + `contact_type`** (partner-supplied opaque identifiers, nullable; `contact_type` ∈ PROPERTY|MAILING). Always returned (not gated on `allow_pii_exports`); `recipient_*` PII fields stay gated. Non-breaking. Supports the iframe 'Add to Marketing List' flow (ballpoint-iframe#145).
+
 ## v1.7.0 — 2026-06-26
 
 - **New: `POST /v1/billing/campaigns/preview` — campaign-level cost preview (§6a-ii).** One call returns per-order and campaign-level wholesale (partner-cost) totals for every order in a payment-gated submission. Partner-only (`X-Partner-Key`); non-partner keys (`X-API-Key`) get `401`. Replaces the legacy N-call pattern of looping `POST /v1/billing/orders/preview` once per drop after `campaign_submitted` — partners now make a single call passing the full list of `ballpointOrderId`s from `campaign_submitted.orders[]` and read `campaign_partner_cost_total_tcents` plus the per-order `partner_cost_total_tcents` breakdown. Per-order `partner_cost_total_tcents` remains the authoritative wholesale debit amount per order.

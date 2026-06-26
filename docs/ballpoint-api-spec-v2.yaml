@@ -1164,7 +1164,19 @@ paths:
           default: 0
       responses:
         '200':
-          description: Suppression list with pagination
+          description: |
+            Suppression list with pagination. Each `suppression_list[]` entry
+            includes `piece_id`, `status`, `last_scan_at`, and
+            `last_scan_facility_state`, plus the partner identifiers
+            `contact_id` and `contact_type` (always returned, both nullable;
+            `contact_type` ∈ `PROPERTY` | `MAILING`). `contact_id` /
+            `contact_type` are partner-supplied opaque identifiers echoed
+            verbatim from the recipient upload — they are not Ballpoint PII
+            and are returned regardless of the `allow_pii_exports` setting.
+            The `recipient_*` PII fields (`recipient_name`,
+            `recipient_address`, `recipient_city`, `recipient_state`,
+            `recipient_zip`) are only included when the account has
+            `allow_pii_exports` enabled.
         '429':
           description: Rate limit exceeded
           content:
