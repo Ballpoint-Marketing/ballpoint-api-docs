@@ -944,7 +944,7 @@
                     }
                   ]
                 },
-                "description": "Return-to-sender suppression list with pagination. include_forwarded defaults true."
+                "description": "Return-to-sender suppression list with pagination. include_forwarded defaults true. Each suppression_list[] entry now also includes per-piece contact_id and contact_type (PROPERTY|MAILING) — partner-supplied opaque identifiers, always returned (not gated on allow_pii_exports)."
               },
               "event": [
                 {
