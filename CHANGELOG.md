@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.7.2 — 2026-06-26
+
+- **New iframe → parent event: `add_to_marketing_list_requested`** — emitted when the user clicks 'Add to Marketing List' in the RTS Suppression List; payload `recipients[]` carries each contact_id-bearing entry's `{contact_id, contact_type}` (no PII). Fire-and-forget; embed-only; origin-locked. Documented in IFRAME_KIT §6. (ballpoint-iframe#145)
+
 ## v1.7.1 — 2026-06-26
 
 - **Additive: `GET /v1/campaigns/{id}/mail-tracking/rts` now returns per-piece `contact_id` + `contact_type`** (partner-supplied opaque identifiers, nullable; `contact_type` ∈ PROPERTY|MAILING). Always returned (not gated on `allow_pii_exports`); `recipient_*` PII fields stay gated. Non-breaking. Supports the iframe 'Add to Marketing List' flow (ballpoint-iframe#145).

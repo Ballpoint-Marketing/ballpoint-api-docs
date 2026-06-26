@@ -1011,6 +1011,48 @@ Possible `reason` values: `user_back`, `user_cancel`.
 }
 ```
 
+#### `add_to_marketing_list_requested` — User clicked "Add to Marketing List"
+
+Sent when the user clicks the iframe's **Add to Marketing List** CTA on the RTS Suppression List (campaign-detail view). The event hands the partner-side `contact_id`s for every RTS suppression entry that carries one so PropStream can open its own native marketing-list modal seeded with those contacts.
+
+**Fire-and-forget semantics (not a blocking handshake).** This event is a one-way notification. The iframe emits `add_to_marketing_list_requested` and does NOT pause, await an ack, or wait for any parent response. The iframe takes no further UI action on its own — opening the marketing-list modal is entirely PropStream-side.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "add_to_marketing_list_requested",
+  "recipients": [
+    { "contact_id": "ps_contact_8821", "contact_type": "PROPERTY" },
+    { "contact_id": "ps_contact_4410", "contact_type": "MAILING" }
+  ]
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------------|
+| `source` | string | Always `ballpoint-mailer`. |
+| `version` | number | Always `1`. |
+| `type` | string | Always `add_to_marketing_list_requested`. |
+| `recipients` | array | Non-empty list of suppression entries the user is forwarding to the marketing list. Order mirrors the suppression list view. |
+| `recipients[].contact_id` | string | Partner-supplied opaque contact identifier echoed verbatim from the original recipient upload (the same value PropStream uploaded and that the `GET /v1/campaigns/{campaign_id}/mail-tracking/rts` suppression endpoint surfaces, documented in v1.7.1). |
+| `recipients[].contact_type` | string \| null | `"PROPERTY"` or `"MAILING"` when the partner supplied it; `null` when no address-type was supplied. Disambiguates two pieces sharing the same `contact_id`. |
+
+No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` / `recipient_state` / `recipient_zip`) is included in this event. The parent already owns those values via its own CRM keyed by `(contact_id, contact_type)`.
+
+**Visibility / lifecycle**
+
+- Emitted only in **embed (iframe) mode**. In standalone (non-embedded) mode the CTA is suppressed and this event is not emitted.
+- `recipients[]` is **filtered to suppression entries that carry a `contact_id`** — RTS entries without a `contact_id` (e.g. legacy uploads or Ballpoint-direct manifests with no partner key column) are omitted. If no suppression entry carries a `contact_id`, the event is **suppressed entirely** (the iframe does not emit an empty `recipients[]`).
+- **Pre-lock behavior:** queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Not broadcast to all allowlisted origins. Identical treatment to [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail).
+- The iframe does not call any Ballpoint API in response to this click — the contact ids are already in the iframe's RTS suppression view and are simply forwarded to the parent.
+
+**Expected PropStream behavior**
+
+1. Listen for `add_to_marketing_list_requested`.
+2. Open your native marketing-list modal seeded with the supplied `recipients[]`, resolving each entry to a CRM contact by `(contact_id, contact_type)`.
+3. No reply postMessage is required. The iframe does not wait for one.
+
 ### Campaign Events
 
 #### `campaign_created` — Campaign created (before submission)
