@@ -848,7 +848,7 @@ paths:
                         previous_total_price_tcents:
                           type: integer
                           nullable: true
-                          description: Nullable for gated unconfirmed orders not yet priced.
+                          description: Populated for gated orders created on/after 2026-06-23 (price frozen at creation, no debit); null only for legacy gated orders created before that change.
                         new_total_price_tcents:
                           type: integer
                           description: Always computed via current pricing tables. Non-null.

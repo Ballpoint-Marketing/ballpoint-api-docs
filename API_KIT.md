@@ -1249,7 +1249,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/orders?days=30&li
 }
 ```
 
-Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders or billing configurations where no partner-facing amount is set. For payment-gated accounts, this endpoint is for dashboard/post-confirmation reads, not for pre-confirmation charge authorization; use [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) (campaign-level, recommended) — or [`POST /v1/billing/orders/preview`](#6a-preview-cost) for single-order/pre-submission previews — for that flow.
+Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders or billing configurations where no partner-facing amount is set. For payment-gated accounts, this endpoint is for dashboard/post-confirmation reads, not for pre-confirmation charge authorization; use [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) (campaign-level, recommended) — or [`POST /v1/billing/orders/preview`](#6a-preview-cost) for single-order/pre-submission previews — for that flow. For payment-gated accounts, orders created on/after the 2026-06-23 price-freeze carry a non-null `total_cost_cents` as soon as they are created, but it remains a dashboard/display value and is **not** the authoritative charge amount — always source the debit from the preview path's `partner_cost_total_tcents` (see [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate)).
 
 #### `GET /v1/billing/partner/health`
 
@@ -1486,9 +1486,9 @@ Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, 
   "accepted": 499,
   "previous_piece_count": 500,
   "new_piece_count": 499,
-  "previous_unit_price_tcents": null,
+  "previous_unit_price_tcents": 5050,
   "new_unit_price_tcents": 5050,
-  "previous_total_price_tcents": null,
+  "previous_total_price_tcents": 2525000,
   "new_total_price_tcents": 2519950,
   "payment_confirmed": false
 }
@@ -1498,9 +1498,9 @@ Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, 
 |---|---|
 | `accepted` | Count of recipients successfully written (equals `new_piece_count`). |
 | `previous_piece_count` / `new_piece_count` | Order `piece_count` before/after this PATCH. |
-| `previous_unit_price_tcents` | integer or null. Wholesale unit price (tenth-cents) before this PATCH. **`null` for gated unconfirmed orders** — `POST /orders` does not populate pricing columns until `/confirm-payment` fires `charge_order`. Tier-aware: shrinking past a volume tier boundary changes the per-piece rate. |
+| `previous_unit_price_tcents` | integer or null. Wholesale unit price (tenth-cents) before this PATCH. **Populated for gated orders created on/after the gated price-freeze (2026-06-23)** — `POST /orders` freezes `unit_price_tcents` / `total_price_tcents` on the order row at creation (no debit; the wholesale debit still happens only at `/confirm-payment`). `null` only for **legacy** gated orders created before that change. Tier-aware: shrinking past a volume tier boundary changes the per-piece rate. |
 | `new_unit_price_tcents` | integer. Wholesale unit price after this PATCH. Always populated because this PATCH recomputes via the canonical `get_unit_price` helper. |
-| `previous_total_price_tcents` | integer or null. Display total before this PATCH (unit × count). **`null` for gated unconfirmed orders** for the same reason as `previous_unit_price_tcents`. |
+| `previous_total_price_tcents` | integer or null. Display total before this PATCH (unit × count). **Populated for gated orders created on/after 2026-06-23** (price frozen at creation); `null` only for legacy gated orders created before that change — same as `previous_unit_price_tcents`. |
 | `new_total_price_tcents` | integer. Display total after this PATCH (`new_unit_price_tcents` × `new_piece_count`). Always populated. |
 | `payment_confirmed` | Always `false` (endpoint gate rejects `true`). |
 
@@ -1609,7 +1609,7 @@ Campaign-level delta add/remove endpoint. One call applies recipient changes acr
       "order_id": "ord_a",
       "previous_piece_count": 500,
       "new_piece_count": 517,
-      "previous_total_price_tcents": null,
+      "previous_total_price_tcents": 2525000,
       "new_total_price_tcents": 2610858,
       "payment_confirmed": false
     }
@@ -1636,7 +1636,7 @@ Campaign-level delta add/remove endpoint. One call applies recipient changes acr
 | `drops_affected[].order_id` | string | Ballpoint order ID. |
 | `drops_affected[].previous_piece_count` | integer | Piece count before this mutation. |
 | `drops_affected[].new_piece_count` | integer | Piece count after this mutation. **Per-drop source of truth.** |
-| `drops_affected[].previous_total_price_tcents` | integer or null | Total price before mutation (tenth-cents). `null` for gated unconfirmed orders that haven't been priced yet. |
+| `drops_affected[].previous_total_price_tcents` | integer or null | Total price before mutation (tenth-cents). Populated for gated orders created on/after 2026-06-23 (price frozen at creation); `null` only for legacy gated orders created before that change. |
 | `drops_affected[].new_total_price_tcents` | integer | Total price after mutation (tenth-cents). Always computed from the same pricing path used at `/confirm-payment`. |
 | `drops_affected[].payment_confirmed` | boolean | Always `false` (editable drops are by definition unconfirmed). |
 | `drops_locked` | array | Drops skipped because they are past the editable window. |
