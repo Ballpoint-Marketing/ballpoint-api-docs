@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.7.3 — 2026-06-26
+
+- **Docs fix (billing): pre-confirmation pricing fields corrected for the gated price-freeze.** Since the gated `POST /orders` price-freeze (orders created on/after 2026-06-23 persist `unit_price_tcents` / `total_price_tcents` at creation, with no debit), the Edit Leads (§6o) and Campaign Delta (§6p) response docs no longer claim `previous_unit_price_tcents` / `previous_total_price_tcents` are `null` for gated unconfirmed orders — they are populated for orders created on/after that date and `null` only for legacy pre-freeze rows. §6l clarified: `GET /v1/billing/partner/orders.total_cost_cents` is populated pre-confirmation for gated accounts but stays a dashboard/display value (not the authoritative charge source); the authoritative wholesale debit is always the preview path's `partner_cost_total_tcents` (see §6a-ii). No API behavior change; docs-only. (ballpoint-api#49)
+
 ## v1.7.2 — 2026-06-26
 
 - **New iframe → parent event: `add_to_marketing_list_requested`** — emitted when the user clicks 'Add to Marketing List' in the RTS Suppression List; payload `recipients[]` carries each contact_id-bearing entry's `{contact_id, contact_type}` (no PII). Fire-and-forget; embed-only; origin-locked. Documented in IFRAME_KIT §6. (ballpoint-iframe#145)
