@@ -401,6 +401,58 @@ Use this when your app wants the user to see, in My Campaigns, only the direct-m
 
 Backed by the repeated `list_id` query parameter on the dashboard read endpoints — see [`GET /v1/billing/orders` in API_KIT.md](API_KIT.md).
 
+### `open_direct_mail_dashboard` — Open the Direct Mail dashboard (parent → iframe)
+
+Explicit navigation command. Sends the iframe to its **My Campaigns / Direct Mail Dashboard** view and enters **dashboard-first mode**.
+
+```json
+{
+  "source": "propstream",
+  "version": 1,
+  "type": "open_direct_mail_dashboard"
+}
+```
+
+This message has **no payload fields** beyond the standard envelope (`source`, `version`, `type`). Send it once during bootstrap to land the iframe on the Dashboard.
+
+**This is the only way to land the iframe on the Dashboard.** Sibling messages do not navigate:
+
+- [`set_dashboard_filter`](#set_dashboard_filter--scope-the-my-campaigns-dashboard-to-a-marketing-group-parent--iframe) is **view-only** — it scopes what is displayed on the Dashboard (campaign list, insights header, tab counts) but never changes the active page.
+- [`set_list`](#set_list--recipient-list-info-required) (and [`set_lists`](#set_lists--multiple-lists-for-user-selection-alternative-to-set_list)) set context only — they never navigate by themselves.
+- [`open_create_direct_mail`](#open_create_direct_mail--open-the-create-direct-mail-flow-optional) opens the **Create Direct Mail** flow (and is gated on an active list context). It does not open the Dashboard.
+
+**Session-sticky — no "exit dashboard-first" command in V1.** Once `open_direct_mail_dashboard` lands, dashboard-first mode persists for the iframe's lifetime. There is intentionally no inverse message. To return the iframe to the legacy `set_list`-first behavior (list context is supplied up front, and create navigation remains driven by the existing CTA/flow), remount the iframe element (or reload its `src`) and re-bootstrap without `open_direct_mail_dashboard`.
+
+#### Dashboard-first handshake (worked example)
+
+Recommended bootstrap order in dashboard-first mode:
+
+1. On `ready`, send these four messages — **in this order**:
+   1. `set_api_config`
+   2. `set_dashboard_filter` *(optional — scopes the Dashboard view)*
+   3. `open_direct_mail_dashboard`
+   4. `set_sender` *(optional — pre-fills sender info)*
+
+   The iframe is **order-robust** and always ends on the Dashboard regardless of the actual arrival order. The recommended order above avoids a brief one-frame flash of the create page — sending `open_direct_mail_dashboard` **before** `set_sender` prevents the iframe from momentarily composing the post-`set_sender` create view before the Dashboard navigation lands.
+
+2. The iframe shows the Dashboard.
+
+3. User clicks **+ Create Direct Mail** on the Dashboard. The iframe emits a **no-context** [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail) with payload `{ entryPoint: "campaign_home" }` only — `listId`, `listName`, and `recipientCount` are omitted because no active list context exists in dashboard-first mode. The iframe **stays on the Dashboard**; it does not open the create flow on its own in this mode.
+
+4. The parent creates its own list / record on its backend.
+
+5. On success, the parent sends — **in this order**:
+   1. `set_list` *(context for the newly created list)*
+   2. `open_create_direct_mail` *(navigation)*
+
+   Order matters: `open_create_direct_mail` is gated on an active list context (see its [required list context note](#open_create_direct_mail--open-the-create-direct-mail-flow-optional)). If `open_create_direct_mail` arrives before `set_list`, the iframe emits [`open_create_direct_mail_failed`](#open_create_direct_mail_failed--create-direct-mail-command-rejected) and does not navigate.
+
+6. The iframe opens the **Create Direct Mail** page with the new list context.
+
+7. On parent-side failure, the parent sends nothing. The iframe stays on the Dashboard with **no iframe-side toast, error banner, or status message** — error UX is entirely the parent's responsibility.
+
+> **Compatibility with the existing `set_list`-first flow.** Partners that do **not** send `open_direct_mail_dashboard` see the legacy bootstrap behavior unchanged: partners provide concrete list context up front via `set_list` or `set_lists`; when the iframe-owned Create Direct Mail CTA runs, [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail) includes `listId` / `listName` / `recipientCount` and the iframe opens the create flow locally, as before.
+
 ### `payment_result` — Payment popup outcome (parent → iframe)
 
 > **Current staging contract — pending PropStream wiring.** This is the iframe-side contract for the in-iframe Payment Successful / Payment Failed result screens. The payment popup and the charge itself remain partner-owned (see [Partner Payment Gate Flow](#partner-payment-gate-flow-send-now-walkthrough)); after the partner's popup resolves, the partner should send `payment_result` to the iframe so the iframe can render the matching result screen. PropStream's listener / sender is not yet wired — this section documents what the iframe expects today on staging.
@@ -937,7 +989,11 @@ No sender PII (`fullName`, `address`, `city`, `state`, `zip`, `phone`, `email`, 
 
 #### `create_direct_mail_requested` — User clicked Create Direct Mail
 
-Sent when the user clicks the iframe-owned **Create Direct Mail** CTA after the iframe has an active, concrete list context from `set_list` or a selected `set_lists` item. The event is emitted before the iframe opens the create flow, so the parent can pre-create its own Direct Mail Campaign record if needed.
+Sent when the user clicks the iframe-owned **Create Direct Mail** CTA. The event has **two payload shapes** depending on whether the iframe currently has an active list context — partners should branch on the presence of `listId` to distinguish them.
+
+##### Shape A — with list context (`set_list`-first flow)
+
+Fired when the user clicks **+ Create Direct Mail** after the iframe has a concrete active list context from `set_list` or a selected `set_lists` item. The event is emitted before the iframe opens the create flow, so the parent can pre-create its own Direct Mail Campaign record if needed.
 
 **Fire-and-forget semantics (not a blocking handshake).** This event is a one-way notification. The iframe emits `create_direct_mail_requested` and then IMMEDIATELY opens its create flow using the CURRENT active list context (the `listId` already accepted via `set_list` or selected from `set_lists`). The iframe does NOT pause, await an ack, or wait for any parent response before proceeding into the create flow.
 
@@ -964,7 +1020,30 @@ If a future integration genuinely needs blocking behavior (iframe waits for a fr
 | `recipientCount` | number | Original concrete count supplied by the parent for the active list. |
 | `entryPoint` | string | Today the iframe emits ONLY `"campaign_home"`, fired from the Direct Mail dashboard / My Campaigns CTA (this includes the empty-state "create your first direct mail" button). `"products"` is a RESERVED value reflecting a possible future product-page entry point; there is no product-page "Create Direct Mail" CTA in the iframe today, so partner integrators should NOT expect to receive a `"products"` value from the current iframe build. |
 
-This event is not emitted for demo/default context without a real `set_list` / selected `set_lists` item. It is also not emitted when the parent sends [`open_create_direct_mail`](#open_create_direct_mail--open-the-create-direct-mail-flow-optional); that command remains parent-initiated and either opens the flow or emits [`open_create_direct_mail_failed`](#open_create_direct_mail_failed--create-direct-mail-command-rejected).
+This shape is not emitted for demo/default context without a real `set_list` / selected `set_lists` item.
+
+##### Shape B — no list context (dashboard-first flow)
+
+Fired when the user clicks **+ Create Direct Mail** on the Dashboard in **dashboard-first mode** (the iframe was opened with [`open_direct_mail_dashboard`](#open_direct_mail_dashboard--open-the-direct-mail-dashboard-parent--iframe) and no active list context exists yet). The iframe emits the event so the parent can create its own list/record on the backend, then **stays on the Dashboard**. The iframe does **not** open the create flow on its own in this mode — the parent drives the next step by sending `set_list` then [`open_create_direct_mail`](#open_create_direct_mail--open-the-create-direct-mail-flow-optional) (see the [dashboard-first handshake](#dashboard-first-handshake-worked-example) for the full sequence).
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "create_direct_mail_requested",
+  "entryPoint": "campaign_home"
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `entryPoint` | string | Same enum as Shape A. Today only `"campaign_home"` is emitted. |
+
+`listId`, `listName`, and `recipientCount` are **omitted from the payload** (not set to `null`) in this shape — there is no active list to echo back. Partners parsing the event should branch on the presence of `listId` to route Shape A vs Shape B.
+
+##### Common to both shapes
+
+This event is not emitted when the parent sends [`open_create_direct_mail`](#open_create_direct_mail--open-the-create-direct-mail-flow-optional); that command remains parent-initiated and either opens the flow or emits [`open_create_direct_mail_failed`](#open_create_direct_mail_failed--create-direct-mail-command-rejected).
 
 #### `open_create_direct_mail_failed` — Create Direct Mail command rejected
 
