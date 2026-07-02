@@ -1104,7 +1104,8 @@ Sent when the user clicks the iframe's **Add to Marketing List** CTA on the RTS 
   "recipients": [
     { "contact_id": "ps_contact_8821", "contact_type": "PROPERTY" },
     { "contact_id": "ps_contact_4410", "contact_type": "MAILING" }
-  ]
+  ],
+  "ballpointCampaignId": "cmp_abc"
 }
 ```
 
@@ -1116,6 +1117,7 @@ Sent when the user clicks the iframe's **Add to Marketing List** CTA on the RTS 
 | `recipients` | array | Non-empty list of suppression entries the user is forwarding to the marketing list. Order mirrors the suppression list view. |
 | `recipients[].contact_id` | string | Partner-supplied opaque contact identifier echoed verbatim from the original recipient upload (the same value PropStream uploaded and that the `GET /v1/campaigns/{campaign_id}/mail-tracking/rts` suppression endpoint surfaces, documented in v1.7.1). |
 | `recipients[].contact_type` | string \| null | `"PROPERTY"` or `"MAILING"` when the partner supplied it; `null` when no address-type was supplied. Disambiguates two pieces sharing the same `contact_id`. |
+| `ballpointCampaignId` | string \| null | Server-side Ballpoint campaign id (the same id used on `recipients_updated` / `payment_result` — **not** the PropStream `listId`). Always present on this event; `null` when the iframe cannot resolve a campaign id for the active suppression list view. |
 
 No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` / `recipient_state` / `recipient_zip`) is included in this event. The parent already owns those values via its own CRM keyed by `(contact_id, contact_type)`.
 
