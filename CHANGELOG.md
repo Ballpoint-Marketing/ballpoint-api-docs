@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.7.5 — 2026-07-02
+
+- **Additive: `add_to_marketing_list_requested` now carries `ballpointCampaignId`** — the iframe → parent postMessage emitted from the RTS Suppression List's **Add to Marketing List** CTA now includes the server-side Ballpoint campaign id (the same id used on `recipients_updated` / `payment_result`, **not** the PropStream `listId`) so the parent can attribute the forwarded suppression-list recipients to a specific campaign. Field is **always present**; `null` when the iframe cannot resolve a campaign id for the active suppression list view. The existing `recipients[]` shape is unchanged — partners already listening for the event continue to work with no changes. PropStream ask (Balazs 2026-07-01). Documented in `IFRAME_KIT.md` §6. (ballpoint-iframe#178)
+- **No API or webhook changes.** This release adds one field to one existing iframe → parent postMessage. No HTTP API endpoint, request/response shape, or webhook payload changes. All sibling existing postMessages are unchanged.
+
 ## v1.7.4 — 2026-06-30
 
 - **New parent → iframe command: `open_direct_mail_dashboard`.** Explicit navigation that lands the iframe on the **My Campaigns / Direct Mail Dashboard** and enters **dashboard-first mode**. Envelope only (`source`, `version`, `type`); no payload fields. **Session-sticky — there is no "exit dashboard-first" command in V1.** Partners that want to leave the mode must remount the iframe element (or reload its `src`) and re-bootstrap without `open_direct_mail_dashboard`. Documented in `IFRAME_KIT.md` §5. (ballpoint-iframe#170)
