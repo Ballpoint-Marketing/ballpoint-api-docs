@@ -2274,6 +2274,32 @@ On `429` responses:
 Retry-After: 12
 ```
 
+### Client Error Telemetry (automatic)
+
+`POST /v1/partner/client-errors` — the embedded iframe calls this endpoint **automatically** to log client-side JavaScript errors it catches during a partner session (`window.onerror` and `unhandledrejection`). **Partners do not need to integrate it**; it is documented here because the request is authenticated with `X-Partner-Key` and will appear in partner-side network monitoring as expected traffic.
+
+Intake is **log-only** — every accepted event becomes a single structured log line on Ballpoint's side. No database row, no webhook fan-out, no state change, and no request-body echo in any response. PII (emails, phone numbers, ZIPs, long digit-runs) is scrubbed **client-side by the iframe** before send, and the iframe caps itself at 5 events per page-load (deduped).
+
+**Caps.** Request body ≤ **4096 bytes**; per-partner-key rate limit **60 requests / minute** (sliding window, independent of the account-wide 120/min bucket above); per-field caps on the JSON payload — `name` ≤ 50, `message` ≤ 220, `source` ≤ 300, `pageId` ≤ 40, `buildId` ≤ 64, `lineno`/`colno` 0–10,000,000, `contractVersions` ≤ 6 keys of ≤ 20 chars each. Extra fields and control characters (`\r`, `\n`, `0x00`–`0x1F`) are rejected.
+
+| Status | Meaning | Body |
+|--------|---------|------|
+| `204 No Content` | Accepted and logged. | empty |
+| `401 Unauthorized` | Missing or invalid `X-Partner-Key`. | standard auth error envelope |
+| `413 Payload Too Large` | Request body larger than 4096 bytes. | empty |
+| `422 Unprocessable Entity` | Field cap exceeded, unknown field, or control character present. | empty |
+| `429 Too Many Requests` | Over 60 requests/minute for this partner key. | empty |
+
+413/422/429 responses have empty bodies by design (no payload echo, no field-name leak). 401 returns the standard auth error envelope used across `/v1/billing/partner/*`.
+
+Payload example (fields the iframe sends):
+
+```json
+{"type":"error","name":"TypeError","message":"Cannot read properties of undefined","source":"https://mailer.ballpointmarketing.com/js/app.js","lineno":42,"colno":7,"pageId":"pg_01H8XYZ","buildId":"abc1234","contractVersions":{"iframe":"1","api":"3","partner":"1"}}
+```
+
+Available on staging now; production on the next API release.
+
 ---
 
 ## 11. Sandbox & Testing
@@ -2343,6 +2369,7 @@ Before switching to your live key:
 | Pricing catalog | `GET` | `/v1/billing/pricing?product_type=...` | `X-Partner-Key` |
 | Mint SSE token | `POST` | `/v1/billing/orders/{id}/sse-token` | `X-Partner-Key` |
 | SSE stream | `GET` | `/v1/billing/orders/{id}/events` | *(cookie auth via sse-token)* |
+| Client-error telemetry (iframe, automatic — no partner action needed) | `POST` | `/v1/partner/client-errors` | `X-Partner-Key` |
 | Health check | `GET` | `/health` | *(none)* |
 
 ---
