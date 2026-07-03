@@ -252,7 +252,7 @@
                     "exec": [
                       "var orderId = pm.variables.get('ballpoint_order_id');",
                       "if (!orderId || orderId === '' || /seed|REPLACE/i.test(orderId)) {",
-                      "  console.log('Skipping: ballpoint_order_id is not seeded (Tier A2 — needs a real ballpointOrderId from campaign_submitted).');",
+                      "  console.log('Skipping: ballpoint_order_id is not seeded (Tier A2 \u2014 needs a real ballpointOrderId from campaign_submitted).');",
                       "  pm.execution.skipRequest();",
                       "}"
                     ]
@@ -638,6 +638,57 @@
               ]
             },
             {
+              "name": "Client Errors (telemetry) - POST",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/partner/client-errors",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "partner",
+                    "client-errors"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"error\",\n  \"name\": \"TypeError\",\n  \"message\": \"Cannot read properties of undefined\",\n  \"source\": \"https://mailer.ballpointmarketing.com/js/app.js\",\n  \"lineno\": 42,\n  \"colno\": 7,\n  \"pageId\": \"pg_01H8XYZ\",\n  \"buildId\": \"abc1234\",\n  \"contractVersions\": { \"iframe\": \"1\", \"api\": \"3\", \"partner\": \"1\" }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Log-only client-error telemetry intake. Called AUTOMATICALLY by the embedded iframe (window.onerror / unhandledrejection) - partners do NOT need to integrate it. Documented here because it is partner-key authenticated and requests will appear in partner-side network monitoring. Response is 204 with an empty body on success; 413/422/429 error responses have empty bodies by design (401 returns the standard auth error envelope). Caps: 4096-byte request body, 60 requests/minute per partner key, per-field length caps (name<=50, message<=220, source<=300, pageId<=40, buildId<=64, contractVersions<=6 keys/20 chars). PII is scrubbed client-side by the iframe before send."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 204', function () { pm.response.to.have.status(204); });",
+                      "pm.test('empty body (no payload echo)', function () {",
+                      "  pm.expect(pm.response.text() || '').to.eql('');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Account mail-tracking summary (shape not modeled in docs)",
               "request": {
                 "method": "GET",
@@ -944,7 +995,7 @@
                     }
                   ]
                 },
-                "description": "Return-to-sender suppression list with pagination. include_forwarded defaults true. Each suppression_list[] entry now also includes per-piece contact_id and contact_type (PROPERTY|MAILING) — partner-supplied opaque identifiers, always returned (not gated on allow_pii_exports)."
+                "description": "Return-to-sender suppression list with pagination. include_forwarded defaults true. Each suppression_list[] entry now also includes per-piece contact_id and contact_type (PROPERTY|MAILING) \u2014 partner-supplied opaque identifiers, always returned (not gated on allow_pii_exports)."
               },
               "event": [
                 {
