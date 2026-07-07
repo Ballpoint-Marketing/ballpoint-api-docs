@@ -1979,7 +1979,7 @@ In addition to order-level updates, you may receive campaign-level tracking even
     "campaign_id": "camp_spring_2026",
     "new_rts_pieces": [
       {
-        "piece_id": "pc_4a7f2b",
+        "piece_id": "9f2a1c7b4e6d8a0f3b5c2e14",
         "status": "RTS",
         "recipient_name": "Jane Doe",
         "recipient_address": "123 Main St",
