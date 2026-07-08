@@ -668,6 +668,19 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
   }'
 ```
 
+**Rejection reasons:**
+
+| HTTP | `error.code` | When |
+|------|------|------|
+| 400 | `MAIL_DATE_INVALID_FORMAT` | `mail_date` present but not `YYYY-MM-DD` (datetime strings, ISO-with-TZ are rejected). Same shape as `§6m` reschedule. Server-side enforcement at creation added in **v1.7.8**. |
+| 400 | `MAIL_DATE_TOO_SOON` | `mail_date − SLA_business_days(product_type)` is ≤ today + 1 day (same threshold as `§6m` reschedule). SLA is in **business days** (Mon–Fri); see `§6q` for the per-product table. Server-side enforcement at creation added in **v1.7.8**. |
+| 400 | `MAIL_DATE_TOO_FAR` | `mail_date` is more than 365 days in the future. Same shape as `§6m` reschedule. Server-side enforcement at creation added in **v1.7.8**. |
+| 400 | `INVALID_PRODUCT_CONFIG` | Unknown / unsupported `product_type` (e.g. `handwritten_letter`, empty string), or a `postage_type` / `envelope_style` that is not valid for the requested product. See `§5 Product Catalog` for the accepted set. |
+
+**Idempotency-Key on a 4xx rejection.** A `MAIL_DATE_*` or `INVALID_PRODUCT_CONFIG` rejection does **not** commit a body under the caller's Idempotency-Key that a same-key retry could displace. **Retry with a FRESH `Idempotency-Key`** after correcting the body — a same-key retry that swaps in a different body is rejected with `409 IDEMPOTENCY_KEY_REUSE`. This is separate from the retry rules in `§11` for 5xx/transport failures, where the caller's original request may have succeeded and the same key is required.
+
+`mail_date` is optional — omit it for immediate send-now creation (`accepted` for non-gated accounts, `pending_payment` for payment-gated accounts). When present, all three checks above run before the order row is inserted. The `sla_business_days` value on `GET /v1/billing/pricing` (added in v1.7.7) is the authoritative per-product lead time to use client-side so the user cannot pick a `mail_date` that will be rejected here.
+
 ---
 
 ### 6c. Get Order
@@ -1697,7 +1710,7 @@ Ballpoint computes `scheduled_production_date` by subtracting the product's SLA 
 
 Unknown product types are rejected by validation (`INVALID_PRODUCT_CONFIG`). If an unrecognized type reaches the scheduler through a legacy path, the conservative default is 5 business days.
 
-The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date ≤ today + 1 day`.
+The `MAIL_DATE_TOO_SOON` rejection fires when `scheduled_production_date ≤ today + 1 day`. As of **v1.7.8** this check runs at **both** order creation (§6b) and reschedule (§6m), using the exact same threshold and error message. Prior to v1.7.8 it ran only on reschedule; creation would silently fall through to send-now on a stale `mail_date`. Companion codes `MAIL_DATE_INVALID_FORMAT` and `MAIL_DATE_TOO_FAR` now also fire on create with the same shape as reschedule — see §6b and §6m for the full rejection tables.
 
 ---
 

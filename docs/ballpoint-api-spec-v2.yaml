@@ -186,7 +186,7 @@ components:
           type: integer
           minimum: 1
           maximum: 15
-          description: 'Business days of production lead time between the scheduled production start date and `mail_date` for this product type. Range 1-15 (practically 2-5 today). Identical across postage variants of the same product. This value is a UX affordance so partners can render an accurate date-picker minimum. It is not currently enforced server-side at order creation — server-side enforcement is planned separately. Added in v1.7.7.'
+          description: 'Business days of production lead time between the scheduled production start date and `mail_date` for this product type. Range 1-15 (practically 2-5 today). Identical across postage variants of the same product. This value is a UX affordance so partners can render an accurate date-picker minimum. **As of v1.7.8 it is also enforced server-side at order creation** (`POST /orders`): a `mail_date` whose scheduled production date lands ≤ today+1 day is rejected with `400 MAIL_DATE_TOO_SOON` (byte-identical to the reschedule check on `POST /v1/billing/orders/{order_id}/reschedule`); companion codes `MAIL_DATE_INVALID_FORMAT` (malformed date) and `MAIL_DATE_TOO_FAR` (>365 days out) also fire. Added in v1.7.7; server-side enforcement at creation added in v1.7.8.'
     OrderDetail:
       type: object
       description: 'Response shape for `GET /v1/billing/orders/{order_id}` and each element of `GET /v1/billing/orders`. Source of truth: `_format_order_row` (billing_router.py). Status fields are documented as plain strings because the live enum sets are owned by the API and can evolve; partners should treat them as opaque values.'
@@ -625,7 +625,7 @@ paths:
       tags:
       - Orders
       summary: Get pricing catalog
-      description: "Returns the pricing catalog for all product/postage combinations available to the calling principal. Partner principals with a configured markup see the marked-up (retail) `unit_price_tcents`; internal/live/test principals see base prices. Rate-limited per principal (read tier).\n\nEach row exposes `sla_business_days`, the production lead time (business days) between the scheduled production start and `mail_date` for that product type. This value is a UX affordance so partners can render an accurate date-picker minimum. It is not currently enforced server-side at order creation — server-side enforcement is planned separately."
+      description: "Returns the pricing catalog for all product/postage combinations available to the calling principal. Partner principals with a configured markup see the marked-up (retail) `unit_price_tcents`; internal/live/test principals see base prices. Rate-limited per principal (read tier).\n\nEach row exposes `sla_business_days`, the production lead time (business days) between the scheduled production start and `mail_date` for that product type. This value is a UX affordance so partners can render an accurate date-picker minimum. As of v1.7.8 it is also enforced server-side at order creation — `POST /orders` rejects a `mail_date` whose scheduled production date lands ≤ today+1 day with `400 MAIL_DATE_TOO_SOON`."
       operationId: listPricing
       parameters:
       - name: product_type
@@ -1426,6 +1426,12 @@ paths:
               schema:
                 type: object
                 description: Order acceptance payload (shape not strictly modeled in OpenAPI source).
+        '400':
+          description: 'Validation failure. `error.code` values: `MAIL_DATE_INVALID_FORMAT` (not `YYYY-MM-DD`), `MAIL_DATE_TOO_SOON` (`mail_date − SLA_days` is ≤ today + 1 day), `MAIL_DATE_TOO_FAR` (> 365 days in the future), `INVALID_PRODUCT_CONFIG` (unsupported product_type/postage_type/envelope_style combination).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Validation Error
           content:
