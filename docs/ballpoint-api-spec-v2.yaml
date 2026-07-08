@@ -152,6 +152,41 @@ components:
             trace_id:
               type: string
               description: Request trace ID for support
+    PricingRow:
+      type: object
+      description: 'One row in the pricing catalog response from `GET /v1/billing/pricing`. For partner principals with a configured markup, `unit_price_tcents` is the marked-up (retail) price shown to end users; internal/live/test principals see base prices. Dollars = tcents / 10000.'
+      required:
+      - product_type
+      - postage_type
+      - unit_price_tcents
+      - min_quantity
+      - sla_business_days
+      properties:
+        product_type:
+          type: string
+          description: 'Product identifier (e.g. `4x6_printed`, `6x9_cursive`, `color_letter`, `hybrid_letter`, `greeting_letter`).'
+        postage_type:
+          type: string
+          description: 'Postage tier for this row (e.g. `first_class`, `standard`, `presort`). Varies by product.'
+        unit_price_tcents:
+          type: integer
+          description: Per-piece price in tenth-cents. Divide by 10,000 for dollars.
+        min_quantity:
+          type: integer
+          description: Minimum piece_count this pricing row applies to.
+        max_quantity:
+          type: integer
+          nullable: true
+          description: Maximum piece_count this pricing row applies to. `null` = no upper bound.
+        description:
+          type: string
+          nullable: true
+          description: Human-readable description of the row.
+        sla_business_days:
+          type: integer
+          minimum: 1
+          maximum: 15
+          description: 'Business days of production lead time between the scheduled production start date and `mail_date` for this product type. Range 1-15 (practically 2-5 today). Identical across postage variants of the same product. This value is a UX affordance so partners can render an accurate date-picker minimum. It is not currently enforced server-side at order creation — server-side enforcement is planned separately. Added in v1.7.7.'
     OrderDetail:
       type: object
       description: 'Response shape for `GET /v1/billing/orders/{order_id}` and each element of `GET /v1/billing/orders`. Source of truth: `_format_order_row` (billing_router.py). Status fields are documented as plain strings because the live enum sets are owned by the API and can evolve; partners should treat them as opaque values.'
@@ -585,6 +620,38 @@ security:
 - bearerAuth: []
 - partnerKeyAuth: []
 paths:
+  /v1/billing/pricing:
+    get:
+      tags:
+      - Orders
+      summary: Get pricing catalog
+      description: "Returns the pricing catalog for all product/postage combinations available to the calling principal. Partner principals with a configured markup see the marked-up (retail) `unit_price_tcents`; internal/live/test principals see base prices. Rate-limited per principal (read tier).\n\nEach row exposes `sla_business_days`, the production lead time (business days) between the scheduled production start and `mail_date` for that product type. This value is a UX affordance so partners can render an accurate date-picker minimum. It is not currently enforced server-side at order creation — server-side enforcement is planned separately."
+      operationId: listPricing
+      parameters:
+      - name: product_type
+        in: query
+        required: false
+        description: Optional filter — return rows for a single product type only.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Pricing catalog rows
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/X-Trace-Id'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PricingRow'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/billing/orders/{order_id}:
     get:
       tags:

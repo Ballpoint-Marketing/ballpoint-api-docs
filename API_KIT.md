@@ -328,7 +328,8 @@ Response:
     "unit_price_tcents": 5054,
     "min_quantity": 1,
     "max_quantity": null,
-    "description": "4x6 printed postcard - 1st class"
+    "description": "4x6 printed postcard - 1st class",
+    "sla_business_days": 2
   },
   {
     "product_type": "4x6_printed",
@@ -336,10 +337,26 @@ Response:
     "unit_price_tcents": 4910,
     "min_quantity": 1,
     "max_quantity": null,
-    "description": "4x6 printed postcard - standard"
+    "description": "4x6 printed postcard - standard",
+    "sla_business_days": 2
   }
 ]
 ```
+
+#### `sla_business_days` (integer, additive since v1.7.7)
+
+Business days of production lead time between the scheduled production start date and `mail_date` for the row's `product_type`. Range: **1–15** (practically **2–5** today). Identical across all postage variants of the same product type.
+
+Current values per partner-sendable product type:
+
+| Product | `sla_business_days` |
+|---------|---------------------|
+| `4x6_printed`, `6x9_printed` | **2** |
+| `color_letter` | **3** |
+| `4x6_cursive`, `6x9_cursive` | **4** |
+| `hybrid_letter`, `greeting_letter` | **5** |
+
+This value is a UX affordance so partners can render an accurate date-picker minimum (earliest selectable `mail_date` = today + `sla_business_days` business days, skipping Saturday/Sunday). It is not currently enforced server-side at order creation — server-side enforcement is planned separately. Partners that hard-code a uniform lead time will under-restrict cursive (4bd) and hybrid/greeting (5bd) product types; read this field per row and pass it into your date-picker instead.
 
 ---
 
