@@ -997,24 +997,24 @@ Validator violations return `422 Unprocessable Entity` with a descriptive error 
 - Echoed on every `order.status_changed` event (covers status changes, cancel, complete, payment_failed).
 - Subject to the same retention window as recipient PII — when an order ages past the partner-controlled retention threshold, this field is scrubbed from our storage automatically.
 
-**Sample webhook payload with the field present:**
+**Sample webhook payload with the field present** (flat envelope — see [§7 Envelope Shape on the Wire](#envelope-shape-on-the-wire)):
 
 ```json
 {
-  "type": "order.status_changed",
-  "data": {
-    "order_id": "ord_7f3a2b",
-    "campaign_id": "camp_2025_q1",
-    "previous_production_status": "accepted",
-    "production_status": "printing",
-    "external_user_id": "user_789",
-    "external_user_metadata": {
-      "display_name": "Alice Cooper",
-      "internal_user_id": "u_42",
-      "plan": "pro",
-      "team_id": "t_17"
-    }
-  }
+  "order_id": "ord_7f3a2b",
+  "campaign_id": "camp_2025_q1",
+  "previous_production_status": "accepted",
+  "production_status": "printing",
+  "external_user_id": "user_789",
+  "external_user_metadata": {
+    "display_name": "Alice Cooper",
+    "internal_user_id": "u_42",
+    "plan": "pro",
+    "team_id": "t_17"
+  },
+  "event_id": "7d8e9f0a-1b2c-4d3e-8f4a-5b6c7d8e9f0a",
+  "event_type": "order.status_changed",
+  "timestamp": "2026-03-01T16:30:00Z"
 }
 ```
 
@@ -1375,7 +1375,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/res
 
 **Distinct from `payment_failed → new order`.** The existing terminal-failed-payment flow (`§6k Confirm Payment`) applies only **after** a terminal payment failure: the failed order is left in `payment_failed`, and partners create a fresh order to retry. Same-order reschedule (this endpoint) applies **only before** payment is processed.
 
-**On success.** Ballpoint emits the `order.rescheduled` webhook (see §7 Payload Format) and — when initiated from the embedded iframe — an `order_rescheduled` postMessage to the parent (see `IFRAME_KIT.md §6`). Webhook delivery is scoped to subscriptions owned by the order's `external_account_id` (existing routing property of the outbox routing layer).
+**On success.** Ballpoint emits the `order.rescheduled` webhook (see §7 Payload Format) and — when initiated from the embedded iframe — an `order_rescheduled` postMessage to the parent (see `IFRAME_KIT.md §6`). Webhook delivery goes to every active webhook endpoint registered on the order's `account_id`, optionally filtered by that endpoint's own `event_types[]` allowlist — **not** scoped by `external_account_id` (finer-grained per-external-account scoping is an open joint-decision item, not currently implemented — see [§7 Delivery Scope](#delivery-scope-shipping-behavior)).
 
 ### 6n. Upload Recipients (Initial Upload)
 
@@ -1705,7 +1705,7 @@ The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date 
 
 > **Ballpoint delivers webhooks at least once. Your integration must handle duplicates, delays, and out-of-order delivery.**
 
-> Ballpoint emits two webhook event families: order lifecycle events (`order.status_changed` for status transitions and `order.rescheduled` for mail-date changes — this section) and the per-piece RTS push-back (see [§7b](#7b-per-piece-rts-push-back-v1) below — V1 contract documented; live emission shipping in a future release).
+> Ballpoint emits two webhook event families: order lifecycle events (`order.status_changed` for status transitions, `order.usps_update` for USPS rollup transitions, and `order.rescheduled` for mail-date changes — this section) and the per-piece RTS push-back (`campaign.mail_tracking.rts_update` — see [§7b](#7b-per-piece-rts-push-back-v1) below — **live today**; fires whenever a webhook endpoint is configured for the account/source).
 
 ### Registration
 
@@ -1717,32 +1717,67 @@ Send us your webhook endpoint URL — Ballpoint will configure it on our side. T
 - Must respond with `2xx` within 10 seconds
 - Must be publicly reachable from the internet
 
+### <a id="delivery-scope-shipping-behavior"></a>Delivery Scope (as currently shipped)
+
+Ballpoint's outbox worker delivers each event to **every ACTIVE webhook endpoint registered on the order's / campaign's `account_id`**, optionally filtered by that endpoint's own `event_types[]` allowlist if one is configured on the endpoint.
+
+- **Not** scoped by `external_account_id`. If your account has multiple `external_account_id` values behind a single Ballpoint `account_id`, every registered endpoint will receive events for **all** of them.
+- **Not** scoped by `source`. Same as above — endpoint receives events across all `source` values on the account.
+- **Endpoint `event_types[]` allowlist** (if configured on the endpoint at onboarding) is the only per-event filter applied at delivery time; an endpoint with no `event_types[]` receives every event enqueued for the account.
+
+If you need per-`external_account_id` or per-`source` delivery isolation today, register a distinct endpoint URL per external-account/source and have us configure them separately at onboarding.
+
+Finer-grained per-`external_account_id` (or per-`source`) delivery scoping enforced by the outbox layer itself is an **open joint-decision item, not currently implemented** — framed as a decision, not a promise to build.
+
+### <a id="envelope-shape-on-the-wire"></a>Envelope Shape on the Wire
+
+There are **two envelope shapes** depending on the event type. Code against the shape of the event you subscribe to — the two do not converge.
+
+**Flat envelope — `order.*` events (`order.status_changed`, `order.usps_update`, `order.rescheduled`).** Only `event_id` / `event_type` / `timestamp` are added at the top level at delivery time. There is **no** `id` / `type` / `version` / `data` wrapper on the wire. All payload fields sit directly at the top of the JSON object alongside `event_id` / `event_type` / `timestamp`.
+
+**Wrapped envelope — `campaign.mail_tracking.rts_update`.** Uses `{ id, type, version, created_at, data }` with the actual payload nested inside `data`. In addition, `event_id` / `event_type` / `timestamp` are **also** added at the top level at delivery time (so the wire object has both forms). See the [`campaign.mail_tracking.rts_update` example](#campaign-level-mail-tracking-events) for the concrete shape.
+
+Match on the appropriate top-level key. `X-Ballpoint-Event` and `X-Ballpoint-Event-Id` headers are always present and are the recommended dispatch/dedup surfaces regardless of envelope shape.
+
 ### Payload Format
 
-When an order's status changes, we send an `order.status_changed` event:
+When an order's status changes, we send an `order.status_changed` event. **Flat envelope** (see [Envelope Shape on the Wire](#envelope-shape-on-the-wire) above) — no `data` wrapper on the wire:
 
 ```json
 {
-  "id": "evt_order.status_changed_ord_7f3a2b_20260301_a1b2c3",
-  "type": "order.status_changed",
-  "version": "2026-02-01",
-  "timestamp": "2026-03-01T16:30:00Z",
-  "data": {
-    "order_id": "ord_7f3a2b",
-    "campaign_id": "camp_test",
-    "previous_production_status": "accepted",
-    "production_status": "printing",
-    "display_status": "printing",
-    "product_type": "4x6_printed",
-    "source": "your_source",
-    "external_account_id": "acct_partner",
-    "external_user_id": "user_789",
-    "list_id": "marketing_q1_2026"
-  }
+  "order_id": "ord_7f3a2b",
+  "campaign_id": "camp_test",
+  "previous_production_status": "accepted",
+  "production_status": "printing",
+  "usps_status": null,
+  "display_status": "printing",
+  "product_type": "4x6_printed",
+  "note": null,
+  "external_user_id": "user_789",
+  "external_user_metadata": { "agent_id": "a-123" },
+  "list_id": "marketing_q1_2026",
+  "source": "your_source",
+  "external_account_id": "acct_partner",
+  "event_id": "b6c3f9d1-2e4a-4d7b-9c1a-5f8e2b3d4c6e",
+  "event_type": "order.status_changed",
+  "timestamp": "2026-03-01T16:30:00Z"
 }
 ```
 
 `list_id` echoes back verbatim the value you originally passed when creating the order (or `null` for orders not created via the partner endpoint). Use it as the join key on your side for reconciliation.
+
+#### <a id="d1-order-status_changed-field-name-pairs"></a>Two field-name pairs by trigger
+
+`order.status_changed` is enqueued by **four** code paths (internal-staff status change, partner-initiated cancel, scheduler expiring an unconfirmed payment, and order-job dead-letter). They share the same event type but **use two different field-name pairs** to describe the transition:
+
+| Trigger path | Transition field pair | Also carried |
+|---|---|---|
+| Internal-staff status change | `previous_production_status` → `production_status` | `usps_status`, `display_status`, `note`, `refund` (object, only when a refund was executed on a cancel) |
+| Partner-initiated cancel | `previous_status` → `new_status` (values `scheduled`/`accepted` → `cancelled`) | — |
+| Scheduler expires an unconfirmed payment | `previous_status` → `new_status` (values `scheduled` → `payment_failed`) | `trigger` (`payment_confirmation_expired`), `failure_reason` (`expired_no_payment_confirmation`) |
+| Order-job dead-letter (terminal failure) | `previous_production_status` → `production_status` (`failed` terminal) | `error_message` |
+
+**A robust consumer reads either field-name pair.** The `production_status` / `new_status` value string set is identical across paths (`scheduled | accepted | prep | printing | writing | inserting | stamping | shipping | complete | cancelled | failed | payment_failed`); only the field name carrying the value changes. Fields present on all four triggers: `order_id`, `campaign_id`, `external_user_id`. Fields present on staff-path, partner-cancel, and scheduler-expire (not dead-letter): `list_id`, `external_user_metadata`. Fields present only on staff-path and dead-letter — not on partner-cancel or scheduler-expire, since those two pass `source`/`external_account_id` to `enqueue_webhook_event` for outbox routing only and neither key appears in the delivered JSON on those two paths: `source`, `external_account_id`.
 
 ### `order.rescheduled` Payload Format (v1.4.0+)
 
@@ -1750,22 +1785,19 @@ Fired on a successful `POST /v1/billing/orders/{order_id}/reschedule` (see [§6m
 
 ```json
 {
-  "id": "evt_order.rescheduled_ord_7f3a2b_20260315_a1b2c3",
-  "type": "order.rescheduled",
-  "version": "2026-02-01",
-  "timestamp": "2026-03-15T16:30:00Z",
-  "data": {
-    "order_id": "ord_7f3a2b",
-    "campaign_id": "camp_test",
-    "list_id": "marketing_q1_2026",
-    "source": "your_source",
-    "external_account_id": "acct_partner",
-    "external_user_id": "user_789",
-    "external_user_metadata": { "agent_id": "a-123" },
-    "product_type": "4x6_printed",
-    "previous_mail_date": "2026-08-01",
-    "new_mail_date": "2026-08-15"
-  }
+  "order_id": "ord_7f3a2b",
+  "campaign_id": "camp_test",
+  "list_id": "marketing_q1_2026",
+  "source": "your_source",
+  "external_account_id": "acct_partner",
+  "external_user_id": "user_789",
+  "external_user_metadata": { "agent_id": "a-123" },
+  "product_type": "4x6_printed",
+  "previous_mail_date": "2026-08-01",
+  "new_mail_date": "2026-08-15",
+  "event_id": "7d8e9f0a-1b2c-4d3e-8f4a-5b6c7d8e9f0a",
+  "event_type": "order.rescheduled",
+  "timestamp": "2026-03-15T16:30:00Z"
 }
 ```
 
@@ -1773,8 +1805,8 @@ Field notes:
 
 - **`previous_mail_date`** / **`new_mail_date`** are `YYYY-MM-DD` strings (no time, no timezone) — same shape as the API request body in §6m.
 - The webhook intentionally does **NOT** carry `previous_scheduled_production_date` / `new_scheduled_production_date`. Those are returned only in the synchronous reschedule API response (§6m). Partners rarely need the production-date directly; consume the API response if you do.
-- The outer envelope (`id`, `type`, `version`, `timestamp`) and `data.*` field conventions match `order.status_changed`. Re-use your existing webhook deduplication, retry logic, and signature verification — no changes required.
-- **Delivery scope.** Routed only to webhook subscriptions whose `external_account_id` matches the order's. Cross-tenant subscriptions never receive this event (existing routing property of the outbox routing layer).
+- **Flat envelope, same shape as `order.status_changed`.** Only `event_id` / `event_type` / `timestamp` are added at the top level at delivery time — no `id` / `type` / `version` / `data` wrapper (see [Envelope Shape on the Wire](#envelope-shape-on-the-wire)). Re-use your existing webhook deduplication, retry logic, and signature verification — no changes required.
+- **Delivery scope.** Delivered to every **active** webhook endpoint registered on the order's `account_id`, optionally filtered by that endpoint's own `event_types[]` allowlist if one is configured. **Not scoped by `external_account_id`.** Finer-grained per-`external_account_id` delivery scoping is an **open joint-decision item, not currently implemented** (see also [§7 Delivery Scope](#delivery-scope-shipping-behavior)). If you need per-external-account isolation today, register a distinct endpoint URL per `external_account_id` and let us configure them separately on the Ballpoint side.
 
 ### Webhook Headers
 
@@ -1923,77 +1955,95 @@ RTS pieces count toward the `delivered` threshold above so the badge progresses 
 
 ### USPS Update Webhook
 
-When USPS tracking status changes, you receive an `order.usps_update` event with piece-level breakdown:
+When USPS tracking status changes, you receive an `order.usps_update` event with piece-level breakdown. Envelope is **flat on the wire** (`event_id` / `event_type` / `timestamp` at the top level, no `data` wrapper) — see [Envelope Shape on the Wire](#envelope-shape-on-the-wire).
 
 ```json
 {
-  "type": "order.usps_update",
-  "data": {
-    "order_id": "ord_7f3a2b",
-    "usps_status": "out_for_delivery",
-    "previous_usps_status": "shipped",
-    "piece_count": 500,
-    "pieces_delivered": 50,
-    "pieces_at_destination": 200,
-    "pieces_scanned": 380
-  }
+  "order_id": "ord_7f3a2b",
+  "campaign_id": "camp_test",
+  "previous_usps_status": "shipped",
+  "usps_status": "out_for_delivery",
+  "production_status": "shipping",
+  "display_status": "out_for_delivery",
+  "product_type": "4x6_printed",
+  "external_user_id": "user_789",
+  "source": "your_source",
+  "external_account_id": "acct_partner",
+  "piece_count": 500,
+  "pieces_delivered": 50,
+  "pieces_at_destination": 200,
+  "pieces_rts": 3,
+  "pieces_scanned": 380,
+  "event_id": "b6c3f9d1-2e4a-4d7b-9c1a-5f8e2b3d4c6e",
+  "event_type": "order.usps_update",
+  "timestamp": "2026-03-05T18:30:00Z"
 }
 ```
+
+**Full field set (15 payload fields + 3 delivery-time fields):**
+
+- `order_id`, `campaign_id` — always present.
+- `previous_usps_status`, `usps_status` — string, one of `shipped` / `out_for_delivery` / `delivered`. Forward-only; never fires on regression.
+- `production_status`, `display_status`, `product_type` — always present.
+- `external_user_id`, `source`, `external_account_id` — always present (echo of the values you passed on order creation, per your partner-side scoping).
+- `piece_count`, `pieces_delivered`, `pieces_at_destination`, `pieces_rts`, `pieces_scanned` — integer piece-level counters.
+- `event_id`, `event_type`, `timestamp` — delivery-time envelope fields (see [Envelope Shape on the Wire](#envelope-shape-on-the-wire)).
+
+**Fields NOT on this event.** Unlike `order.status_changed` and `order.rescheduled`, `order.usps_update` does **not** carry `list_id` or `external_user_metadata`. For reconciliation on your side, key this event on `order_id` (join back to the original order's `list_id` / `external_user_metadata` from your own store, or from the order-detail GET endpoint).
 
 ### Campaign-Level Mail Tracking Events
 
-In addition to order-level updates, you may receive campaign-level tracking events:
+In addition to order-level updates, you may receive campaign-level tracking events. Only `campaign.mail_tracking.rts_update` is emitted today. The other four campaign-level types are documented historically but no code path enqueues them — see the "not emitted" rows below.
 
-| Event Type | When |
-|------------|------|
-| `order.status_changed` | Production status changes (scheduled → accepted → prep → printing → ... → shipping → complete; also `cancelled` and `failed`) |
-| `order.usps_update` | USPS scan data changes the order's delivery status |
-| `campaign.mail_tracking.in_transit` | First USPS scans detected for the campaign |
-| `campaign.mail_tracking.out_for_delivery` | ≥51% of campaign pieces at destination facility |
-| `campaign.mail_tracking.delivered` | ≥80% of campaign pieces delivered |
-| `campaign.mail_tracking.rts_update` | Return-to-sender pieces found (per-piece payload with recipient PII for suppression + `contact_id`/`contact_type` for CRM reconciliation) |
-| `campaign.mail_tracking.stalled` | No scans in 72+ hours with pieces still in transit |
+| Event Type | Status | When |
+|------------|--------|------|
+| `order.status_changed` | Emitted | Production status changes (scheduled → accepted → prep → printing → ... → shipping → complete; also `cancelled` and `failed`) — see [D10](#not-emitted-orderdrop_completed--orderdrop_cancelled) for the terminal-transition note. |
+| `order.usps_update` | Emitted | USPS scan data changes the order's delivery status. |
+| `campaign.mail_tracking.rts_update` | Emitted | Return-to-sender pieces found (per-piece payload with recipient PII for suppression + `contact_id`/`contact_type` for CRM reconciliation). |
+| `campaign.mail_tracking.in_transit` | **Not emitted — pending joint decision.** | Historically documented as "first USPS scans detected for the campaign"; no code path emits this event today. Decision needed on whether to ship the emitter or remove from the public docs (framed as a decision, not a promise). Consume the per-order `order.usps_update` in the meantime. |
+| `campaign.mail_tracking.out_for_delivery` | **Not emitted — pending joint decision.** | Historically documented as "≥51% of campaign pieces at destination"; no code path emits this event today. Same decision framing as above. Consume the per-order `order.usps_update` (with `usps_status == "out_for_delivery"`) in the meantime. |
+| `campaign.mail_tracking.delivered` | **Not emitted — pending joint decision.** | Historically documented as "≥80% of campaign pieces delivered"; no code path emits this event today. Same decision framing. Consume the per-order `order.usps_update` (with `usps_status == "delivered"`) in the meantime. |
+| `campaign.mail_tracking.stalled` | **Not emitted — pending joint decision.** | Historically documented as "no scans in 72+ hours with pieces still in transit"; no code path emits this event today. Same decision framing. No consumption surface today. |
+
+> **Do not code against the four "not emitted" rows.** Ballpoint makes no implicit promise to ship any of them — decision is joint. Their example payload shapes have been removed from this document to avoid confusion; if the decision goes toward shipping, the payload contracts will be published then.
+
+#### <a id="not-emitted-orderdrop_completed--orderdrop_cancelled"></a>Not emitted: `order.drop_completed` / `order.drop_cancelled`
+
+Ballpoint does **not** emit `order.drop_completed` or `order.drop_cancelled` webhooks. Both terminal transitions are communicated via the existing `order.status_changed` event — key on the `production_status` field value `"complete"` (staff-driven finalization path) or the sibling `new_status` field value `"cancelled"` (partner-driven cancel path). See [§7 D1 field-name note](#d1-order-status_changed-field-name-pairs) for the field-name-pair split by code path.
+
+Any test plan or integration that subscribes to `order.drop_completed` or `order.drop_cancelled` should be rewritten to subscribe to `order.status_changed` and gate on the status-value string. Whether Ballpoint later adds a dedicated terminal event is an open joint-decision item (framed as a decision, not a promise).
 
 #### Example Payloads
 
-**`campaign.mail_tracking.in_transit`**
+**`campaign.mail_tracking.rts_update`** — this is the only campaign-level event Ballpoint actually emits today. Wrapped envelope (`id`, `type`, `version`, `created_at`, `data`), plus the flat `event_id` / `event_type` / `timestamp` fields added at delivery time (see [Envelope Shape on the Wire](#envelope-shape-on-the-wire)).
 
 ```json
 {
-  "type": "campaign.mail_tracking.in_transit",
-  "data": {
-    "campaign_id": "camp_spring_2026",
-    "order_ids": ["ord_7f3a2b", "ord_8c4d5e"],
-    "pieces_total": 1000,
-    "pieces_scanned": 120,
-    "first_scan_at": "2026-03-03T14:22:00Z"
-  }
-}
-```
-
-**`campaign.mail_tracking.delivered`**
-
-```json
-{
-  "type": "campaign.mail_tracking.delivered",
-  "data": {
-    "campaign_id": "camp_spring_2026",
-    "order_ids": ["ord_7f3a2b", "ord_8c4d5e"],
-    "pieces_total": 1000,
-    "pieces_delivered": 812,
-    "delivery_rate": 0.812,
-    "delivered_at": "2026-03-06T09:15:00Z"
-  }
-}
-```
-
-**`campaign.mail_tracking.rts_update`**
-
-```json
-{
+  "id": "evt_campaign.mail_tracking.rts_update_camp_spring_2026_2026030518_a1b2c3",
   "type": "campaign.mail_tracking.rts_update",
+  "version": "2026-02-01",
+  "created_at": "2026-03-05T18:30:00Z",
   "data": {
     "campaign_id": "camp_spring_2026",
+    "mail_status": "in_transit",
+    "total_pieces": 1000,
+    "scanned_pieces": 620,
+    "scan_coverage": 0.62,
+    "delivered": 380,
+    "in_transit": 210,
+    "out_for_delivery": 30,
+    "rts": 12,
+    "forwarded": 0,
+    "delivered_rate": 0.38,
+    "rts_rate": 0.012,
+    "first_scan_at": "2026-03-03T14:22:00Z",
+    "last_scan_at": "2026-03-05T18:20:00Z",
+    "integration": {
+      "source": "your_source",
+      "external_account_id": "acct_partner",
+      "external_user_id": "user_789",
+      "external_id": "ps_camp_ref_42"
+    },
     "new_rts_pieces": [
       {
         "piece_id": "9f2a1c7b4e6d8a0f3b5c2e14",
@@ -2007,10 +2057,24 @@ In addition to order-level updates, you may receive campaign-level tracking even
         "contact_id": "ps_contact_42",
         "contact_type": "PROPERTY"
       }
-    ]
+    ],
+    "new_rts_count": 1,
+    "event_id": "b6c3f9d1-2e4a-4d7b-9c1a-5f8e2b3d4c6e",
+    "event_type": "campaign.mail_tracking.rts_update",
+    "timestamp": "2026-03-05T18:30:00Z"
   }
 }
 ```
+
+**Field notes on the rollup counters.**
+
+- `mail_status` — rolled-up campaign delivery status string.
+- `total_pieces` / `scanned_pieces` / `delivered` / `in_transit` / `out_for_delivery` / `rts` / `forwarded` — integer campaign-wide counters.
+- `scan_coverage` / `delivered_rate` / `rts_rate` — rate values. Treat the scale as "value present, verify on your side" for now — a scale-consistency reconciliation on `rts_rate` is an open internal item.
+- `first_scan_at` / `last_scan_at` — ISO 8601 UTC or `null`.
+- `integration.source` / `.external_account_id` / `.external_user_id` / `.external_id` — for tenant / user / campaign routing on your side.
+- `new_rts_pieces[]` — per-piece objects (see below).
+- `new_rts_count` — length of `new_rts_pieces[]`.
 
 Per-piece fields:
 
@@ -2023,47 +2087,31 @@ Per-piece fields:
 
 Note: the unique recipient key is `(contact_id, contact_type)`. A single `contact_id` may appear twice in one payload (both PROPERTY and MAILING came back RTS). These are **pass-through** — Ballpoint does not address-match; the partner pre-resolves the key at manifest-upload time. The existing `recipient_*` PII is unchanged (kept for suppression).
 
-**`campaign.mail_tracking.stalled`**
-
-```json
-{
-  "type": "campaign.mail_tracking.stalled",
-  "data": {
-    "campaign_id": "camp_spring_2026",
-    "order_ids": ["ord_8c4d5e"],
-    "pieces_total": 500,
-    "pieces_scanned": 310,
-    "pieces_stalled": 190,
-    "last_scan_at": "2026-03-04T08:00:00Z",
-    "hours_since_last_scan": 78
-  }
-}
-```
-
 ### Retry Policy
 
-Events are guaranteed to be delivered. If your endpoint is down, we retry with exponential backoff:
+Delivery is at-least-once. Retries run in two layers, back-to-back:
 
-**Per-delivery attempt (immediate retries):**
+**Layer 1 — inline HTTP retries within one outbox pass.**
 
-| Attempt | Backoff |
-|---------|---------|
-| 1 | Immediate |
-| 2 | 1 second |
-| 3 | 2 seconds |
-| 4 | 4 seconds |
-| 5 | 8 seconds |
+- Up to **3 HTTP attempts** per outbox pass, with **1s / 2s** backoff between attempts (formula `2^(attempt-1)`, capped at 30s — the loop stops after attempt 3, so no 3rd sleep / no 4s ever occurs in this schedule).
+- **10-second timeout** per HTTP attempt.
+- **4xx responses (400–499) short-circuit — no retry** (client/config problem — fix your endpoint).
+- 5xx / timeout / connection error continues to the next inline attempt (and, if all fail, to Layer 2).
 
-4xx responses (400, 401, 403, 404) are **not retried** — they indicate a problem with your endpoint.
+**Layer 2 — outbox re-enqueue.**
 
-**If all 5 attempts fail:** The event goes back to the queue with increasing delays (10s → 30s → 90s → up to 1 hour). After 15 total delivery attempts, the event moves to dead letter and Ballpoint support is notified.
+- Up to **5 total outbox rounds** (each round is one Layer-1 pass above).
+- Between rounds the next retry is scheduled at `now + min(10 * 3^(round-1), 3600)` seconds — i.e. **10s → 30s → 90s → 270s → 810s**, capped at **1 hour (3600s)**.
+- After 5 rounds fail the event moves to `dead_letter` with `last_error = "Max attempts reached"`. **There is no automatic replay** — dead-letter recovery is operator-only. Total worst-case ceiling: **up to 15 HTTP POSTs** (5 rounds × 3 inline attempts) before dead-letter.
 
-**Auto-disable:** If your endpoint accumulates 10 consecutive failures across different events, we disable it and notify you. Contact us to re-enable.
+**Circuit breaker.** Sustained 5xx / timeout / connection errors open the `webhooks` circuit; queued events pause until the circuit half-opens or closes. 4xx does not trip the circuit.
+
+**Endpoint auto-disable.** 10 consecutive failed deliveries across events on the same endpoint flip `active` to `false`; the partner is notified out-of-band. Contact us to re-enable.
 
 **Your responsibilities:**
-- Return `2xx` within 10 seconds
-- Deduplicate on `X-Ballpoint-Event-Id` (you may receive the same event more than once)
-- Reject payloads with `X-Ballpoint-Timestamp` older than 5 minutes or more than 2 minutes in the future
+- Return `2xx` within 10 seconds.
+- Deduplicate on `X-Ballpoint-Event-Id` (stable across the 3 inline HTTP retries within one outbox round; **may change across outbox re-enqueues** of the same logical event — for the strongest dedup use a composite key of your own — see [Deduplication](#deduplication-required)).
+- Reject payloads with `X-Ballpoint-Timestamp` older than 5 minutes or more than 2 minutes in the future.
 
 ---
 
@@ -2071,7 +2119,7 @@ Events are guaranteed to be delivered. If your endpoint is down, we retry with e
 
 When the USPS scan pipeline detects a returned-to-sender piece, Ballpoint emits a per-piece RTS event server-to-server so the partner can reconcile each undeliverable mailing piece against its CRM contact directly.
 
-> **Status:** V1 contract finalized. Delivery will be enabled once the partner endpoint is configured and E2E testing is complete.
+> **Status:** Live today — fires whenever a webhook endpoint is configured for the account/source. The V1 contract described here is what Ballpoint emits.
 
 **Delivery**
 
