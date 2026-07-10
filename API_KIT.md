@@ -1815,7 +1815,7 @@ Every webhook includes these headers:
 ```
 X-Ballpoint-Signature: sha256=<hex>
 X-Ballpoint-Timestamp: 2026-03-01T16:30:00Z
-X-Ballpoint-Event-Id: evt_order.status_changed_ord_7f3a2b_20260301_a1b2c3
+X-Ballpoint-Event-Id: b6c3f9d1-2e4a-4d7b-9c1a-5f8e2b3d4c6e
 X-Ballpoint-Delivery: d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a
 ```
 
