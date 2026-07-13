@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.7.10 — 2026-07-13
+
+- **Additive: `POST` / `DELETE /v1/mail-tracking/recipients/opt-out` now return `recipients[]` on `RecipientOptOutResponse`.** Both endpoints now include a `recipients[]` array of `{ contact_id, contact_type }` on the success response — the distinct `contact_id`-bearing recipients matched by the opt-out (or undo) at the target normalized address, across every campaign the calling tenant owns. `contact_id` is the partner-supplied opaque identifier previously accepted on upload; `contact_type` is `PROPERTY` | `MAILING` and **may be `null`** when the original upload did not carry one. The array is deduplicated by `(contact_id, contact_type)`. **Historical recipients uploaded without a `contact_id`** (pre-`contact_id` uploads, or uploads that omitted it) **cannot be represented in `recipients[]`** — the server-side opt-out still applies to those rows, but they do not appear in the array and do not surface in the postMessage event. Existing response fields on `RecipientOptOutResponse` are unchanged. Documented in `docs/ballpoint-api-spec-v2.yaml` (`RecipientOptOutResponse.recipients[]` + `RecipientContactRef` schema).
+- **New iframe → parent event: `recipient_opt_out_changed`.** When the iframe drives an opt-out (or undo) via the endpoints above and the response carries a non-empty `recipients[]`, the iframe emits a fire-and-forget `recipient_opt_out_changed` postMessage to the parent so the parent CRM can reconcile suppression state at the partner side without polling. Origin-locked to the embed parent; no partner action is required to receive it beyond listening on `window.message`.
+- **Envelope — exact shape.** The event carries only the fields below; no additional fields are present, no PII is included.
+
+  ```json
+  {
+    "source": "ballpoint-mailer",
+    "version": 1,
+    "type": "recipient_opt_out_changed",
+    "opted_out": true,
+    "recipients": [
+      { "contact_id": "ps_contact_abc123", "contact_type": "PROPERTY" },
+      { "contact_id": "ps_contact_def456", "contact_type": "MAILING" },
+      { "contact_id": "ps_contact_ghi789", "contact_type": null }
+    ]
+  }
+  ```
+
+  `source` is always the literal string `"ballpoint-mailer"`. `version` is `1`. `type` is `"recipient_opt_out_changed"`. `opted_out` is a boolean — see the next bullet. `recipients[]` mirrors the API response's `recipients[]`; `contact_type` may be `null`.
+- **Both directions carried on one event type.** `opted_out: true` fires after a successful `POST /v1/mail-tracking/recipients/opt-out` (opt-out applied); `opted_out: false` fires after a successful `DELETE /v1/mail-tracking/recipients/opt-out` (undo — opt-out cleared). Partners key their local suppression toggle off the `opted_out` boolean and the `(contact_id, contact_type)` pairs in `recipients[]`.
+- **Address-level + tenant-wide semantics.** The API matches by **normalized address** and applies the opt-out (or undo) to every recipient row at that address across every campaign the calling tenant owns. `recipients[]` accordingly lists **all distinct `contact_id`-bearing recipients at the matched address across the tenant** — one address input can (and often will) resolve to more than one `contact_id`, and the same `contact_id` will not appear twice regardless of how many campaigns reference it. The event's semantics follow the API's semantics — one input address, one event, all affected `contact_id`s in `recipients[]`.
+- **Event is suppressed when there is nothing to notify.** When no valid `contact_id` exists at the target address — e.g. every matched row was uploaded pre-`contact_id`, or every row's `contact_id` was omitted at upload — the **server-side opt-out (or undo) still succeeds** and the address is still suppressed (or unsuppressed) end-to-end, but the API response's `recipients[]` is empty and **no `recipient_opt_out_changed` postMessage is emitted**. This keeps partner-side reconciliation identifier-driven: an event without identifiers would carry no reconciliation signal, so the iframe suppresses the emit rather than dispatching an empty `recipients[]`.
+- **Fire-and-forget — no ack, no replay in this version.** The parent does not acknowledge receipt, and the iframe does not retry, buffer, or replay `recipient_opt_out_changed` if the parent is not listening at the moment of emit. Partners that need durable suppression reconciliation should treat the event as a **hint** and reconcile authoritatively off their existing suppression queries against the API. A replayable / acknowledged variant is an open joint-decision item and is not included in this release.
+- **Auto-suppress is not included in this release.** This release documents the opt-out **event surface**; it does **not** change the server-side suppression policy or introduce automatic suppression from any other signal (RTS scans, USPS undeliverable, etc.). Suppression continues to require an explicit `POST /v1/mail-tracking/recipients/opt-out` (or the existing suppression-list flows). Auto-suppress remains a separately-scoped item and is not shipped here.
+- **No database migration.** This release adds a response field to an existing endpoint and one new iframe → parent postMessage. No schema changes; no migration is applied on either staging or production.
+- **Version lockstep: `PARTNER_CONTRACT_VERSION` and the iframe handshake now report `1.7.10`.** Five-surface bump 1.7.9 → 1.7.10 across `ballpoint-api-docs/CHANGELOG.md` (this entry), `ballpoint-api/constants.py` (`PARTNER_CONTRACT_VERSION`), `ballpoint-iframe/js/build-info.js` (partner-contract handshake value), and `ballpoint-iframe/.github/workflows/deploy.yml` (both the staging and production hardcoded contract-version literal blocks). The lockstep gate (see `pattern_partner_contract_version_lockstep_gate`) is satisfied at `1.7.10` after this release.
+- **Availability — staging only.** The contract described in this entry is **available on staging** (partner-facing staging API + staging iframe). **Production is not on this build**; partners integrating against production continue to see the prior contract behavior until a subsequent release cuts this over. Partner-side integration work against this contract should be exercised on staging.
+
 ## v1.7.9 — 2026-07-10
 
 - **Docs corrections — webhook reference (`API_KIT.md` §7) aligned to shipped behavior. No contract change, no version bump.** This release is a **documentation accuracy fix**, not a behavior or contract change. Ten separately-verified drifts between the public webhook docs and the code Ballpoint actually ships were corrected against `ballpoint-api` HEAD `0c60f9d5`. **`PARTNER_CONTRACT_VERSION` is bumped to `1.7.9` as part of this release** — see the version-lockstep bullet below; the webhook-reference corrections themselves (D1-D10) remain pure documentation-accuracy fixes with no behavior change. Partners currently coding against §7 should re-read the section; existing integrations that already reconcile off `X-Ballpoint-Event` / `X-Ballpoint-Event-Id` and tolerate the previously-published field variants continue to work with no changes.
