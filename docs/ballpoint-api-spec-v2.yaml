@@ -336,6 +336,59 @@ components:
           nullable: true
         status_version:
           type: string
+    RecipientContactRef:
+      type: object
+      description: Partner contact reference for a piece affected by a recipient opt-out toggle. `contact_id` is the partner-supplied opaque identifier echoed verbatim from the original recipient upload; `contact_type` disambiguates two pieces sharing the same `contact_id` (`PROPERTY` vs `MAILING`).
+      required:
+      - contact_id
+      properties:
+        contact_id:
+          type: string
+          description: Partner-supplied opaque contact identifier, echoed verbatim from the original recipient upload.
+          example: ps_contact_8821
+        contact_type:
+          type: string
+          nullable: true
+          enum:
+          - PROPERTY
+          - MAILING
+          description: Address type as supplied by the partner on the original recipient upload. `null` when no address-type was supplied.
+          example: PROPERTY
+    RecipientOptOutResponse:
+      type: object
+      description: 'Response from `POST /v1/mail-tracking/recipients/opt-out` and `DELETE /v1/mail-tracking/recipients/opt-out`. Suppression is tenant-wide and address-level: the server matches by normalized address (case-insensitive `address`/`city`/`state` + first 5 digits of `zip`) across every campaign the tenant owns. `recipients[]` lists the distinct partner `contact_id`s at that address group and is computed regardless of `rows_affected`, so an idempotent repeat (0 rows) or the opt-in/undo direction still returns the full set.'
+      required:
+      - opted_out
+      - recipient_address
+      - recipient_city
+      - recipient_state
+      - recipient_zip
+      properties:
+        opted_out:
+          type: boolean
+          description: '`true` on the opt-out (POST) response; `false` on the opt-in/undo (DELETE) response.'
+        rows_affected:
+          type: integer
+          description: Number of `piece_tracking` rows the tenant-scoped UPDATE actually toggled. `0` on idempotent repeats (already opted out on POST, already opted in on DELETE).
+          default: 0
+        recipient_address:
+          type: string
+        recipient_city:
+          type: string
+        recipient_state:
+          type: string
+        recipient_zip:
+          type: string
+          description: First 5 digits of the ZIP, matching the server-side normalization.
+        recipients:
+          type: array
+          description: Distinct `(contact_id, contact_type)` pairs for the tenant-scoped address group. Includes only pieces that carry a partner `contact_id`; empty when no affected piece has one. Populated on both POST (opt-out) and DELETE (opt-in) responses, and computed regardless of `rows_affected`.
+          default: []
+          items:
+            $ref: '#/components/schemas/RecipientContactRef'
+          example:
+          - contact_id: ps_contact_8821
+            contact_type: PROPERTY
     RateLimitError:
       type: object
       description: Returned when request rate exceeds limit. Check Retry-After header.

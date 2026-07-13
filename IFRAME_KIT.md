@@ -1134,6 +1134,52 @@ No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` /
 2. Open your native marketing-list modal seeded with the supplied `recipients[]`, resolving each entry to a CRM contact by `(contact_id, contact_type)`.
 3. No reply postMessage is required. The iframe does not wait for one.
 
+#### `recipient_opt_out_changed` — User toggled Opt Out on a recipient row
+
+Sent when the user clicks the iframe's **Opt Out** control on a recipient row (either opting them out, `opted_out: true`, or undoing a previous opt-out, `opted_out: false`). The event hands the partner-side `contact_id`s for every piece at the affected address so PropStream can mirror the suppression state in its own CRM.
+
+**Fire-and-forget semantics (not a blocking handshake).** This event is a one-way notification. The iframe emits `recipient_opt_out_changed` and does NOT pause, await an ack, or wait for any parent response. The server-side opt-out has already been applied (via `POST /v1/mail-tracking/recipients/opt-out` or `DELETE /v1/mail-tracking/recipients/opt-out`) before the event is emitted; the parent takes whatever CRM action it wants and the iframe takes no further UI action.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "recipient_opt_out_changed",
+  "opted_out": true,
+  "recipients": [
+    { "contact_id": "ps_contact_8821", "contact_type": "PROPERTY" }
+  ]
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------------|
+| `source` | string | Always `ballpoint-mailer`. |
+| `version` | number | Always `1`. |
+| `type` | string | Always `recipient_opt_out_changed`. |
+| `opted_out` | boolean | `true` when the user just opted the recipient out; `false` when the user undid a previous opt-out. |
+| `recipients` | array | Non-empty list of distinct partner contacts at the affected address. |
+| `recipients[].contact_id` | string | Partner-supplied opaque contact identifier echoed verbatim from the original recipient upload (the same value PropStream uploaded and that the suppression / RTS endpoints surface). |
+| `recipients[].contact_type` | string \| null | `"PROPERTY"` or `"MAILING"` when the partner supplied it; `null` when no address-type was supplied. Disambiguates two pieces sharing the same `contact_id`. |
+
+No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` / `recipient_state` / `recipient_zip`) is included in this event. The parent already owns those values via its own CRM keyed by `(contact_id, contact_type)`.
+
+**Suppression is tenant-wide and address-level, not user- or campaign-scoped.** The server matches the target row by normalized address (case-insensitive `address`/`city`/`state` + first 5 digits of `zip`) across every campaign the tenant owns, and the opt-out flag is written to **every** piece_tracking row at that address for the tenant. Consequently, `recipients[]` lists **all distinct `contact_id`s** the tenant has ever mailed to that address across their campaigns — not just the piece the user clicked and not just the current campaign. The parent should mirror the suppression state at the same scope on its side (tenant-scoped, keyed by contact or by address, whichever the partner CRM uses).
+
+**Visibility / lifecycle**
+
+- Emitted only in **embed (iframe) mode**. In standalone (non-embedded) mode the CTA is present but this event is not emitted.
+- Emitted on **both directions** — `opted_out: true` when the user opts a recipient out, `opted_out: false` when the user undoes a previous opt-out. The `recipients[]` set is computed identically in both directions (the full tenant-scoped address group).
+- `recipients[]` is **filtered to affected pieces that carry a `contact_id`** — pieces without a `contact_id` (e.g. legacy uploads or Ballpoint-direct manifests with no partner key column) are omitted. **If no piece at the address carries a `contact_id`, the event is suppressed entirely** (the iframe does not emit an empty `recipients[]`). The server-side opt-out still applies in that case — it is only the parent-side notification that is skipped. This means `contact_id` on the original recipient upload is what makes the opt-out state round-trip to the partner CRM.
+- Emitted on **every user toggle**, including idempotent repeats where the server-side `rows_affected` is `0` (e.g. re-opting-out an already opted-out recipient). The server always returns the full contact set for the address group regardless of `rows_affected`, so the iframe can safely re-emit.
+- **Pre-lock behavior:** queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Not broadcast to all allowlisted origins. Identical treatment to [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail).
+
+**Expected PropStream behavior**
+
+1. Listen for `recipient_opt_out_changed`.
+2. For each `recipients[]` entry, resolve to a CRM contact by `(contact_id, contact_type)` and mirror the suppression state on your side (`opted_out: true` → mark suppressed; `opted_out: false` → clear suppression).
+3. No reply postMessage is required. The iframe does not wait for one.
+
 ### Campaign Events
 
 #### `campaign_created` — Campaign created (before submission)
