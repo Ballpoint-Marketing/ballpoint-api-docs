@@ -908,7 +908,7 @@ Emitted by the parent app (e.g. PropStream) after successfully PATCHing each `af
 
 ```json
 {
-  "source": "propstream-app",
+  "source": "propstream",
   "version": 1,
   "type": "recipients_updated",
   "tenantKey": "ps_acc_42",
@@ -1133,6 +1133,46 @@ No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` /
 1. Listen for `add_to_marketing_list_requested`.
 2. Open your native marketing-list modal seeded with the supplied `recipients[]`, resolving each entry to a CRM contact by `(contact_id, contact_type)`.
 3. No reply postMessage is required. The iframe does not wait for one.
+
+#### `auto_suppress_next_drop_changed` — User changed the next-drop auto-suppress preference
+
+Sent when the user checks or unchecks **Auto-suppress on next drop** in the RTS Suppression List. This is a PropStream-only, fire-and-forget preference intent. It tells the parent what the user selected; it does not perform suppression inside the iframe.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "auto_suppress_next_drop_changed",
+  "enabled": true,
+  "ballpointCampaignId": "cmp_abc"
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `source` | string | Always `ballpoint-mailer`. |
+| `version` | number | Always `1`. |
+| `type` | string | Always `auto_suppress_next_drop_changed`. |
+| `enabled` | boolean | `true` when checked; `false` when unchecked. |
+| `ballpointCampaignId` | string | Non-empty server-side Ballpoint campaign id for the suppression-list view. Never a PropStream list id and never `null` on this event. |
+
+The event contains no recipients, contact identifiers, recipient PII, counts, prices, order ids, request id, or acknowledgement fields. The iframe does not choose which future order is the "next drop," call a recipient-update endpoint, or update any displayed count/price in response to the click.
+
+**Visibility and state**
+
+- The checkbox is rendered only for an allowlisted **PropStream** parent origin. It is absent in standalone/demo mode and other partner embeds.
+- The checkbox is rendered only when the iframe can resolve a non-empty `ballpointCampaignId` from the active campaign detail.
+- The iframe remembers a successfully emitted choice only for the lifetime of the current iframe document so ordinary detail re-renders do not visually undo the click. Reloading the iframe resets that visual state in v1.7.11; there is no hydration message in this contract.
+- The event is delivered only to the origin-locked parent. It is queued until that lock exists and is never added to the pre-lock broadcast allowlist.
+- Fire-and-forget: no parent acknowledgement, retry, replay, or optimistic count/pricing update is defined.
+
+**Expected PropStream behavior**
+
+1. Listen for `auto_suppress_next_drop_changed` and persist the boolean preference against the supplied `ballpointCampaignId` (or the corresponding campaign record on the PropStream side).
+2. When the next drop becomes applicable, determine the target order and suppression set using PropStream's own campaign/contact context.
+3. Apply the recipient change through the existing Ballpoint recipient-update API flow; this event does not introduce a new Ballpoint endpoint.
+4. After the authoritative recipient update succeeds, send the existing [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) message. The iframe then performs its existing campaign-history refresh.
+5. No reply is required for the checkbox click itself. Before production rollout, Ballpoint and PropStream must confirm whether a future hydration contract is needed to restore the checkbox after iframe reload.
 
 #### `recipient_opt_out_changed` — User toggled Opt Out on a recipient row
 
