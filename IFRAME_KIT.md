@@ -189,6 +189,21 @@ All messages must include these base fields:
 
 This is the only message that can be sent more than once (to refresh tokens). All other message types are accepted once per session.
 
+For a PropStream embed, the iframe uses this configuration plus the
+`externalUserId` from `set_list` to fetch `GET /v1/config`. The response is
+cached in memory for the API-provided TTL (currently 60 seconds), coalesces
+concurrent fetches, refreshes after expiry/visibility wake, and is invalidated
+when API credentials or list context are refreshed. It is never written to
+`localStorage` or `sessionStorage`.
+
+`propstream_send_mail_enabled` is a preventive submit gate. If configuration
+cannot be fetched or the flag is false, the iframe does not call `POST /orders`.
+The API independently re-evaluates the flag on both order-creation routes, so
+the browser check is not the security boundary. The flag introduces **no new
+button, checkbox, copy, or layout**. PropStream continues to own visibility of
+its Send Mail entry point; Ballpoint owns the submit decision after the user
+enters the iframe. Non-PropStream embeds are unchanged.
+
 ### `set_list` — Recipient list info (required)
 
 | Field | Type | Description |
