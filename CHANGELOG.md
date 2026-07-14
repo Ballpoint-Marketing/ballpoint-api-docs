@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.12 — 2026-07-14
+
+- **Additive partner configuration endpoint:** `GET /v1/config`, authenticated by `X-Partner-Key`, returns boolean-only flags, evaluation metadata, and a 60-second private cache TTL. Optional `X-External-User-ID` selects the per-user rollout context. The response contains no raw or hashed user/account identifiers.
+- **PropStream Send Mail rollout gate:** `propstream_send_mail_enabled` starts OFF. Evaluation precedence is kill switch, source-qualified user allowlist, source-qualified account allowlist, partner-source allowlist, deterministic HMAC percentage, then default state. Unknown/unavailable configuration fails closed.
+- **Authoritative API enforcement:** PropStream calls to both `POST /orders` and `POST /v1/billing/orders` return `403 FEATURE_DISABLED` before idempotency, campaign/order creation, billing, or other mutation when disabled. Non-PropStream and internal calls are unchanged.
+- **Iframe preventive enforcement with no interface change:** the iframe fetches/coalesces/caches configuration in memory, refreshes on expiry/visibility/context changes, and suppresses `POST /orders` when disabled. No button, checkbox, copy, CSS, or layout is added; PropStream owns Send Mail button visibility.
+- **Operational controls:** migration `038_feature_flags.sql` adds DB-trigger-enforced audit history; percentage rollout requires `FLAG_BUCKET_SECRET`. Configuration limits are 10/min per partner-key+external-user and 3,000/min aggregate per partner key, with a structured distinct-user enumeration advisory.
+- **Version lockstep:** API, iframe committed metadata, both iframe deploy literal blocks, and this changelog now report `1.7.12`.
+- **Rollout scope:** code and contract are prepared for migration-first staging validation. This entry is not a production deployment claim.
+
 ## v1.7.11 — 2026-07-14
 
 - **Additive PropStream iframe event: `auto_suppress_next_drop_changed`.** The RTS Suppression List now shows an **Auto-suppress on next drop** checkbox only when the iframe is embedded by an allowlisted PropStream origin and the active view has a resolvable Ballpoint campaign id. Each ON/OFF change emits exactly `{ source: "ballpoint-mailer", version: 1, type: "auto_suppress_next_drop_changed", enabled: boolean, ballpointCampaignId: string }` to the origin-locked parent.

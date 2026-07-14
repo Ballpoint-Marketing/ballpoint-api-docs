@@ -24,6 +24,8 @@ tags:
   description: Partner debugging and support
 - name: Sandbox
   description: Testing and integration validation
+- name: Partner Configuration
+  description: Partner-authenticated feature configuration bootstrap
 - name: Mail Tracking
   description: USPS mail tracking — campaign summary, piece-level status, scan events, RTS suppression
 components:
@@ -143,6 +145,7 @@ components:
               - NOT_FOUND
               - UNAUTHORIZED
               - FORBIDDEN
+              - FEATURE_DISABLED
             message:
               type: string
               description: Human-readable error message
@@ -152,6 +155,88 @@ components:
             trace_id:
               type: string
               description: Request trace ID for support
+    PartnerConfigResponse:
+      type: object
+      required:
+      - flags
+      - evaluated_at
+      - evaluation_context
+      - cache_ttl_seconds
+      properties:
+        flags:
+          type: object
+          description: Boolean-only feature flags resolved for this partner context.
+          additionalProperties:
+            type: boolean
+          example:
+            propstream_send_mail_enabled: false
+        evaluated_at:
+          type: string
+          format: date-time
+        evaluation_context:
+          $ref: '#/components/schemas/PartnerConfigEvaluationContext'
+        cache_ttl_seconds:
+          type: integer
+          const: 60
+    PartnerConfigEvaluationContext:
+      type: object
+      required:
+      - principal_type
+      - source
+      - kill_switch_engaged
+      properties:
+        principal_type:
+          type: string
+          const: partner
+        source:
+          type: string
+          example: propstream
+        kill_switch_engaged:
+          type: boolean
+      description: Contains no raw or hashed user/account identifier.
+    BillingOrderCreateRequest:
+      type: object
+      required:
+      - campaign_id
+      - product_type
+      - postage_type
+      - piece_count
+      properties:
+        campaign_id:
+          type: string
+        product_type:
+          type: string
+        postage_type:
+          type: string
+        piece_count:
+          type: integer
+          minimum: 1
+        envelope_style:
+          type:
+          - string
+          - 'null'
+        external_user_id:
+          type:
+          - string
+          - 'null'
+        external_user_metadata:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+        metadata:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+        print_font:
+          type:
+          - string
+          - 'null'
+        shipping_option:
+          type:
+          - string
+          - 'null'
     PricingRow:
       type: object
       description: 'One row in the pricing catalog response from `GET /v1/billing/pricing`. For partner principals with a configured markup, `unit_price_tcents` is the marked-up (retail) price shown to end users; internal/live/test principals see base prices. Dollars = tcents / 10000.'
@@ -1456,12 +1541,123 @@ paths:
           description: Order not found
         '429':
           description: Subscriber cap exceeded. Either per-order (MAX_SSE_SUBSCRIBERS_PER_ORDER) or per-account (MAX_SSE_SUBSCRIBERS_PER_ACCOUNT) limit reached.
+  /v1/config:
+    get:
+      tags:
+      - Partner Configuration
+      summary: Resolve partner feature flags
+      operationId: get_partner_config
+      description: |
+        Returns boolean-only partner feature flags for the current source/user
+        context. The iframe caches this response in memory for 60 seconds.
+        For PropStream, `propstream_send_mail_enabled` also gates both order
+        creation routes authoritatively; disabled requests return
+        `403 FEATURE_DISABLED` before any mutation.
+      security:
+      - partnerKeyAuth: []
+      parameters:
+      - name: X-External-User-ID
+        in: header
+        required: false
+        description: Partner user ID for source-qualified rollout evaluation.
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        '200':
+          description: Resolved feature configuration
+          headers:
+            Cache-Control:
+              description: Private in-memory cache TTL.
+              schema:
+                type: string
+                const: private, max-age=60
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerConfigResponse'
+        '400':
+          description: Invalid external user ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing/invalid partner key or non-partner principal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Partner account suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 10/min per user context or 3,000/min per partner key exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/billing/orders:
+    post:
+      tags:
+      - Billing
+      summary: Create an order with billing gate enforced
+      operationId: create_order_v1_billing_orders_post
+      description: PropStream requests return 403 FEATURE_DISABLED before idempotency, order creation, or billing when propstream_send_mail_enabled resolves false. Other sources are unchanged.
+      security:
+      - partnerKeyAuth: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: X-External-User-ID
+        in: header
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingOrderCreateRequest'
+      responses:
+        '202':
+          description: Order accepted
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Validation error or missing idempotency key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Account suspended or PropStream Send Mail feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Request body validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /orders:
     post:
       tags:
       - Partner Orders
       summary: Create order (partner format)
-      description: Accepts the partner iframe order format and translates to internal model.
+      description: Accepts the partner iframe order format and translates to internal model. PropStream requests return 403 FEATURE_DISABLED before any mutation when propstream_send_mail_enabled resolves false.
       operationId: partner_create_order_orders_post
       security:
       - partnerKeyAuth: []
@@ -1479,6 +1675,12 @@ paths:
               schema:
                 type: object
                 description: Order acceptance payload (shape not strictly modeled in OpenAPI source).
+        '403':
+          description: Account suspended or PropStream Send Mail feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Validation Error
           content:

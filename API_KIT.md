@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.2.2 · May 2026**
+> **v1.7.12 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -67,6 +67,7 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
    - [6j. Per-end-user attribution (external_user_metadata)](#6j-per-end-user-attribution-external_user_metadata)
    - [6k. Confirm Payment (Partner Payment Gate)](#6k-confirm-payment-partner-payment-gate)
    - [6l. Partner Dashboard Endpoints](#6l-partner-dashboard-endpoints)
+   - [6r. Partner Feature Configuration](#6r-partner-feature-configuration)
 7. [Status Updates via Webhooks](#7-status-updates-via-webhooks)
    - [Per-piece RTS Push-Back (V1)](#per-piece-rts-push-back-v1)
 8. [Real-Time UI via SSE (Optional)](#8-real-time-ui-via-sse-optional)
@@ -1699,6 +1700,47 @@ Unknown product types are rejected by validation (`INVALID_PRODUCT_CONFIG`). If 
 
 The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date ≤ today + 1 day`.
 
+### 6r. Partner Feature Configuration
+
+`GET /v1/config` resolves the current partner feature flags for the requesting
+user. The embedded iframe calls this automatically; partners normally do not
+need to call it themselves.
+
+```bash
+curl https://api.ballpointmarketing.com/v1/config \
+  -H "X-Partner-Key: ${BALLPOINT_PARTNER_KEY}" \
+  -H "X-External-User-ID: user_456"
+```
+
+```json
+{
+  "flags": { "propstream_send_mail_enabled": false },
+  "evaluated_at": "2026-07-14T16:00:00Z",
+  "evaluation_context": {
+    "principal_type": "partner",
+    "source": "propstream",
+    "kill_switch_engaged": false
+  },
+  "cache_ttl_seconds": 60
+}
+```
+
+The response contains boolean flags only and never returns raw or hashed user
+or account identifiers. Cache it in memory for 60 seconds (`Cache-Control:
+private, max-age=60`). Do not persist it to browser storage. `X-External-User-ID`
+is optional; without it, evaluation uses the partner/account context only.
+
+Rate limits are 10 requests/minute per partner-key + external-user pair and
+3,000 requests/minute per partner key. Headerless requests skip the per-user
+tier. Standard `401`, `403`, and `429` errors apply.
+
+For PropStream, `propstream_send_mail_enabled` authoritatively gates both
+`POST /orders` and `POST /v1/billing/orders`. A disabled evaluation returns
+`403 FEATURE_DISABLED` before idempotency, order creation, or billing. Other
+partner sources and internal flows are unchanged. This flag is a rollout
+control, not strong user authorization: the external user ID is asserted by
+the partner holding the shared partner key.
+
 ---
 
 ## 7. Status Updates via Webhooks
@@ -2421,6 +2463,7 @@ Before switching to your live key:
 | Action | Method | Path | Key Headers |
 |--------|--------|------|-------------|
 | Preview cost (single order) | `POST` | `/v1/billing/orders/preview` | `X-Partner-Key` |
+| Resolve partner feature flags (iframe automatic) | `GET` | `/v1/config` | `X-Partner-Key`, optional `X-External-User-ID` |
 | Preview campaign cost (payment-gate) | `POST` | `/v1/billing/campaigns/preview` | `X-Partner-Key` (server-to-server) |
 | Create order | `POST` | `/v1/billing/orders` | `X-Partner-Key`, `Idempotency-Key`, `X-External-User-ID` |
 | Get order | `GET` | `/v1/billing/orders/{id}` | `X-Partner-Key` |
