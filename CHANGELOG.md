@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.14 — 2026-07-15
+
+- **`open_create_direct_mail` is now idempotent during an active create flow.** The first valid parent → iframe command still opens the existing creation path and emits its normal `page_changed`. Replayed commands while the user is already in that creation lifecycle are ignored: the iframe does not call `startNewCampaign()` again, navigate, clear selections/form state, or emit another `page_changed`.
+- **A legitimate later campaign remains supported in the same iframe load.** The replay guard is lifecycle-aware rather than once-per-document. Returning to the Direct Mail Dashboard, explicitly cancelling/abandoning the flow, or completing it rearms the command, so a later valid `open_create_direct_mail` may start a fresh campaign even for the same list.
+- **Partner guidance:** PropStream and other parent apps should still avoid duplicate sends. The iframe-side guard is defense-in-depth for framework effect reruns, retries, or replayed messages; it does not add an acknowledgement or change the command payload.
+- **No API, webhook, schema, billing, pricing, or tenant behavior changes.** This release changes only iframe navigation lifecycle semantics, regression coverage, public iframe documentation, and partner-contract metadata. `open_create_direct_mail_failed` behavior for missing list context or an unavailable handler is unchanged.
+- **Version lockstep:** API metadata, iframe committed metadata and deploy literals, and this changelog report `1.7.14`.
+- **Rollout scope — staging first.** Validate the replay sequence in the real PropStream staging embed before any production cutover.
+
 ## v1.7.13 — 2026-07-14
 
 - **Restored the dedicated terminal-drop contract.** Ballpoint now emits `order.drop_completed` when a drop reaches `complete` and `order.drop_cancelled` when the canonical partner/staff cancellation path succeeds, in addition to the existing `order.status_changed` transition. This resolves the drift introduced when v1.7.9 documented the then-shipped runtime instead of the originally communicated dedicated-event contract.
