@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Ballpoint partner webhook HTTP headers",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "Content-Type",
+    "X-Ballpoint-Timestamp",
+    "X-Ballpoint-Event",
+    "X-Ballpoint-Event-Id",
+    "X-Ballpoint-Delivery",
+    "User-Agent"
+  ],
+  "properties": {
+    "Content-Type": { "const": "application/json" },
+    "X-Ballpoint-Timestamp": { "type": "string", "format": "date-time" },
+    "X-Ballpoint-Event": {
+      "type": "string",
+      "enum": [
+        "order.drop_completed",
+        "order.drop_cancelled",
+        "order.status_changed",
+        "order.rescheduled",
+        "order.usps_update",
+        "campaign.mail_tracking.rts_update"
+      ]
+    },
+    "X-Ballpoint-Event-Id": { "type": "string", "format": "uuid" },
+    "X-Ballpoint-Delivery": { "type": "string", "format": "uuid" },
+    "User-Agent": { "type": "string", "pattern": "^Ballpoint-Webhooks/" },
+    "X-Ballpoint-Signature": {
+      "type": "string",
+      "pattern": "^sha256=[0-9a-f]{64}$",
+      "description": "HMAC-SHA256 over UTF-8(timestamp header + exact raw body bytes)."
+    },
+    "X-Ballpoint-Insecure": {
+      "const": "true",
+      "description": "Grace-period marker present only when an endpoint has no signing secret configured."
+    }
+  },
+  "oneOf": [
+    {
+      "required": ["X-Ballpoint-Signature"],
+      "not": { "required": ["X-Ballpoint-Insecure"] }
+    },
+    {
+      "required": ["X-Ballpoint-Insecure"],
+      "not": { "required": ["X-Ballpoint-Signature"] }
+    }
+  ]
+}

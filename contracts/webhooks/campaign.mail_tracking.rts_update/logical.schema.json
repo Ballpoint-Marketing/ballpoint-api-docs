@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/campaign.mail_tracking.rts_update/logical.schema.json",
+  "title": "campaign.mail_tracking.rts_update logical payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "version", "created_at", "data"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Legacy wrapped-payload identifier. It is not the transport deduplication key."
+    },
+    "type": { "const": "campaign.mail_tracking.rts_update" },
+    "version": { "const": "2026-02-01" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "data": { "$ref": "#/$defs/data" }
+  },
+  "$defs": {
+    "nullableString": { "type": ["string", "null"] },
+    "rate": { "type": "number", "minimum": 0, "maximum": 100 },
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "external_account_id", "external_user_id", "external_id"],
+      "properties": {
+        "source": { "$ref": "#/$defs/nullableString" },
+        "external_account_id": { "$ref": "#/$defs/nullableString" },
+        "external_user_id": { "$ref": "#/$defs/nullableString" },
+        "external_id": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "piece": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "piece_id", "status", "recipient_name", "recipient_address",
+        "recipient_city", "recipient_state", "recipient_zip", "last_scan_at",
+        "contact_id", "contact_type"
+      ],
+      "properties": {
+        "piece_id": { "type": "string", "pattern": "^[0-9a-f]{24}$" },
+        "status": { "$ref": "#/$defs/nullableString" },
+        "recipient_name": { "$ref": "#/$defs/nullableString" },
+        "recipient_address": { "$ref": "#/$defs/nullableString" },
+        "recipient_city": { "$ref": "#/$defs/nullableString" },
+        "recipient_state": { "$ref": "#/$defs/nullableString" },
+        "recipient_zip": { "$ref": "#/$defs/nullableString" },
+        "last_scan_at": {
+          "anyOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }]
+        },
+        "contact_id": { "$ref": "#/$defs/nullableString" },
+        "contact_type": {
+          "anyOf": [
+            { "type": "string", "enum": ["PROPERTY", "MAILING"] },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "campaign_id", "mail_status", "total_pieces", "scanned_pieces",
+        "scan_coverage", "delivered", "in_transit", "out_for_delivery",
+        "rts", "forwarded", "delivered_rate", "rts_rate", "first_scan_at",
+        "last_scan_at", "integration", "new_rts_pieces", "new_rts_count"
+      ],
+      "properties": {
+        "campaign_id": { "type": "string", "minLength": 1 },
+        "mail_status": { "type": "string", "minLength": 1 },
+        "total_pieces": { "type": "integer", "minimum": 0 },
+        "scanned_pieces": { "type": "integer", "minimum": 0 },
+        "scan_coverage": { "$ref": "#/$defs/rate" },
+        "delivered": { "type": "integer", "minimum": 0 },
+        "in_transit": { "type": "integer", "minimum": 0 },
+        "out_for_delivery": { "type": "integer", "minimum": 0 },
+        "rts": { "type": "integer", "minimum": 0 },
+        "forwarded": { "type": "integer", "minimum": 0 },
+        "delivered_rate": { "$ref": "#/$defs/rate" },
+        "rts_rate": { "$ref": "#/$defs/rate" },
+        "first_scan_at": {
+          "anyOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }]
+        },
+        "last_scan_at": {
+          "anyOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }]
+        },
+        "integration": { "$ref": "#/$defs/integration" },
+        "new_rts_pieces": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/piece" }
+        },
+        "new_rts_count": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    }
+  }
+}

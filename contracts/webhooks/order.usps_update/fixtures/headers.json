@@ -1,0 +1,9 @@
+{
+  "Content-Type": "application/json",
+  "X-Ballpoint-Timestamp": "2026-07-14T15:00:00+00:00",
+  "X-Ballpoint-Event": "order.usps_update",
+  "X-Ballpoint-Event-Id": "55555555-5555-4555-8555-555555555555",
+  "X-Ballpoint-Delivery": "00000008-aaaa-4aaa-8aaa-000000000008",
+  "User-Agent": "Ballpoint-Webhooks/3.1",
+  "X-Ballpoint-Signature": "sha256=eeb2c814bebaee8e1a3cb7811971f96fcc703794780835b28cc016ed7add7c61"
+}

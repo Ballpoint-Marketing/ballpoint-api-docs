@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/order.status_changed/logical.schema.json",
+  "title": "order.status_changed logical payload",
+  "description": "The four runtime variants are intentionally preserved as shipped.",
+  "oneOf": [
+    { "$ref": "#/$defs/worker_failed" },
+    { "$ref": "#/$defs/staff_transition" },
+    { "$ref": "#/$defs/partner_cancelled" },
+    { "$ref": "#/$defs/payment_expired" }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "nullableString": { "type": ["string", "null"] },
+    "nullableObject": { "type": ["object", "null"] },
+    "worker_failed": {
+      "type": "object",
+      "required": [
+        "order_id", "campaign_id", "previous_production_status",
+        "production_status", "display_status", "product_type",
+        "external_user_id", "source", "external_account_id", "error_message"
+      ],
+      "properties": {
+        "order_id": { "type": "string", "minLength": 1 },
+        "campaign_id": { "$ref": "#/$defs/nullableString" },
+        "previous_production_status": { "$ref": "#/$defs/nullableString" },
+        "production_status": { "const": "failed" },
+        "display_status": { "const": "failed" },
+        "product_type": { "$ref": "#/$defs/nullableString" },
+        "external_user_id": { "$ref": "#/$defs/nullableString" },
+        "source": { "$ref": "#/$defs/nullableString" },
+        "external_account_id": { "$ref": "#/$defs/nullableString" },
+        "error_message": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "staff_transition": {
+      "type": "object",
+      "required": [
+        "order_id", "campaign_id", "previous_production_status",
+        "production_status", "usps_status", "display_status", "product_type",
+        "note", "external_user_id", "external_user_metadata", "list_id",
+        "source", "external_account_id"
+      ],
+      "properties": {
+        "order_id": { "type": "string", "minLength": 1 },
+        "campaign_id": { "$ref": "#/$defs/nullableString" },
+        "previous_production_status": { "$ref": "#/$defs/nullableString" },
+        "production_status": { "type": "string", "minLength": 1 },
+        "usps_status": { "$ref": "#/$defs/nullableString" },
+        "display_status": { "type": "string", "minLength": 1 },
+        "product_type": { "$ref": "#/$defs/nullableString" },
+        "note": { "$ref": "#/$defs/nullableString" },
+        "external_user_id": { "$ref": "#/$defs/nullableString" },
+        "external_user_metadata": { "$ref": "#/$defs/nullableObject" },
+        "list_id": { "type": "string" },
+        "source": { "$ref": "#/$defs/nullableString" },
+        "external_account_id": { "$ref": "#/$defs/nullableString" },
+        "refund": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["transaction_id", "refund_cents", "balance_after_cents"],
+          "properties": {
+            "transaction_id": { "type": "string", "minLength": 1 },
+            "refund_cents": { "type": "integer", "minimum": 0 },
+            "balance_after_cents": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "partner_cancelled": {
+      "type": "object",
+      "required": [
+        "order_id", "campaign_id", "previous_status", "new_status",
+        "external_user_id", "external_user_metadata", "list_id"
+      ],
+      "properties": {
+        "order_id": { "type": "string", "minLength": 1 },
+        "campaign_id": { "$ref": "#/$defs/nullableString" },
+        "previous_status": { "type": "string", "minLength": 1 },
+        "new_status": { "const": "cancelled" },
+        "external_user_id": { "$ref": "#/$defs/nullableString" },
+        "external_user_metadata": { "$ref": "#/$defs/nullableObject" },
+        "list_id": { "type": "string" }
+      }
+    },
+    "payment_expired": {
+      "type": "object",
+      "required": [
+        "order_id", "campaign_id", "previous_status", "new_status",
+        "trigger", "failure_reason", "external_user_id",
+        "external_user_metadata", "list_id"
+      ],
+      "properties": {
+        "order_id": { "type": "string", "minLength": 1 },
+        "campaign_id": { "$ref": "#/$defs/nullableString" },
+        "previous_status": { "const": "scheduled" },
+        "new_status": { "const": "payment_failed" },
+        "trigger": { "const": "payment_confirmation_expired" },
+        "failure_reason": { "const": "expired_no_payment_confirmation" },
+        "external_user_id": { "$ref": "#/$defs/nullableString" },
+        "external_user_metadata": { "$ref": "#/$defs/nullableObject" },
+        "list_id": { "type": "string" }
+      }
+    }
+  }
+}

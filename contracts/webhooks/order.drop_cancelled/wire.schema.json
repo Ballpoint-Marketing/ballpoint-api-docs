@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/order.drop_cancelled/wire.schema.json",
+  "title": "order.drop_cancelled wire body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "order_id",
+    "campaign_id",
+    "cancelled_at",
+    "drop_index",
+    "total_drops",
+    "ballpoint_billed",
+    "ballpoint_billed_amount_tcents",
+    "reason",
+    "event_id",
+    "event_type",
+    "timestamp"
+  ],
+  "properties": {
+    "type": { "const": "order.drop_cancelled" },
+    "order_id": { "type": "string", "minLength": 1 },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "cancelled_at": { "type": "string", "format": "date-time" },
+    "drop_index": { "type": "integer", "minimum": 1 },
+    "total_drops": { "type": "integer", "minimum": 1 },
+    "ballpoint_billed": { "type": "boolean" },
+    "ballpoint_billed_amount_tcents": { "type": "integer", "minimum": 0 },
+    "reason": {
+      "type": "string",
+      "enum": ["user_cancel", "staff_cancel"]
+    },
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "const": "order.drop_cancelled" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "ballpoint_billed": { "const": true } },
+        "required": ["ballpoint_billed"]
+      },
+      "then": {
+        "properties": {
+          "ballpoint_billed_amount_tcents": { "minimum": 1 }
+        }
+      },
+      "else": {
+        "properties": {
+          "ballpoint_billed_amount_tcents": { "const": 0 }
+        }
+      }
+    }
+  ]
+}

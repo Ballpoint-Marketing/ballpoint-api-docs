@@ -1,0 +1,13 @@
+{
+  "order_id": "ord_fixture_payment_expired",
+  "campaign_id": "campaign_fixture_partner",
+  "previous_status": "scheduled",
+  "new_status": "payment_failed",
+  "trigger": "payment_confirmation_expired",
+  "failure_reason": "expired_no_payment_confirmation",
+  "external_user_id": "user_fixture_42",
+  "external_user_metadata": {
+    "segment": "fixture"
+  },
+  "list_id": "list_fixture_42"
+}

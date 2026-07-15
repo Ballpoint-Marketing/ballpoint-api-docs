@@ -1,0 +1,32 @@
+name: Partner contract checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  webhook-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install jsonschema==4.23.0 PyYAML==6.0.2
+      - run: python tools/contract-check/check-webhook-contracts.py
+      - name: Parse OpenAPI and assert canonical webhook references
+        run: |
+          python - <<'PY'
+          import pathlib, yaml
+          spec = yaml.safe_load(pathlib.Path("docs/ballpoint-api-spec-v2.yaml").read_text())
+          assert "/orders/{order_id}/cancel" in spec["paths"]
+          assert len(spec["webhooks"]) == 6
+          for item in spec["webhooks"].values():
+              ref = item["post"]["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+              assert (pathlib.Path("docs") / ref).resolve().is_file(), ref
+          print("OK: OpenAPI paths and webhook references")
+          PY

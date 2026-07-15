@@ -47,10 +47,12 @@ export default {
 
     // 4. Parse and process the event
     const payload = JSON.parse(rawBody);
-    console.log(`Webhook received: ${payload.type} (${eventId})`);
+    const eventType = payload.event_type || payload.type;
+    const eventData = eventType === "campaign.mail_tracking.rts_update" ? payload.data : payload;
+    console.log(`Webhook received: ${eventType} (${eventId})`);
 
-    const orderId = payload.data?.order_id;
-    const status = payload.data?.display_status;
+    const orderId = eventData?.order_id;
+    const status = eventData?.display_status || eventData?.production_status || eventData?.new_status || eventType;
     console.log(`Order ${orderId} → ${status}`);
 
     return Response.json({ received: true }, { status: 200 });

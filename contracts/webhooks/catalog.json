@@ -1,0 +1,135 @@
+{
+  "catalog_version": "1.0",
+  "canonical_layer": "wire",
+  "headers_contract": "headers/contract.json",
+  "transport": {
+    "event_id": "Persisted transport deduplication key, stable across retries and endpoints.",
+    "delivery_id": "Unique identifier for one HTTP request attempt.",
+    "signature_input": "UTF-8(X-Ballpoint-Timestamp + exact raw body bytes)"
+  },
+  "events": [
+    {
+      "type": "order.drop_completed",
+      "status": "emitted",
+      "logical_schema": "order.drop_completed/logical.schema.json",
+      "wire_schema": "order.drop_completed/wire.schema.json",
+      "fixtures": [{
+        "logical": "order.drop_completed/fixtures/logical.json",
+        "wire": "order.drop_completed/fixtures/wire.json",
+        "raw_body": "order.drop_completed/fixtures/wire.body.json",
+        "headers": "order.drop_completed/fixtures/headers.json"
+      }]
+    },
+    {
+      "type": "order.drop_cancelled",
+      "status": "emitted",
+      "logical_schema": "order.drop_cancelled/logical.schema.json",
+      "wire_schema": "order.drop_cancelled/wire.schema.json",
+      "fixtures": [{
+        "logical": "order.drop_cancelled/fixtures/logical.json",
+        "wire": "order.drop_cancelled/fixtures/wire.json",
+        "raw_body": "order.drop_cancelled/fixtures/wire.body.json",
+        "headers": "order.drop_cancelled/fixtures/headers.json"
+      }]
+    },
+    {
+      "type": "order.status_changed",
+      "status": "emitted",
+      "logical_schema": "order.status_changed/logical.schema.json",
+      "wire_schema": "order.status_changed/wire.schema.json",
+      "variants": [
+        "worker_failed",
+        "staff_transition",
+        "partner_cancelled",
+        "payment_expired"
+      ],
+      "fixtures": [
+        {
+          "variant": "worker_failed",
+          "logical": "order.status_changed/fixtures/worker_failed.logical.json",
+          "wire": "order.status_changed/fixtures/worker_failed.wire.json",
+          "raw_body": "order.status_changed/fixtures/worker_failed.wire.body.json",
+          "headers": "order.status_changed/fixtures/worker_failed.headers.json"
+        },
+        {
+          "variant": "staff_transition",
+          "logical": "order.status_changed/fixtures/staff_transition.logical.json",
+          "wire": "order.status_changed/fixtures/staff_transition.wire.json",
+          "raw_body": "order.status_changed/fixtures/staff_transition.wire.body.json",
+          "headers": "order.status_changed/fixtures/staff_transition.headers.json"
+        },
+        {
+          "variant": "partner_cancelled",
+          "logical": "order.status_changed/fixtures/partner_cancelled.logical.json",
+          "wire": "order.status_changed/fixtures/partner_cancelled.wire.json",
+          "raw_body": "order.status_changed/fixtures/partner_cancelled.wire.body.json",
+          "headers": "order.status_changed/fixtures/partner_cancelled.headers.json"
+        },
+        {
+          "variant": "payment_expired",
+          "logical": "order.status_changed/fixtures/payment_expired.logical.json",
+          "wire": "order.status_changed/fixtures/payment_expired.wire.json",
+          "raw_body": "order.status_changed/fixtures/payment_expired.wire.body.json",
+          "headers": "order.status_changed/fixtures/payment_expired.headers.json"
+        }
+      ]
+    },
+    {
+      "type": "order.rescheduled",
+      "status": "emitted",
+      "logical_schema": "order.rescheduled/logical.schema.json",
+      "wire_schema": "order.rescheduled/wire.schema.json",
+      "fixtures": [{
+        "logical": "order.rescheduled/fixtures/logical.json",
+        "wire": "order.rescheduled/fixtures/wire.json",
+        "raw_body": "order.rescheduled/fixtures/wire.body.json",
+        "headers": "order.rescheduled/fixtures/headers.json"
+      }]
+    },
+    {
+      "type": "order.usps_update",
+      "status": "emitted",
+      "logical_schema": "order.usps_update/logical.schema.json",
+      "wire_schema": "order.usps_update/wire.schema.json",
+      "fixtures": [{
+        "logical": "order.usps_update/fixtures/logical.json",
+        "wire": "order.usps_update/fixtures/wire.json",
+        "raw_body": "order.usps_update/fixtures/wire.body.json",
+        "headers": "order.usps_update/fixtures/headers.json"
+      }]
+    },
+    {
+      "type": "campaign.mail_tracking.rts_update",
+      "status": "emitted",
+      "logical_schema": "campaign.mail_tracking.rts_update/logical.schema.json",
+      "wire_schema": "campaign.mail_tracking.rts_update/wire.schema.json",
+      "logical_id_semantics": "Legacy wrapped-payload identifier, distinct from event_id.",
+      "fixtures": [{
+        "logical": "campaign.mail_tracking.rts_update/fixtures/logical.json",
+        "wire": "campaign.mail_tracking.rts_update/fixtures/wire.json",
+        "raw_body": "campaign.mail_tracking.rts_update/fixtures/wire.body.json",
+        "headers": "campaign.mail_tracking.rts_update/fixtures/headers.json"
+      }]
+    },
+    {
+      "type": "campaign.mail_tracking.in_transit",
+      "status": "not_emitted",
+      "reason": "Registered name only; no runtime enqueue path exists."
+    },
+    {
+      "type": "campaign.mail_tracking.out_for_delivery",
+      "status": "not_emitted",
+      "reason": "Registered name only; no runtime enqueue path exists."
+    },
+    {
+      "type": "campaign.mail_tracking.delivered",
+      "status": "not_emitted",
+      "reason": "Registered name only; no runtime enqueue path exists."
+    },
+    {
+      "type": "campaign.mail_tracking.stalled",
+      "status": "not_emitted",
+      "reason": "Registered name only; no runtime enqueue path exists."
+    }
+  ]
+}

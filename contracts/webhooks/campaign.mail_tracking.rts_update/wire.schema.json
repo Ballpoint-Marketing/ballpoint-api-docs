@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/campaign.mail_tracking.rts_update/wire.schema.json",
+  "title": "campaign.mail_tracking.rts_update wire body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "type", "version", "created_at", "data",
+    "event_id", "event_type", "timestamp"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Legacy wrapped-payload identifier; preserved for compatibility."
+    },
+    "type": { "const": "campaign.mail_tracking.rts_update" },
+    "version": { "const": "2026-02-01" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "data": {
+      "$ref": "logical.schema.json#/$defs/data"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Canonical transport deduplication key; stable across retries and endpoints."
+    },
+    "event_type": { "const": "campaign.mail_tracking.rts_update" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}
