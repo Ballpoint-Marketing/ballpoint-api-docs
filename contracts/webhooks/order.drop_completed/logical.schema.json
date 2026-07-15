@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/order.drop_completed/logical.schema.json",
+  "title": "order.drop_completed logical payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "order_id",
+    "campaign_id",
+    "billed_count",
+    "actual_mailed",
+    "rts_suppressed_count",
+    "suppressed_count",
+    "completed_at"
+  ],
+  "properties": {
+    "type": { "const": "order.drop_completed" },
+    "order_id": { "type": "string", "minLength": 1 },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "billed_count": { "type": "integer", "minimum": 0 },
+    "actual_mailed": { "type": "integer", "minimum": 0 },
+    "rts_suppressed_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Canonical suppression count. Runtime also enforces billed_count = actual_mailed + rts_suppressed_count."
+    },
+    "suppressed_count": {
+      "type": "integer",
+      "minimum": 0,
+      "deprecated": true,
+      "description": "Compatibility alias; always equal to rts_suppressed_count during the migration window."
+    },
+    "completed_at": { "type": "string", "format": "date-time" }
+  }
+}

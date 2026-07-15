@@ -1,0 +1,9 @@
+{
+  "Content-Type": "application/json",
+  "X-Ballpoint-Timestamp": "2026-07-14T15:00:00+00:00",
+  "X-Ballpoint-Event": "order.drop_cancelled",
+  "X-Ballpoint-Event-Id": "22222222-2222-4222-8222-222222222222",
+  "X-Ballpoint-Delivery": "00000002-aaaa-4aaa-8aaa-000000000002",
+  "User-Agent": "Ballpoint-Webhooks/3.1",
+  "X-Ballpoint-Signature": "sha256=683a87bacc26711fa6ca70aef11665ed5448eb47cfa31538e8ea9a0a5cd62bed"
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/order.rescheduled/logical.schema.json",
+  "title": "order.rescheduled logical payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "order_id", "campaign_id", "list_id", "source", "external_account_id",
+    "external_user_id", "external_user_metadata", "product_type",
+    "previous_mail_date", "new_mail_date"
+  ],
+  "properties": {
+    "order_id": { "type": "string", "minLength": 1 },
+    "campaign_id": { "type": ["string", "null"] },
+    "list_id": { "type": "string" },
+    "source": { "type": ["string", "null"] },
+    "external_account_id": { "type": ["string", "null"] },
+    "external_user_id": { "type": ["string", "null"] },
+    "external_user_metadata": { "type": ["object", "null"] },
+    "product_type": { "type": ["string", "null"] },
+    "previous_mail_date": {
+      "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }]
+    },
+    "new_mail_date": { "type": "string", "format": "date" }
+  }
+}

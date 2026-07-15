@@ -1,0 +1,22 @@
+{
+  "order_id": "ord_fixture_staff_transition",
+  "campaign_id": "campaign_fixture_partner",
+  "previous_production_status": "printing",
+  "production_status": "cancelled",
+  "usps_status": null,
+  "display_status": "cancelled",
+  "product_type": "4x6_printed",
+  "note": "Synthetic fixture transition",
+  "external_user_id": "user_fixture_42",
+  "external_user_metadata": {
+    "segment": "fixture"
+  },
+  "list_id": "list_fixture_42",
+  "source": "propstream",
+  "external_account_id": "tenant_fixture",
+  "refund": {
+    "transaction_id": "txn_fixture_refund",
+    "refund_cents": 25270,
+    "balance_after_cents": 100000
+  }
+}

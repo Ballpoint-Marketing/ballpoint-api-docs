@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/order.usps_update/logical.schema.json",
+  "title": "order.usps_update logical payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "order_id", "campaign_id", "previous_usps_status", "usps_status",
+    "production_status", "display_status", "product_type", "external_user_id",
+    "source", "external_account_id", "piece_count", "pieces_delivered",
+    "pieces_at_destination", "pieces_rts", "pieces_scanned"
+  ],
+  "properties": {
+    "order_id": { "type": "string", "minLength": 1 },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "previous_usps_status": { "type": ["string", "null"] },
+    "usps_status": { "type": "string", "minLength": 1 },
+    "production_status": { "type": ["string", "null"] },
+    "display_status": { "type": "string", "minLength": 1 },
+    "product_type": { "type": ["string", "null"] },
+    "external_user_id": { "type": ["string", "null"] },
+    "source": { "type": ["string", "null"] },
+    "external_account_id": { "type": ["string", "null"] },
+    "piece_count": { "type": "integer", "minimum": 0 },
+    "pieces_delivered": { "type": "integer", "minimum": 0 },
+    "pieces_at_destination": { "type": "integer", "minimum": 0 },
+    "pieces_rts": { "type": "integer", "minimum": 0 },
+    "pieces_scanned": { "type": "integer", "minimum": 0 }
+  }
+}

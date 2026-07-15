@@ -1,0 +1,20 @@
+{
+  "order_id": "ord_fixture_usps_update",
+  "campaign_id": "campaign_fixture_partner",
+  "previous_usps_status": "shipped",
+  "usps_status": "out_for_delivery",
+  "production_status": "complete",
+  "display_status": "out_for_delivery",
+  "product_type": "4x6_printed",
+  "external_user_id": "user_fixture_42",
+  "source": "propstream",
+  "external_account_id": "tenant_fixture",
+  "piece_count": 100,
+  "pieces_delivered": 20,
+  "pieces_at_destination": 40,
+  "pieces_rts": 2,
+  "pieces_scanned": 75,
+  "event_id": "55555555-5555-4555-8555-555555555555",
+  "event_type": "order.usps_update",
+  "timestamp": "2026-07-14T15:00:00+00:00"
+}

@@ -1,0 +1,16 @@
+{
+  "order_id": "ord_fixture_payment_expired",
+  "campaign_id": "campaign_fixture_partner",
+  "previous_status": "scheduled",
+  "new_status": "payment_failed",
+  "trigger": "payment_confirmation_expired",
+  "failure_reason": "expired_no_payment_confirmation",
+  "external_user_id": "user_fixture_42",
+  "external_user_metadata": {
+    "segment": "fixture"
+  },
+  "list_id": "list_fixture_42",
+  "event_id": "33333333-3333-4333-8333-333333333334",
+  "event_type": "order.status_changed",
+  "timestamp": "2026-07-14T15:00:00+00:00"
+}

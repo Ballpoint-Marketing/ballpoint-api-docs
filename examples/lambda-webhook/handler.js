@@ -70,11 +70,13 @@ exports.handler = async (event) => {
 
   // 4. Parse and process the event
   const payload = JSON.parse(rawBody);
-  console.log(`Webhook received: ${payload.type} (${eventId})`);
+  const eventType = payload.event_type || payload.type;
+  const eventData = eventType === "campaign.mail_tracking.rts_update" ? payload.data : payload;
+  console.log(`Webhook received: ${eventType} (${eventId})`);
 
-  const orderId = payload.data?.order_id;
-  const status = payload.data?.display_status;
-  const userId = payload.data?.external_user_id;
+  const orderId = eventData?.order_id;
+  const status = eventData?.display_status || eventData?.production_status || eventData?.new_status || eventType;
+  const userId = eventData?.external_user_id;
   console.log(`Order ${orderId} → ${status} (user: ${userId})`);
 
   return {

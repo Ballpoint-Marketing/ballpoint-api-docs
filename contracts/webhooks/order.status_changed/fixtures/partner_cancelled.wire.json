@@ -1,0 +1,14 @@
+{
+  "order_id": "ord_fixture_partner_cancelled",
+  "campaign_id": "campaign_fixture_partner",
+  "previous_status": "accepted",
+  "new_status": "cancelled",
+  "external_user_id": "user_fixture_42",
+  "external_user_metadata": {
+    "segment": "fixture"
+  },
+  "list_id": "list_fixture_42",
+  "event_id": "33333333-3333-4333-8333-333333333333",
+  "event_type": "order.status_changed",
+  "timestamp": "2026-07-14T15:00:00+00:00"
+}

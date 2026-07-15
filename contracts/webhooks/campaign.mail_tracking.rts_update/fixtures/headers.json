@@ -1,0 +1,9 @@
+{
+  "Content-Type": "application/json",
+  "X-Ballpoint-Timestamp": "2026-07-14T15:00:00+00:00",
+  "X-Ballpoint-Event": "campaign.mail_tracking.rts_update",
+  "X-Ballpoint-Event-Id": "66666666-6666-4666-8666-666666666666",
+  "X-Ballpoint-Delivery": "00000009-aaaa-4aaa-8aaa-000000000009",
+  "User-Agent": "Ballpoint-Webhooks/3.1",
+  "X-Ballpoint-Signature": "sha256=73b6b2fadb963f2762fedb37d9242a344ad3198187bdda8df6a10ec09bb03347"
+}

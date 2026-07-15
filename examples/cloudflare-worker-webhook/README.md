@@ -63,7 +63,7 @@ Share the URL with Ballpoint and we'll configure webhook delivery.
 # Generate a test signature
 SECRET="whsec_test"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-BODY='{"type":"order.status_changed","data":{"order_id":"ord_test","display_status":"printing"}}'
+BODY='{"order_id":"ord_test","campaign_id":"camp_test","previous_production_status":"prep","production_status":"printing","usps_status":null,"display_status":"printing","product_type":"4x6_printed","note":null,"external_user_id":"user_test","external_user_metadata":null,"list_id":"list_test","source":"propstream","external_account_id":"tenant_test","event_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","event_type":"order.status_changed","timestamp":"2026-07-15T00:00:00Z"}'
 SIG=$(echo -n "${TIMESTAMP}${BODY}" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
 
 # Call your worker

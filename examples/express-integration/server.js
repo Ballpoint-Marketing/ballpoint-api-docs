@@ -111,10 +111,12 @@ app.post("/webhooks/ballpoint", express.raw({ type: "application/json" }), (req,
 
   // Step 3: Parse payload
   const event = JSON.parse(req.body.toString());
-  console.log(`Webhook received: ${event.type} (${eventId})`);
+  const eventType = event.event_type || event.type;
+  const payload = eventType === "campaign.mail_tracking.rts_update" ? event.data : event;
+  console.log(`Webhook received: ${eventType} (${eventId})`);
 
   // Step 4: Process event (idempotently — deduplicate on eventId)
-  const orderId = event.data?.order_id;
+  const orderId = payload?.order_id;
   if (orderId && orders.has(orderId)) {
     const order = orders.get(orderId);
 
@@ -125,10 +127,10 @@ app.post("/webhooks/ballpoint", express.raw({ type: "application/json" }), (req,
     }
 
     // Update status
-    order.status = event.data.display_status || event.data.production_status || order.status;
+    order.status = payload.display_status || payload.production_status || payload.new_status || order.status;
     order.events.push({
       eventId,
-      type: event.type,
+      type: eventType,
       status: order.status,
       receivedAt: new Date().toISOString(),
     });
@@ -141,10 +143,13 @@ app.post("/webhooks/ballpoint", express.raw({ type: "application/json" }), (req,
 function verifySignature(bodyBuffer, timestamp, signature, secret) {
   const expected = crypto
     .createHmac("sha256", secret)
-    .update(timestamp + bodyBuffer.toString())
-    .digest("hex");
+    .update(timestamp, "utf8")
+    .update(bodyBuffer)
+    .digest();
   const received = signature.replace("sha256=", "");
-  return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(received, "hex"));
+  const receivedBytes = Buffer.from(received, "hex");
+  return receivedBytes.length === expected.length &&
+    crypto.timingSafeEqual(expected, receivedBytes);
 }
 
 // --- 3. Dashboard ---

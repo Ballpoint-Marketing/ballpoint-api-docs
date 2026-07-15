@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/order.status_changed/wire.schema.json",
+  "title": "order.status_changed wire body",
+  "description": "Canonical partner-facing body; variants remain as shipped.",
+  "oneOf": [
+    { "allOf": [{ "$ref": "logical.schema.json#/$defs/worker_failed" }, { "$ref": "#/$defs/transport" }] },
+    { "allOf": [{ "$ref": "logical.schema.json#/$defs/staff_transition" }, { "$ref": "#/$defs/transport" }] },
+    { "allOf": [{ "$ref": "logical.schema.json#/$defs/partner_cancelled" }, { "$ref": "#/$defs/transport" }] },
+    { "allOf": [{ "$ref": "logical.schema.json#/$defs/payment_expired" }, { "$ref": "#/$defs/transport" }] }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "transport": {
+      "type": "object",
+      "required": ["event_id", "event_type", "timestamp"],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Persisted transport deduplication key; stable across retries and endpoints."
+        },
+        "event_type": { "const": "order.status_changed" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

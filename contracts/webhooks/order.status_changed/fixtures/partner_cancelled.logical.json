@@ -1,0 +1,11 @@
+{
+  "order_id": "ord_fixture_partner_cancelled",
+  "campaign_id": "campaign_fixture_partner",
+  "previous_status": "accepted",
+  "new_status": "cancelled",
+  "external_user_id": "user_fixture_42",
+  "external_user_metadata": {
+    "segment": "fixture"
+  },
+  "list_id": "list_fixture_42"
+}

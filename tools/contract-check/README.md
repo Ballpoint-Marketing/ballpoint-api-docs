@@ -12,11 +12,16 @@ paths and method mismatches before they reach partner-facing docs.
 - `check-spec.sh` — extracts method+path pairs from the OpenAPI spec, runs the
   resolver in `--check` mode for each, prints a table, exits non-zero on any
   PHANTOM or METHOD-MISMATCH.
+- `check-webhook-contracts.py` — validates the public webhook inventory,
+  Draft 2020-12 schemas, logical/wire fixtures, exact serialized body bytes,
+  header contract, independent HMAC, event/delivery identifiers, and RTS
+  percentage/batch invariants.
 
 ## Usage
 
 ```
 BALLPOINT_API_DIR=~/ballpoint-api ./tools/contract-check/check-spec.sh
+python tools/contract-check/check-webhook-contracts.py
 ```
 
 Default API dir is `~/ballpoint-api` if `BALLPOINT_API_DIR` is unset.
