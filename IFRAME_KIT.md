@@ -1004,6 +1004,29 @@ No sender PII (`fullName`, `address`, `city`, `state`, `zip`, `phone`, `email`, 
 }
 ```
 
+#### `campaign_home_requested` — User requested the partner campaign home
+
+Sent once when the user clicks **Back to Campaign Home** on the iframe's Direct Mail Dashboard / My Campaigns page. This is a fire-and-forget navigation request: the iframe stays on the Dashboard while the PropStream parent owns the campaign-home navigation or iframe unmount.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "campaign_home_requested"
+}
+```
+
+The envelope above is the complete event. It contains no payload object, identifiers, tenant/list/user fields, page, reason, or PII, and the iframe does not wait for an acknowledgement.
+
+**Lifecycle and delivery semantics**
+
+- Exactly one event is emitted per user click.
+- The click does not emit `cancelled`, does not emit `page_changed`, and does not end an active create-flow lifecycle.
+- **Pre-lock behavior:** queued until the parent-origin lock completes and then delivered only to that locked parent origin. It is not broadcast to every allowlisted origin.
+- In standalone mode no postMessage is emitted; the button falls back to the iframe's local Sender Information page.
+
+**Adjacent Previous-button behavior:** clicking **Previous** on the Direct Mail Type step is local in-flow navigation back to Sender Information. It does not emit `cancelled` or end the create lifecycle, and the user can continue forward again in the same session.
+
 #### `create_direct_mail_requested` — User clicked Create Direct Mail
 
 Sent when the user clicks the iframe-owned **Create Direct Mail** CTA. The event has **two payload shapes** depending on whether the iframe currently has an active list context — partners should branch on the presence of `listId` to distinguish them.
@@ -1085,6 +1108,8 @@ Sent when the parent sends `open_create_direct_mail` before the iframe has the r
 Possible `reason` values: `list_context_missing`, `handler_unavailable`.
 
 #### `cancelled` — User cancelled the flow
+
+This terminal event is reserved for explicit cancellation/abandonment actions. Ordinary in-flow **Previous** navigation and **Back to Campaign Home** do not emit it.
 
 ```json
 {

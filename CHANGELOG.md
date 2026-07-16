@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.15 — 2026-07-15
+
+- **Additive iframe → parent navigation event:** clicking **Back to Campaign Home** on the Direct Mail Dashboard emits exactly `{ "source": "ballpoint-mailer", "version": 1, "type": "campaign_home_requested" }`. The iframe remains on the Dashboard; the PropStream parent owns navigation or unmounting. The event carries no identifiers, payload object, reason, page, or PII and requires no acknowledgement.
+- **Previous now means in-flow navigation, not cancellation.** Clicking **Previous** on the Direct Mail Type step returns to Sender Information without emitting `cancelled` and without ending the active create-flow lifecycle. The user can continue forward again with the current session intact.
+- **Delivery semantics:** one `campaign_home_requested` is emitted per user click. Before parent-origin lock it is queued and delivered only after lock; it is not allowlist-broadcast. Standalone mode retains a local fallback to Sender Information and emits no postMessage.
+- **No API, webhook, order, billing, pricing, schema, or tenant behavior changes.** The API change in this release is metadata-only so all partner contract surfaces remain version-aligned.
+- **Version lockstep:** API metadata, iframe committed metadata and both deploy literals, public iframe documentation, and this changelog report `1.7.15`.
+- **Rollout scope — staging first.** Validate both navigation paths in the real PropStream staging embed before any production cutover.
+
 ## v1.7.14 — 2026-07-15
 
 - **`open_create_direct_mail` is now idempotent during an active create flow.** The first valid parent → iframe command still opens the existing creation path and emits its normal `page_changed`. Replayed commands while the user is already in that creation lifecycle are ignored: the iframe does not call `startNewCampaign()` again, navigate, clear selections/form state, or emit another `page_changed`.
