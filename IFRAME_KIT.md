@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.18** (staging; not a production availability claim)
+Partner contract version: **v1.7.19** (prepared for local and staging validation; not a deployment or availability claim)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -64,6 +64,8 @@ Add this to your page:
 | `allow-same-origin` | Yes | Iframe needs access to its own storage |
 | `allow-forms` | Yes | Campaign builder uses form elements |
 | `allow-downloads` | Yes | Users can export tracking data as CSV |
+
+The exact four-token value above remains required in the parent page. In a normal cross-origin embed, browser same-origin policy may prevent the Ballpoint iframe from reading its parent `<iframe>` element, so Ballpoint cannot inspect the `sandbox` attribute directly. That inspection limitation does **not** mean the attribute is missing or incorrect. When the parent element is inspectable, Ballpoint warns only if the attribute or one of the four documented tokens is missing.
 
 ---
 
@@ -1824,7 +1826,7 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 - **Origin validation:** The iframe only accepts `postMessage` from allowlisted parent origins. Contact Ballpoint to add your domain to the allowlist.
 - **Token delivery:** `apiToken` is only accepted via `postMessage`, never via URL params.
 - **State reconciliation:** `set_tenant` establishes the tenant scope and cannot switch it later in the iframe session. The first `set_sender` for a load/tenant is a fresh snapshot; later same-scope `set_sender` messages are patches where omitted fields are preserved and explicitly empty fields are cleared. `set_api_config` can be resent to refresh the token. `set_list` may be resent with the SAME `listId` to refresh `count` / `name` / `piece_counts` after PropStream's Edit Leads modal saves (see [`set_list` refresh](#set_list-refresh-post-modal-sync)); a different `listId` is still rejected as a list-switch attempt.
-- **Rate limiting:** Inbound messages are rate-limited to 20 messages per 5 seconds per origin.
+- **Rate limiting:** The iframe processes at most 20 PropStream protocol attempts per 5 seconds for each loaded iframe document. Unrelated parent messages outside the PropStream envelope do not consume this protocol allowance; malformed or unsupported PropStream attempts are still rate-limited. An intentional iframe reload or remount creates a new document and starts a fresh rate window. Continue to send each bootstrap message once per `ready` event rather than using the reset to create bursts.
 - **CSP:** The iframe is served with a strict Content Security Policy. Your domain must be listed in the `frame-ancestors` directive. Contact Ballpoint if you receive CSP errors.
 
 ---

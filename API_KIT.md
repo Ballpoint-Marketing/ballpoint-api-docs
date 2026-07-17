@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.18 · July 2026**
+> **v1.7.19 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -2118,7 +2118,9 @@ In addition to order-level updates, you may receive campaign-level tracking even
 
 #### Dedicated terminal-drop events (v1.7.13+)
 
-`order.drop_completed` and `order.drop_cancelled` are dedicated, flat wire events emitted in addition to the existing `order.status_changed` transition. They are the recommended terminal-drop integration surface.
+`order.drop_completed` and `order.drop_cancelled` are optional, dedicated flat-wire events emitted in addition to the existing `order.status_changed` transition. A consumer that already handles terminal outcomes through `order.status_changed` does not need to consume them.
+
+An existing integration that handles terminal outcomes through `order.status_changed` remains valid and does not need to migrate. The status transition and its dedicated terminal event use independent durable deliveries and may arrive in either order. If you consume both surfaces, choose one as the authoritative trigger for each terminal business action or make that action idempotent on the terminal outcome (for example, `order_id + complete` or `order_id + cancelled`) so the same completion or cancellation is not applied twice. Continue to deduplicate transport retries by `event_id` as described below; transport deduplication alone does not merge the two distinct event types.
 
 `order.drop_completed` fields are `type`, `order_id`, `campaign_id`, `billed_count`, `actual_mailed`, `rts_suppressed_count`, `suppressed_count`, `completed_at`, plus the transport fields. `rts_suppressed_count` is canonical. `suppressed_count` is a deprecated compatibility alias and is always equal to the canonical value during the migration window. Runtime enforces `billed_count = actual_mailed + rts_suppressed_count`.
 
