@@ -1,5 +1,7 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
+Partner contract version: **v1.7.16** (staging; not a production availability claim)
+
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
 > See [CHANGELOG.md](CHANGELOG.md) for revision history.
@@ -1418,7 +1420,7 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 
 > **Timing (v1.6.6).** `order_added` fires **only for multi-month campaigns** — once per drop, at the user's **Continue to Payment** click on the Order Summary (not per-piece during scheduling). For *all* campaign types `campaign_created` also fires at that same click; **Single Send and A/B Split create their orders via `campaign_created` only and never emit `order_added`.** Payload shape is unchanged. `orderId` is still a local pre-API id; key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
 >
-> **Do not poll `GET /v1/billing/orders` for these per-drop ids mid-flow.** As with `campaign_created.orderIds`, `order_added.orderId` is a **local pre-API id** — the drop does not exist server-side until `campaign_submitted` fires. Polling `GET /v1/billing/orders` (or `GET /v1/billing/orders/{order_id}`) against this id mid-flow will not find it. Wait for `campaign_submitted` and reconcile via the matching `orders[].ballpointOrderId`; if that field is `null` for a drop, see the pending-retry caveat in the [`campaign_submitted` field note](#campaign_submitted--campaign-submitted-to-ballpoint) and only poll `GET /orders` **after** submission.
+> **Do not poll `GET /v1/billing/orders` for these per-drop ids mid-flow.** As with `campaign_created.orderIds`, `order_added.orderId` is a **local pre-API id** — the drop does not exist server-side until `campaign_submitted` fires. Polling `GET /v1/billing/orders` (or `GET /v1/billing/orders/{order_id}`) against this id mid-flow will not find it. Wait for `campaign_submitted` and reconcile via the matching `orders[].ballpointOrderId`; if that field is `null` for a drop, see the pending-retry caveat in the [`campaign_submitted` field note](#campaign_submitted--campaign-submitted-to-ballpoint) and only poll `GET /v1/billing/orders` **after** submission.
 
 **How to Test.** Create a Multi-Month campaign with 2+ drops, schedule the drops, then click **Continue to Payment** on the Order Summary — you'll observe one `order_added` per drop. Single Send and A/B Split campaigns emit `campaign_created` + `campaign_submitted` but **never** `order_added`.
 

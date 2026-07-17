@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.13 · July 2026**
+> **v1.7.16 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -136,8 +136,8 @@ Your users select recipients in your platform, then the Ballpoint iframe handles
 │  7. USPS scans arrive 1-2 days later → tracking available             │
 │         │                                                             │
 │         ▼                                                             │
-│  8. Check Tracking ───► GET /orders/{id}/mail-tracking                │
-│     (anytime)           GET /campaigns/{id}/mail-tracking             │
+│  8. Check Tracking ───► GET /v1/orders/{id}/mail-tracking             │
+│     (anytime)           GET /v1/campaigns/{id}/mail-tracking          │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -676,7 +676,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
 
 Fetch a single order by ID — use this to check current status.
 
-> **Not a mid-flow drop-discovery API.** `GET /v1/billing/orders/{order_id}` (and the List variant in §6d) return **persisted Ballpoint orders only**. For iframe-driven campaigns — Single Send, Multi Send, and A/B Split — individual drops do **not** exist server-side until the end-user clicks **Continue to Payment** and the iframe emits `campaign_submitted` (see [IFRAME_KIT.md `campaign_created` timing note](IFRAME_KIT.md#campaign_created--campaign-created-before-submission)). Use `campaign_submitted.orders[].ballpointOrderId` as the reconciliation trigger; **do not poll `GET /orders` for individual drops during scheduling / mid-flow** — the ids carried on `campaign_created.orderIds` and `order_added.orderId` are local pre-API ids and have no server-side row to fetch yet.
+> **Not a mid-flow drop-discovery API.** `GET /v1/billing/orders/{order_id}` (and the List variant in §6d) return **persisted Ballpoint orders only**. For iframe-driven campaigns — Single Send, Multi Send, and A/B Split — individual drops do **not** exist server-side until the end-user clicks **Continue to Payment** and the iframe emits `campaign_submitted` (see [IFRAME_KIT.md `campaign_created` timing note](IFRAME_KIT.md#campaign_created--campaign-created-before-submission)). Use `campaign_submitted.orders[].ballpointOrderId` as the reconciliation trigger; **do not poll `GET /v1/billing/orders` for individual drops during scheduling / mid-flow** — the ids carried on `campaign_created.orderIds` and `order_added.orderId` are local pre-API ids and have no server-side row to fetch yet.
 
 ```
 GET /v1/billing/orders/{order_id}
@@ -986,7 +986,7 @@ Validator violations return `422 Unprocessable Entity` with a descriptive error 
 
 **Lifecycle:**
 
-- Captured **only at order creation** — represents the end-user who placed the order. Subsequent `PATCH /orders/{id}` calls cannot mutate it.
+- Captured **only at order creation** — represents the end-user who placed the order. Subsequent `PATCH /v1/billing/orders/{order_id}` calls cannot mutate it.
 - Echoed on every `order.status_changed` event (covers status changes, cancel, complete, payment_failed).
 - Subject to the same retention window as recipient PII — when an order ages past the partner-controlled retention threshold, this field is scrubbed from our storage automatically.
 
@@ -1452,7 +1452,7 @@ Content-Type: application/json
 
 For Edit Leads recipient replacement on future/unbilled drops. Replaces all recipients on the order, resizes `piece_count` to match the new count, and recomputes display pricing fields (`unit_price_tcents`, `total_price_tcents`) via the canonical pricing helper. Backend gate is order-level and campaign-type-neutral — applies to single send, A/B split, and multi-month equally.
 
-**Distinction from POST /recipients:** the POST endpoint is for **initial recipient upload** (or chunked append). It does NOT resize `piece_count` and is NOT the Edit Leads PATCH flow. Use this PATCH instead for Edit Leads.
+**Distinction from `POST /v1/billing/orders/{order_id}/recipients`:** the POST endpoint is for **initial recipient upload** (or chunked append). It does NOT resize `piece_count` and is NOT the Edit Leads PATCH flow. Use this PATCH instead for Edit Leads.
 
 **Request body:**
 
