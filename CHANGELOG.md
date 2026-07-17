@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.16 — 2026-07-16
+
+- **Sender profile reconciliation is now documented as shipped.** The first accepted `set_sender` in an iframe load/tenant is a fresh snapshot that clears stale cached sender values. Later same-scope messages are patches: omitted fields are preserved and explicitly empty fields are cleared. `fullName` is canonical, with deterministic `firstName` / `lastName` / `businessName` aliases.
+- **Partial and complete Marketing Profiles have distinct UI behavior.** A complete profile requires `fullName`, `address`, `city`, `state`, `zip`, and `phone` and may advance past Sender Information. Partial data remains visible and read-only with only missing values unresolved; account owners can request completion through PropStream.
+- **Dashboard setup/edit flow is active.** Empty, partial, complete, owner, and non-owner states are defined. Dashboard **Set up now** and **Edit** emit `sender_setup_requested` with `page: "campaigns"`; Sender Information actions use `page: "setup"`. These events carry no sender PII.
+- **Owner bootstrap and authority are explicit.** `set_sender.externalUserIsAccountOwner` may bootstrap Dashboard state before list context exists. Once a singular `set_list` is accepted, `set_list.externalUserIsAccountOwner` is authoritative and remains refreshable for the same `listId`.
+- **Parent modal ownership is explicit.** PropStream owns opening, saving, closing, and cancelling its Marketing Profile modal. Ballpoint does not emit a close/cancel request; after a successful save, the parent sends a fresh `set_sender` with the updated profile.
+- **Documentation-only contract clarification.** Runtime sender behavior was already present; there are no API routes, schemas, webhooks, billing, pricing, order, or database changes. API Kit, OpenAPI, and Postman were checked and require no update for these iframe-only messages.
+- **Version lockstep:** API metadata, iframe committed metadata and both deploy literals, public iframe documentation, and this changelog report `1.7.16`.
+- **Rollout scope — staging only.** Validate the complete parent-modal round trip in the real PropStream staging embed before any production cutover.
+
 ## v1.7.15 — 2026-07-15
 
 - **Additive iframe → parent navigation event:** clicking **Back to Campaign Home** on the Direct Mail Dashboard emits exactly `{ "source": "ballpoint-mailer", "version": 1, "type": "campaign_home_requested" }`. The iframe remains on the Dashboard; the PropStream parent owns navigation or unmounting. The event carries no identifiers, payload object, reason, page, or PII and requires no acknowledgement.
