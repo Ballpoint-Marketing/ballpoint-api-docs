@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.19 — 2026-07-17
+
+- **Cross-origin sandbox diagnostics no longer report a false configuration warning.** When browser same-origin policy prevents the iframe from inspecting its parent `<iframe>` element, the sandbox state is treated as unavailable rather than incorrect. When inspection is available, Ballpoint checks the documented `allow-scripts allow-same-origin allow-forms allow-downloads` token set.
+- **Inbound message limiting now follows the PropStream protocol stream.** The limit remains 20 PropStream protocol attempts per 5 seconds, scoped to the currently loaded iframe document. Unrelated parent messages outside the PropStream envelope do not consume that allowance; malformed or unsupported PropStream attempts remain rate-limited. An intentional iframe reload or remount starts a fresh window.
+- **Existing webhook consumers do not need to migrate.** `order.status_changed` remains emitted for terminal status transitions. `order.drop_completed` and `order.drop_cancelled` remain additional dedicated events; integrations that consume both surfaces must make terminal business actions idempotent because deliveries are independent and may arrive out of order. This is a documentation clarification only; webhook runtime, routes, payloads, schemas, and fixtures are unchanged.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI contract metadata, and the Postman collection description report `1.7.19`. Postman environments were checked and contain no partner-contract version metadata, so they require no change. `START_HERE.md` was also checked and carries no version label.
+- **Validation scope:** this entry records changes prepared for local and staging validation only. It is not a deployment or external availability claim.
+
 ## v1.7.18 — 2026-07-17
 
 - **PROPS-3089 — Multi Send CYO navigation no longer requires leaving the iframe.** The blank Create Your Own Design per-piece editor now exposes its iframe-owned **Previous** action. It returns to the Multi campaign review with all selected pieces intact; unsaved canvas changes receive the existing discard confirmation, and no order is created during either return path.
