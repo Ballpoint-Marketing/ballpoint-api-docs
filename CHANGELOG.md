@@ -2,6 +2,8 @@
 
 ## v1.7.18 — 2026-07-17
 
+- **PROPS-3089 — Multi Send CYO navigation no longer requires leaving the iframe.** The blank Create Your Own Design per-piece editor now exposes its iframe-owned **Previous** action. It returns to the Multi campaign review with all selected pieces intact; unsaved canvas changes receive the existing discard confirmation, and no order is created during either return path.
+- **`page_changed` parent lifecycle clarified.** The event is informational and MUST NOT cause the embedding parent to recreate/reload the iframe or change its mount identity during an active create flow. Remounting remains reserved for intentional fresh-session transitions such as starting with a new/permanent `listId`. No postMessage field, envelope, API, webhook, billing, pricing, schema, or database behavior changed.
 - **Partner order postage is now explicit and price-stable.** Partner-format `POST /orders` accepts optional `postage_type` values `first_class`, `standard`, or `presort`, persists the selected class, and freezes the matching unit and total prices used by order and campaign previews.
 - **Existing integrations remain compatible.** Requests that omit `postage_type` retain the historical `first_class` default. Invalid values are rejected before an order or idempotency record is created, and existing orders require no migration.
 - **Idempotent retries remain safe across the contract transition.** A retry of a request first accepted before this field existed can replay its cached response, while newly claimed idempotency keys bind the selected postage class and reject a same-key retry that changes it.
