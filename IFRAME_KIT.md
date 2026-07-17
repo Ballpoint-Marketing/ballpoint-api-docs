@@ -305,24 +305,26 @@ See also the [`edit_leads_requested` event](#edit_leads_requested--user-clicked-
 
 #### Sender-info setup gate (`externalUserIsAccountOwner`)
 
-Optional boolean on `set_list` (singular). Controls **only** the iframe's sender-info "Set up now" CTA on the first-time setup page.
+Optional boolean on singular `set_list` and on `set_sender`. It controls the embedded setup/edit actions on both the Sender Information step and the Direct Mail Dashboard.
 
-| Value sent on `set_list` | Iframe behavior |
-|--------------------------|-----------------|
-| `true` | "Set up now" CTA visible. User may complete sender-info setup and edit existing sender info. `sender_setup_requested` postMessage may be emitted on click. |
-| `false`, missing, or any non-`true` value | "Set up now" CTA hidden. A blocked-state message ("Please contact your account owner to set up sender info") is shown in its place. `sender_setup_requested` postMessage emit is suppressed. |
+| Effective value | Iframe behavior |
+|-----------------|-----------------|
+| `true` | An incomplete profile shows **Set up now** or **Complete in Marketing Profile**. A profile with any sender data shows **Edit** on the Dashboard. Clicking any of these actions may emit `sender_setup_requested`. |
+| `false`, missing, or any non-`true` value | Setup/edit actions are hidden. An incomplete profile with no sender data shows the blocked-state message ("Please contact your account owner to set up sender info"). `sender_setup_requested` is suppressed. |
 
 Rules:
 
 - **Default is `false`.** Partners who do not send the field see the same blocked state as a non-owner. This is intentional (deny-by-default for backward compatibility).
-- **Mutable on `set_list` refresh.** Unlike `externalUserId` and `externalAccountId` (which are locked to the first-receipt values for the session), `externalUserIsAccountOwner` may be flipped on a same-`listId` refresh. The iframe re-applies CTA visibility immediately. PropStream should re-send `set_list` with the updated value whenever the user's account-owner status changes.
+- **Dashboard-first bootstrap:** before any singular `set_list` has been accepted, `set_sender.externalUserIsAccountOwner` may establish the owner state. This lets the Dashboard render the correct setup/edit action before a campaign list exists.
+- **`set_list` becomes authoritative:** once a singular `set_list` has been accepted, its `externalUserIsAccountOwner` value overrides the bootstrap value and later `set_sender` messages cannot change it.
+- **Mutable on `set_list` refresh.** Unlike `externalUserId` and `externalAccountId` (which are locked to the first-receipt values for the session), `externalUserIsAccountOwner` may be flipped on a same-`listId` refresh. The iframe re-applies setup/edit visibility immediately. PropStream should re-send `set_list` with the updated value whenever the user's account-owner status changes.
 - **Singular `set_list` only.** The field is **not** part of the `set_lists` (plural) schema. If sent there, it is silently dropped.
 - **Strict equality.** The iframe checks for `=== true`. String `"true"`, `1`, or any other truthy value is treated as `false`.
 
 Scope (what this field does **not** do):
 
 - Does **not** introduce broader RBAC, role gating, or permission sync between PropStream and the iframe.
-- Does **not** affect dashboard, API, or webhook behavior. Ballpoint's API does not read or enforce this field.
+- Does **not** introduce API or webhook authorization. Ballpoint's API does not read or enforce this field.
 - Does **not** change `externalUserId` semantics — `externalUserId` remains a technical identifier echoed back on outbound events; it is not used as a permission key.
 - Does **not** display a username, role label, or owner indicator anywhere in the iframe UI.
 - Does **not** affect any other CTA (Edit Leads, Reschedule, Cancel, etc.) — sender-info setup only.
@@ -567,19 +569,44 @@ For multi-send (sequence) and A/B split campaigns each drop carries its own `ord
 
 ### `set_sender` — Pre-fill sender info (optional)
 
-If provided, the iframe pre-fills the sender form and locks it so the user cannot edit it.
+If provided, the iframe reconciles the parent-owned Marketing Profile into its read-only sender views. The parent remains the source of truth: users request setup or edits through `sender_setup_requested`, and the parent replies with a new `set_sender` after a successful save.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `fullName` | string | Sender name or company |
+| `fullName` | string | Canonical sender name or company. When present, this value wins over the name aliases below. |
+| `firstName` | string | Optional person-name alias. If `fullName` is omitted, the iframe derives it from `businessName`, or from `firstName` + `lastName`. |
+| `lastName` | string | Optional person-name alias used with `firstName` when `fullName` and `businessName` are omitted. |
+| `businessName` | string | Optional company-name alias. If `fullName` is omitted, a non-empty `businessName` takes precedence over the derived person name. |
 | `address` | string | Street address |
 | `city` | string | City |
 | `state` | string | Two-letter state code (e.g. `FL`) |
 | `zip` | string or number | ZIP code |
 | `phone` | string | Phone number |
+| `email` | string | Optional email address |
 | `website` | string | Website URL |
 | `logo` | string | Optional. URL to sender logo image |
+| `externalUserIsAccountOwner` | boolean | Optional Dashboard-first role bootstrap. Honored only until a singular `set_list` is accepted; `set_list` is authoritative afterward. Strict boolean `true` is required. |
 | `tenantKey` | string | Optional. Tenant scope key |
+
+#### Reconciliation semantics
+
+- **First accepted payload is a snapshot.** The first `set_sender` in an iframe load/tenant scope clears any sender values cached for that scope before applying the supplied fields. This prevents stale Marketing Profile data from a prior session from surviving.
+- **Later payloads are patches.** A later `set_sender` in the same iframe load/tenant scope updates only fields present in the message. Omitted fields preserve their current values; a field sent explicitly as `""` clears that value.
+- **Name derivation is deterministic.** Send `fullName` when possible. If it is omitted and any name alias is present, `businessName` wins; otherwise `firstName` and `lastName` are joined.
+- **Tenant scope is locked.** After sender state is established for a tenant, a later `set_sender` cannot switch to another `tenantKey`; the mismatched message is rejected without changing sender state.
+
+#### Complete and partial profiles
+
+A sender profile is complete only when all six required values are non-empty: `fullName`, `address`, `city`, `state`, `zip`, and `phone`. `email`, `website`, and `logo` are optional.
+
+| Profile received | Sender Information step | Direct Mail Dashboard |
+|------------------|-------------------------|-----------------------|
+| Complete | The iframe may advance to Direct Mail Type. If another parent modal is open, the parent still owns when that modal closes. | Shows the sender summary. An account owner sees **Edit**. |
+| Partial | The step remains open. Supplied fields are prefilled read-only, missing fields remain empty, and an account owner sees **Complete in Marketing Profile**. | Shows available values and `Not set` for missing values. An account owner sees **Edit**. |
+| Empty + account owner | Shows **Set up now**. | Shows **Set up now**. |
+| Empty + non-owner | Shows the account-owner blocked state and emits no setup request. | Shows the account-owner blocked state and emits no setup request. |
+
+For the most predictable reconciliation after a Marketing Profile save, send a complete profile snapshot with all supported fields. Patch messages are supported when intentional; include an explicit empty string when a previously supplied value must be cleared.
 
 ### `set_tenant` — Storage isolation (optional)
 
@@ -953,7 +980,7 @@ Emitted by the parent app (e.g. PropStream) after successfully PATCHing each `af
 
 #### `sender_setup_requested` — User requested sender info setup
 
-Sent when the user clicks the "Set up now" CTA on the iframe's first-time setup page because no sender info has been provided. PropStream's parent app should listen for this event and open its sender-setup modal overlay, then reply with the existing [`set_sender`](#set_sender--pre-fill-sender-info-optional) postMessage once the user saves.
+Sent when an account owner clicks **Set up now** or **Complete in Marketing Profile** on the Sender Information step, or **Set up now** / **Edit** on the Direct Mail Dashboard. PropStream's parent app should open its Marketing Profile modal and reply with a new [`set_sender`](#set_sender--pre-fill-sender-info-optional) after a successful save.
 
 ```json
 {
@@ -973,25 +1000,27 @@ Sent when the user clicks the "Set up now" CTA on the iframe's first-time setup 
 | `version` | number | Always `1`. |
 | `type` | string | Always `sender_setup_requested`. |
 | `reason` | string | V1 enum: `"sender_info_missing"`. Future values are additive — partners should treat unknown values as "open the sender modal" and not hard-fail. |
-| `page` | string | V1 enum: `"setup"` \| `"campaigns"`. Identifies the iframe view the CTA was triggered from. V1 wires `"setup"` (first-time setup page); `"campaigns"` is reserved for a future my-info CTA on the My Campaigns / Dashboard page and is accepted by the contract today so a later wire requires no schema change. |
+| `page` | string | V1 enum: `"setup"` \| `"campaigns"`. `"setup"` identifies the Sender Information step; `"campaigns"` identifies the Direct Mail Dashboard. |
 | `externalAccountId` | string | Partner account identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** if the user reaches "Set up now" before any `set_list` or `set_tenant` has arrived (e.g., very first session before list selection). |
 | `externalUserId` | string | Partner user identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** under the same condition as `externalAccountId`. |
 
-No sender PII (`fullName`, `address`, `city`, `state`, `zip`, `phone`, `email`, `website`) is ever included in this event. The parent already owns the sender data via the existing `set_sender` flow.
+No sender PII (`fullName`, `firstName`, `lastName`, `businessName`, `address`, `city`, `state`, `zip`, `phone`, `email`, `website`, `logo`) is ever included in this event. The parent already owns the sender data via the existing `set_sender` flow.
 
 **Visibility / lifecycle**
 
-- **Gated by `set_list.externalUserIsAccountOwner === true`.** When the field is `false`, missing, or any non-`true` value, the "Set up now" CTA is hidden and `sender_setup_requested` is not emitted. See [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner).
-- Rendered on the iframe's first-time setup page (`page-setup`) only when no `set_sender` has been received yet. Once `set_sender` has been accepted, the CTA is suppressed and the sender form is locked per the existing `set_sender` behavior.
+- **Gated by the effective `externalUserIsAccountOwner === true`.** The value may be bootstrapped by `set_sender` before list context exists; an accepted singular `set_list` is authoritative afterward. When the effective value is `false`, missing, or non-`true`, setup/edit actions are hidden and `sender_setup_requested` is not emitted. See [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner).
+- On the Sender Information step, an empty profile renders **Set up now** and a partial profile renders its available fields plus **Complete in Marketing Profile**. A complete profile may advance the active create flow.
+- On the Direct Mail Dashboard, an empty profile renders **Set up now**; a partial or complete profile renders the available sender summary and **Edit** for an account owner. Dashboard clicks use `page: "campaigns"`.
 - In standalone (non-embed) mode the iframe falls back to its built-in inline sender form. The CTA is suppressed.
 - **Pre-lock behavior:** queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Not broadcast to all allowlisted origins. Identical treatment to `edit_leads_requested`.
+- **Parent owns its modal lifecycle.** The iframe does not emit a modal-close or modal-cancel event. Receiving `set_sender` may update or advance the iframe underneath, but it does not instruct PropStream to close its Marketing Profile modal. Keep that modal open until the parent completes its own explicit save or close action.
 
 **Expected PropStream behavior**
 
 1. Listen for the `sender_setup_requested` event.
-2. Open the sender-setup modal overlay (PropStream-hosted, on top of the iframe).
-3. On modal save, send the existing [`set_sender`](#set_sender--pre-fill-sender-info-optional) postMessage to the iframe with the user's sender data. The iframe's existing locking flow takes over from there.
-4. On modal close without changes, no postMessage required.
+2. Open the Marketing Profile modal overlay (PropStream-hosted, on top of the iframe) and keep it open until the user explicitly saves or closes it.
+3. After a successful save, send a fresh [`set_sender`](#set_sender--pre-fill-sender-info-optional) containing the updated sender data. A complete snapshot is recommended.
+4. Close the parent modal according to PropStream's own save/close lifecycle. On close without changes, no postMessage is required.
 
 #### `page_changed` — User navigated to a different view
 
@@ -1761,7 +1790,7 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 
 - **Origin validation:** The iframe only accepts `postMessage` from allowlisted parent origins. Contact Ballpoint to add your domain to the allowlist.
 - **Token delivery:** `apiToken` is only accepted via `postMessage`, never via URL params.
-- **First-write-wins:** `set_sender` and `set_tenant` are accepted once per session. Duplicates are ignored. `set_api_config` can be resent to refresh the token. `set_list` may be resent with the SAME `listId` to refresh `count` / `name` / `piece_counts` after PropStream's Edit Leads modal saves (see [`set_list` refresh](#set_list-refresh-post-modal-sync)); a different `listId` is still rejected as a list-switch attempt.
+- **State reconciliation:** `set_tenant` establishes the tenant scope and cannot switch it later in the iframe session. The first `set_sender` for a load/tenant is a fresh snapshot; later same-scope `set_sender` messages are patches where omitted fields are preserved and explicitly empty fields are cleared. `set_api_config` can be resent to refresh the token. `set_list` may be resent with the SAME `listId` to refresh `count` / `name` / `piece_counts` after PropStream's Edit Leads modal saves (see [`set_list` refresh](#set_list-refresh-post-modal-sync)); a different `listId` is still rejected as a list-switch attempt.
 - **Rate limiting:** Inbound messages are rate-limited to 20 messages per 5 seconds per origin.
 - **CSP:** The iframe is served with a strict Content Security Policy. Your domain must be listed in the `frame-ancestors` directive. Contact Ballpoint if you receive CSP errors.
 
@@ -1777,9 +1806,9 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 
 ### "Please contact your account owner to set up sender information"
 
-**Cause:** The iframe is in embed (iframe) mode, sender information has not been resolved (`set_sender` not received), and `externalUserIsAccountOwner` is missing or `false` in the `set_list` payload.
+**Cause:** The iframe is embedded, sender information is incomplete, and the effective `externalUserIsAccountOwner` value is missing or `false`.
 
-**Fix:** Either send [`set_sender`](#set_sender--pre-fill-sender-info-optional) with the user's sender data (which skips the setup page entirely), or include `externalUserIsAccountOwner: true` in [`set_list`](#set_list--recipient-list-info-required) so the user sees the "Set up now" CTA and can request setup via [`sender_setup_requested`](#sender_setup_requested--user-requested-sender-info-setup). Once `set_sender` is received, the owner flag no longer matters. See [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner) for full details.
+**Fix:** Send a complete [`set_sender`](#set_sender--pre-fill-sender-info-optional) if the Marketing Profile is already complete. Otherwise provide strict boolean `externalUserIsAccountOwner: true` in `set_sender` during Dashboard-first bootstrap or in [`set_list`](#set_list--recipient-list-info-required) once list context exists, so the user can request setup/edit through [`sender_setup_requested`](#sender_setup_requested--user-requested-sender-info-setup). A partial `set_sender` intentionally keeps setup required; after singular `set_list` is accepted, its owner value is authoritative. See [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner) for full details.
 
 ---
 
