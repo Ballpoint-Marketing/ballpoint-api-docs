@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.18 — 2026-07-17
+
+- **Partner order postage is now explicit and price-stable.** Partner-format `POST /orders` accepts optional `postage_type` values `first_class`, `standard`, or `presort`, persists the selected class, and freezes the matching unit and total prices used by order and campaign previews.
+- **Existing integrations remain compatible.** Requests that omit `postage_type` retain the historical `first_class` default. Invalid values are rejected before an order or idempotency record is created, and existing orders require no migration.
+- **Idempotent retries remain safe across the contract transition.** A retry of a request first accepted before this field existed can replay its cached response, while newly claimed idempotency keys bind the selected postage class and reject a same-key retry that changes it.
+- **Iframe compatibility retries preserve pricing identity.** The iframe no longer removes `postage_type` after a `400` or `422`, so both Single and A/B submissions keep the class displayed in their final totals.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman collection, API metadata, iframe metadata, deploy literals, and cache-bust tokens were updated in the same cycle. All Postman environments were checked and require no change.
+- **Version lockstep:** all partner-contract surfaces report `1.7.18`.
+- **Availability:** **staging first.** This entry is not a production deployment or availability claim.
+
 ## v1.7.17 — 2026-07-17
 
 - **Dashboard search now covers campaigns, recipients, and addresses as one flow.** A result can be found immediately after its order recipients are accepted/uploaded; USPS piece-tracking ingestion is no longer a prerequisite for search visibility.
