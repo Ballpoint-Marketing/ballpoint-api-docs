@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.16 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.17 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -726,6 +726,69 @@
                       "pm.test('status 204', function () { pm.response.to.have.status(204); });",
                       "pm.test('empty body (no payload echo)', function () {",
                       "  pm.expect(pm.response.text() || '').to.eql('');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Search recipients across direct mail",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  },
+                  {
+                    "key": "X-External-User-ID",
+                    "value": "{{external_user_id}}",
+                    "description": "Scopes partner results to this external user's campaigns. Omit for an authorized tenant-wide search."
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/mail-tracking/recipients/search?q={{recipient_search_query}}&limit=20&offset=0",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "mail-tracking",
+                    "recipients",
+                    "search"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "{{recipient_search_query}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Safe recipient/address search used automatically by the embedded iframe. Searches accepted/uploaded order recipients immediately and indexed piece tracking when available. Query tokens may appear in any order. Results contain recipient PII according to the key's PII access level; do not log or persist response bodies."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has paginated search shape', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b.results).to.be.an('array');",
+                      "  pm.expect(b.total).to.be.a('number');",
+                      "  pm.expect(b.limit).to.eql(20);",
+                      "  pm.expect(b.offset).to.eql(0);",
+                      "  pm.expect(b.query).to.be.a('string');",
                       "});"
                     ]
                   }

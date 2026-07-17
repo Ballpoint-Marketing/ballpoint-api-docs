@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.17 — 2026-07-17
+
+- **Dashboard search now covers campaigns, recipients, and addresses as one flow.** A result can be found immediately after its order recipients are accepted/uploaded; USPS piece-tracking ingestion is no longer a prerequisite for search visibility.
+- **Recipient matching is order-independent and punctuation-tolerant.** Queries such as `Gregory, Debra` match `Debra Gregory`; all tokens must match the combined recipient name/address text.
+- **Tenant and user isolation are explicit.** Partner requests remain tenant-scoped and, when the iframe has an external user ID, the search sends `X-External-User-ID` so results are limited to that user's campaigns.
+- **Duplicate and order-only states are safe.** The same address/campaign is returned once, with piece tracking preferred when available. Before tracking exists, scan/status fields are `null` and the iframe does not offer recipient opt-out.
+- **No breaking response, postMessage, billing, pricing, webhook, or database migration change.** The existing search response is documented in snake_case and the iframe behavior is automatic.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman collection, and all Postman environments were updated in the same cycle.
+- **Version lockstep:** public kits, OpenAPI metadata, Postman collection description, API metadata, iframe committed metadata, and both iframe deploy literals report `1.7.17`.
+- **Availability:** **staging first.** This entry is not a production deployment or availability claim.
+
 ## v1.7.16 — 2026-07-16
 
 - **Sender profile reconciliation is now documented as shipped.** The first accepted `set_sender` in an iframe load/tenant is a fresh snapshot that clears stale cached sender values. Later same-scope messages are patches: omitted fields are preserved and explicitly empty fields are cleared. `fullName` is canonical, with deterministic `firstName` / `lastName` / `businessName` aliases.

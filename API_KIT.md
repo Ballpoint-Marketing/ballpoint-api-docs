@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.16 · July 2026**
+> **v1.7.17 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -69,6 +69,7 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
    - [6k. Confirm Payment (Partner Payment Gate)](#6k-confirm-payment-partner-payment-gate)
    - [6l. Partner Dashboard Endpoints](#6l-partner-dashboard-endpoints)
    - [6r. Partner Feature Configuration](#6r-partner-feature-configuration)
+   - [6s. Search Recipients Across Direct Mail](#6s-search-recipients-across-direct-mail)
 7. [Status Updates via Webhooks](#7-status-updates-via-webhooks)
    - [Per-piece RTS Push-Back (V1)](#per-piece-rts-push-back-v1)
 8. [Real-Time UI via SSE (Optional)](#8-real-time-ui-via-sse-optional)
@@ -1733,6 +1734,72 @@ partner sources and internal flows are unchanged. This flag is a rollout
 control, not strong user authorization: the external user ID is asserted by
 the partner holding the shared partner key.
 
+### 6s. Search Recipients Across Direct Mail
+
+`GET /v1/mail-tracking/recipients/search` searches recipient names and mailing
+addresses across the authenticated tenant's direct-mail campaigns. The embedded
+iframe calls this endpoint automatically; partners do not need to add a new
+postMessage handler.
+
+```bash
+curl --get https://api.ballpointmarketing.com/v1/mail-tracking/recipients/search \
+  -H "X-Partner-Key: ${BALLPOINT_PARTNER_KEY}" \
+  -H "X-External-User-ID: user_456" \
+  --data-urlencode "q=Gregory, Debra" \
+  --data-urlencode "limit=20" \
+  --data-urlencode "offset=0"
+```
+
+| Parameter / header | Required | Behavior |
+|---|---|---|
+| `q` | Yes | 2–200 characters. Punctuation and whitespace split the query into tokens; every token must match the combined recipient name/address text in any order. For example, `Gregory, Debra` matches `Debra Gregory`. |
+| `limit` | No | 1–100, default `20`. |
+| `offset` | No | Zero-based result offset, default `0`. |
+| `X-Partner-Key` | Yes | Authenticates and tenant-scopes the request. |
+| `X-External-User-ID` | No | When present, limits partner results to campaigns attributed to that user. Omit only for an authorized tenant-wide search. |
+
+The search reads both accepted/uploaded order recipients and USPS piece-tracking
+rows. A newly accepted campaign is therefore searchable before USPS tracking is
+indexed. Duplicate records for the same normalized address and campaign are
+collapsed; once tracking exists, the tracking row supplies the authoritative
+piece status and opt-out state.
+
+```json
+{
+  "results": [
+    {
+      "recipient_name": "Debra Gregory",
+      "recipient_address": "123 Main St",
+      "recipient_city": "Austin",
+      "recipient_state": "TX",
+      "recipient_zip": "78701",
+      "campaign_count": 1,
+      "is_opted_out": false,
+      "campaigns": [
+        {
+          "campaign_id": "camp_new_fc",
+          "campaign_name": "New_FC",
+          "status": "accepted",
+          "mail_date": "2026-07-18",
+          "last_scan_at": null,
+          "piece_status": null
+        }
+      ]
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0,
+  "query": "Gregory, Debra"
+}
+```
+
+Results are grouped by normalized street address, city, state, and ZIP5. For an
+order-only result, `last_scan_at` and `piece_status` are `null`; this means USPS
+tracking is not available yet, not that the search failed. Principals with full
+PII access receive all recipient fields. Limited PII access omits
+`recipient_address`; principals with no PII access receive `403`.
+
 ---
 
 ## 7. Status Updates via Webhooks
@@ -2476,6 +2543,7 @@ Before switching to your live key:
 | Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` (server-to-server only) |
 | Partner dashboard stats | `GET` | `/v1/billing/partner/stats?days=30&list_id=...&external_user_id=...` | `X-Partner-Key` |
 | Partner dashboard orders | `GET` | `/v1/billing/partner/orders?days=30&list_id=...&status=...` | `X-Partner-Key` |
+| Recipient/direct-mail search (iframe automatic) | `GET` | `/v1/mail-tracking/recipients/search?q=...&limit=20&offset=0` | `X-Partner-Key`, optional `X-External-User-ID` |
 | Order tracking | `GET` | `/v1/orders/{id}/mail-tracking` | `X-Partner-Key` |
 | Campaign tracking | `GET` | `/v1/campaigns/{id}/mail-tracking` | `X-Partner-Key` |
 | Pricing catalog | `GET` | `/v1/billing/pricing?product_type=...` | `X-Partner-Key` |

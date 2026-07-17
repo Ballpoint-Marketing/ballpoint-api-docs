@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.16** (staging; not a production availability claim)
+Partner contract version: **v1.7.17** (staging; not a production availability claim)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -473,6 +473,22 @@ Recommended bootstrap order in dashboard-first mode:
 7. On parent-side failure, the parent sends nothing. The iframe stays on the Dashboard with **no iframe-side toast, error banner, or status message** — error UX is entirely the parent's responsibility.
 
 > **Compatibility with the existing `set_list`-first flow.** Partners that do **not** send `open_direct_mail_dashboard` see the legacy bootstrap behavior unchanged: partners provide concrete list context up front via `set_list` or `set_lists`; when the iframe-owned Create Direct Mail CTA runs, [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail) includes `listId` / `listName` / `recipientCount` and the iframe opens the create flow locally, as before.
+
+#### Dashboard direct-mail, recipient, and address search
+
+The Dashboard search box combines locally loaded campaign matches with a
+tenant-scoped recipient/address search performed by the iframe. Campaigns are
+searchable as soon as their order recipients are accepted/uploaded; the user
+does not have to wait for USPS piece tracking to be indexed. Recipient name
+tokens are order-independent, so `Gregory, Debra` can find `Debra Gregory`.
+
+The iframe sends the active `X-External-User-ID` when one was supplied by the
+parent, merges campaign and recipient results, and shows an empty state only
+when neither source matched. Clearing the query restores the normal campaign
+list. An order-only recipient match can show its campaign, but does not expose
+an **Opt Out** action until a piece-tracking record exists. This behavior is
+automatic: there is no new parent → iframe command, iframe → parent event, or
+partner-side listener to implement.
 
 ### `payment_result` — Payment popup outcome (parent → iframe)
 
