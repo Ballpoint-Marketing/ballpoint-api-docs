@@ -1051,6 +1051,21 @@ No sender PII (`fullName`, `firstName`, `lastName`, `businessName`, `address`, `
 }
 ```
 
+`page_changed` is an informational state event, not a navigation or reload
+command for the parent. While a create flow is active, the parent MUST preserve
+the existing iframe element, `src`, key/mount identity and `contentWindow` when
+this event arrives. Recreating or reloading the iframe starts a new document and
+therefore discards the in-memory campaign selections and per-piece scheduling
+progress.
+
+In-flow controls such as **Previous** are owned by the iframe. For example,
+**Previous** from a Multi Send blank **Create Your Own Design** piece returns to
+the Multi campaign review and emits `page_changed` with `page:
+"campaign-review"`; it does not request a parent route change, create an order,
+or start a new campaign session. A parent should remount only for an intentional
+fresh-session transition, such as the new/permanent `listId` case documented
+under `create_direct_mail_requested` below.
+
 #### `campaign_home_requested` — User requested the partner campaign home
 
 Sent once when the user clicks **Back to Campaign Home** on the iframe's Direct Mail Dashboard / My Campaigns page. This is a fire-and-forget navigation request: the iframe stays on the Dashboard while the PropStream parent owns the campaign-home navigation or iframe unmount.
