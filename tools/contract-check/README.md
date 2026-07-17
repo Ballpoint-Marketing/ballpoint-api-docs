@@ -16,12 +16,17 @@ paths and method mismatches before they reach partner-facing docs.
   Draft 2020-12 schemas, logical/wire fixtures, exact serialized body bytes,
   header contract, independent HMAC, event/delivery identifiers, and RTS
   percentage/batch invariants.
+- `check-partner-contract.py` — treats this repository as the canonical partner
+  version, checks API/iframe metadata lockstep, and enforces explicit public or
+  no-public classification for contract-sensitive iframe diffs.
 
 ## Usage
 
 ```
 BALLPOINT_API_DIR=~/ballpoint-api ./tools/contract-check/check-spec.sh
 python tools/contract-check/check-webhook-contracts.py
+python tools/contract-check/check-partner-contract.py --docs-root .
+python -m unittest discover -s tools/contract-check/tests -v
 ```
 
 Default API dir is `~/ballpoint-api` if `BALLPOINT_API_DIR` is unset.
