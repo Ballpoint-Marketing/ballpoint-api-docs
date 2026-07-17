@@ -440,6 +440,86 @@ components:
           - MAILING
           description: Address type as supplied by the partner on the original recipient upload. `null` when no address-type was supplied.
           example: PROPERTY
+    RecipientCampaignAppearance:
+      type: object
+      required:
+      - campaign_id
+      properties:
+        campaign_id:
+          type: string
+        campaign_name:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        mail_date:
+          type: string
+          nullable: true
+        last_scan_at:
+          type: string
+          format: date-time
+          nullable: true
+        piece_status:
+          type: string
+          nullable: true
+    RecipientSearchResult:
+      type: object
+      description: Recipient appearances grouped by normalized street address, city, state, and ZIP5. Address fields may be omitted according to the caller's PII access level.
+      required:
+      - campaign_count
+      - is_opted_out
+      - campaigns
+      properties:
+        recipient_name:
+          type: string
+          nullable: true
+        recipient_address:
+          type: string
+          nullable: true
+        recipient_city:
+          type: string
+          nullable: true
+        recipient_state:
+          type: string
+          nullable: true
+        recipient_zip:
+          type: string
+          nullable: true
+        campaign_count:
+          type: integer
+          minimum: 0
+        is_opted_out:
+          type: boolean
+        campaigns:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipientCampaignAppearance'
+    RecipientSearchResponse:
+      type: object
+      required:
+      - results
+      - total
+      - limit
+      - offset
+      - query
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipientSearchResult'
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          minimum: 0
+        query:
+          type: string
     RecipientOptOutResponse:
       type: object
       description: 'Response from `POST /v1/mail-tracking/recipients/opt-out` and `DELETE /v1/mail-tracking/recipients/opt-out`. Suppression is tenant-wide and address-level: the server matches by normalized address (case-insensitive `address`/`city`/`state` + first 5 digits of `zip`) across every campaign the tenant owns. `recipients[]` lists the distinct partner `contact_id`s at that address group and is computed regardless of `rows_affected`, so an idempotent repeat (0 rows) or the opt-in/undo direction still returns the full set.'
@@ -1310,6 +1390,77 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /v1/mail-tracking/recipients/search:
+    get:
+      tags:
+      - Mail Tracking
+      summary: Search recipients across direct-mail campaigns
+      description: Searches both accepted/uploaded order recipients and indexed piece-tracking rows. Query tokens are punctuation-tolerant and may match in any order. Results are grouped by normalized address; tracking data wins when an order and tracking row represent the same campaign/address. The embedded iframe calls this endpoint automatically.
+      operationId: searchRecipients
+      parameters:
+      - name: q
+        in: query
+        required: true
+        description: Recipient name or mailing-address query. All tokens must match in any order.
+        schema:
+          type: string
+          minLength: 2
+          maxLength: 200
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - name: X-External-User-ID
+        in: header
+        required: false
+        description: When present on a partner request, limits results to campaigns attributed to this external user. Omit for an authorized tenant-wide search.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Paginated recipient/address matches. Order-only campaign appearances have null `last_scan_at` and `piece_status` until tracking exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipientSearchResponse'
+        '401':
+          description: Missing or invalid authentication.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The principal has no recipient PII access.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Query or pagination validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
   /v1/campaigns/{campaign_id}/mail-tracking:
     get:
       tags:

@@ -474,6 +474,22 @@ Recommended bootstrap order in dashboard-first mode:
 
 > **Compatibility with the existing `set_list`-first flow.** Partners that do **not** send `open_direct_mail_dashboard` see the legacy bootstrap behavior unchanged: partners provide concrete list context up front via `set_list` or `set_lists`; when the iframe-owned Create Direct Mail CTA runs, [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail) includes `listId` / `listName` / `recipientCount` and the iframe opens the create flow locally, as before.
 
+#### Dashboard direct-mail, recipient, and address search
+
+The Dashboard search box combines locally loaded campaign matches with a
+tenant-scoped recipient/address search performed by the iframe. Campaigns are
+searchable as soon as their order recipients are accepted/uploaded; the user
+does not have to wait for USPS piece tracking to be indexed. Recipient name
+tokens are order-independent, so `Gregory, Debra` can find `Debra Gregory`.
+
+The iframe sends the active `X-External-User-ID` when one was supplied by the
+parent, merges campaign and recipient results, and shows an empty state only
+when neither source matched. Clearing the query restores the normal campaign
+list. An order-only recipient match can show its campaign, but does not expose
+an **Opt Out** action until a piece-tracking record exists. This behavior is
+automatic: there is no new parent → iframe command, iframe → parent event, or
+partner-side listener to implement.
+
 ### `payment_result` — Payment popup outcome (parent → iframe)
 
 > **Current staging contract — pending PropStream wiring.** This is the iframe-side contract for the in-iframe Payment Successful / Payment Failed result screens. The payment popup and the charge itself remain partner-owned (see [Partner Payment Gate Flow](#partner-payment-gate-flow-send-now-walkthrough)); after the partner's popup resolves, the partner should send `payment_result` to the iframe so the iframe can render the matching result screen. PropStream's listener / sender is not yet wired — this section documents what the iframe expects today on staging.

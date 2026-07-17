@@ -733,6 +733,69 @@
               ]
             },
             {
+              "name": "Search recipients across direct mail",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  },
+                  {
+                    "key": "X-External-User-ID",
+                    "value": "{{external_user_id}}",
+                    "description": "Scopes partner results to this external user's campaigns. Omit for an authorized tenant-wide search."
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/mail-tracking/recipients/search?q={{recipient_search_query}}&limit=20&offset=0",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "mail-tracking",
+                    "recipients",
+                    "search"
+                  ],
+                  "query": [
+                    {
+                      "key": "q",
+                      "value": "{{recipient_search_query}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Safe recipient/address search used automatically by the embedded iframe. Searches accepted/uploaded order recipients immediately and indexed piece tracking when available. Query tokens may appear in any order. Results contain recipient PII according to the key's PII access level; do not log or persist response bodies."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has paginated search shape', function () {",
+                      "  var b = pm.response.json();",
+                      "  pm.expect(b.results).to.be.an('array');",
+                      "  pm.expect(b.total).to.be.a('number');",
+                      "  pm.expect(b.limit).to.eql(20);",
+                      "  pm.expect(b.offset).to.eql(0);",
+                      "  pm.expect(b.query).to.be.a('string');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Account mail-tracking summary (shape not modeled in docs)",
               "request": {
                 "method": "GET",
