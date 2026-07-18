@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.19 · July 2026**
+> **v1.7.20 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -620,6 +620,17 @@ POST /v1/billing/orders
 | `variant` | string | No | A/B split variant identifier; one of `"a"` \| `"b"`. Case-insensitive (server normalizes to lowercase + trims whitespace). Required only on A/B split sibling orders so they can be reconstructed after reload. Persisted to `metadata.variant` server-side and round-tripped on GET responses. Single-send, multi-send, and edit-leads paths leave it `null`. |
 | `deliver_to` | string | No | Optional, additive. Recipient address routing the user selected on the iframe's piece-selection page when a `piece_counts` table was active. One of `"mailing"` \| `"property"` \| `"both"`. Case-insensitive and trimmed server-side (`"MAILING"`, `" both "` → `"mailing"`, `"both"`); any other value is rejected with 422. Sent only when a validated recipient selection exists; paths without `piece_counts` leave it `null`. Persisted to `metadata.deliver_to` and round-tripped on GET responses. Iframe-driven persistence — no partner-side action required. |
 | `remove_duplicate_addresses` | boolean | No | Optional, additive. Whether the user enabled the "Remove duplicates" checkbox on the iframe's piece-selection page (paired with `deliver_to`). Persisted to `metadata.remove_duplicate_addresses` and round-tripped on GET responses **even when `false`**, so partners can read back the user's exact selection. `null`/absent when no recipient-selection UI was shown. Iframe-driven persistence — no partner-side action required. |
+
+**Partner iframe compatibility sender (`POST /orders`):**
+
+The partner/iframe request shape may include an optional `sender` object. Empty or `null` contact fields remain optional for partial Marketing Profiles. Invalid non-empty contact values return `422` before idempotency or order creation.
+
+| `sender` field | Accepted format |
+|----------------|-----------------|
+| `zip` | 5 digits (`12345`), 9 digits (`123456789`), or ZIP+4 (`12345-6789`); maximum 10 characters. |
+| `phone` | 10 digits, or 11 digits beginning with `1`; `+`, parentheses, spaces, periods, and hyphens are accepted formatting. Letters and extensions are rejected; maximum 20 characters. |
+
+Valid formatted values are persisted as supplied by the API client. The embedded iframe may normalize a valid phone to `AAA-BBB-CCCC` before sending it.
 
 **Example — postcard:**
 
