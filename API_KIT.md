@@ -288,22 +288,26 @@ Available styles: `candy`, `party`, `pastel`, `confetti`, `desert`, `floral`, `s
 
 ### Pricing Table
 
-Prices are in **tenth-cents** (tcents). Divide by 10,000 for dollars: `5054 tcents = $0.5054/piece`.
+The table below is the Ballpoint **base-price schedule effective July 12, 2026**.
+Prices are in **tenth-cents** (tcents). Divide by 10,000 for dollars:
+`5388 tcents = $0.5388/piece`. Partner-authenticated pricing and preview
+responses apply that account's configured markup to the primary display-price
+fields; `partner_cost_*` preview fields retain the base price.
 
 | Product | Postage | Per Piece (tcents) | Per Piece ($) | 500 pieces |
 |---------|---------|-------------------|---------------|------------|
-| 4x6 Printed Postcard | First Class | 5,054 | $0.5054 | $252.70 |
-| 4x6 Printed Postcard | Standard | 4,910 | $0.4910 | $245.50 |
-| 4x6 Cursive Postcard | First Class | 7,554 | $0.7554 | $377.70 |
-| 6x9 Printed Postcard | First Class | 5,810 | $0.5810 | $290.50 |
-| 6x9 Printed Postcard | Standard | 5,510 | $0.5510 | $275.50 |
-| 6x9 Cursive Postcard | First Class | 8,310 | $0.8310 | $415.50 |
-| Color Letter (#10) | First Class | 8,210 | $0.8210 | $410.50 |
-| Color Letter (#10) | Standard | 5,730 | $0.5730 | $286.50 |
-| Hybrid Letter (5x7) | First Class | 10,500 | $1.0500 | $525.00 |
-| Hybrid Letter (5x7) | Presort | 7,800 | $0.7800 | $390.00 |
-| Greeting Letter (5x7) | First Class | 14,500 | $1.4500 | $725.00 |
-| Greeting Letter (5x7) | Presort | 9,500 | $0.9500 | $475.00 |
+| 4x6 Printed Postcard | First Class | 5,388 | $0.5388 | $269.40 |
+| 4x6 Printed Postcard | Standard | 5,144 | $0.5144 | $257.20 |
+| 4x6 Cursive Postcard | First Class | 7,888 | $0.7888 | $394.40 |
+| 6x9 Printed Postcard | First Class | 6,142 | $0.6142 | $307.10 |
+| 6x9 Printed Postcard | Standard | 5,742 | $0.5742 | $287.10 |
+| 6x9 Cursive Postcard | First Class | 8,642 | $0.8642 | $432.10 |
+| Color Letter (#10) | First Class | 8,620 | $0.8620 | $431.00 |
+| Color Letter (#10) | Standard | 5,970 | $0.5970 | $298.50 |
+| Hybrid Letter (5x7) | First Class | 10,900 | $1.0900 | $545.00 |
+| Hybrid Letter (5x7) | Presort | 8,037 | $0.8037 | $401.85 |
+| Greeting Letter (5x7) | First Class | 14,907 | $1.4907 | $745.35 |
+| Greeting Letter (5x7) | Presort | 9,737 | $0.9737 | $486.85 |
 
 Total cost = `unit_price_tcents × piece_count`. No minimums, no surcharges.
 
@@ -321,14 +325,15 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/pricing?product_type=4x6_
   -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
-Response:
+Response when no partner markup is configured (partner markup changes only
+`unit_price_tcents`, not the underlying base schedule):
 
 ```json
 [
   {
     "product_type": "4x6_printed",
     "postage_type": "first_class",
-    "unit_price_tcents": 5054,
+    "unit_price_tcents": 5388,
     "min_quantity": 1,
     "max_quantity": null,
     "description": "4x6 printed postcard - 1st class",
@@ -337,7 +342,7 @@ Response:
   {
     "product_type": "4x6_printed",
     "postage_type": "standard",
-    "unit_price_tcents": 4910,
+    "unit_price_tcents": 5144,
     "min_quantity": 1,
     "max_quantity": null,
     "description": "4x6 printed postcard - standard",
@@ -406,20 +411,19 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/preview \
   "product_type": "4x6_printed",
   "postage_type": "first_class",
   "piece_count": 500,
-  "unit_price_tcents": 5054,
-  "total_tcents": 2527000,
-  "total_dollars": "$252.7000",
-  "partner_cost_unit_price_tcents": 5054,
-  "partner_cost_total_tcents": 2527000,
-  "partner_cost_total_dollars": "$252.7000",
+  "unit_price_tcents": 5388,
+  "total_tcents": 2694000,
+  "total_dollars": "$269.4000",
+  "partner_cost_unit_price_tcents": 5388,
+  "partner_cost_total_tcents": 2694000,
+  "partner_cost_total_dollars": "$269.4000",
   "billing_mode": "none",
   "balance_cents": null,
   "balance_after_cents": null,
   "limits": {
     "passed": true,
     "checks": [
-      {"type": "order_limit", "passed": true, "order_cost_cents": 25270, "limit_cents": 500000},
-      {"type": "balance", "passed": true, "required_cents": 25270, "available_cents": null}
+      {"type": "order_limit", "passed": true, "order_cost_cents": 26940, "limit_cents": 500000}
     ]
   }
 }
@@ -427,7 +431,11 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/preview \
 
 The preview runs the same limit checks as real order creation but reports results as warnings. If `limits.passed` is `false`, the real order would fail — show the user why before they submit.
 
-> **Note:** For accounts with `billing_mode: none`, `balance_cents` is `null` and balance checks always pass. The preview still validates product type, postage, and piece count.
+> **Note:** For accounts with `billing_mode: none`, `balance_cents` and
+> `balance_after_cents` are `null` and no balance check is added. The preview
+> still validates product type, postage, and piece count. If a partner markup
+> is configured, the primary price fields show the marked-up value while the
+> `partner_cost_*` fields remain the Ballpoint base price.
 
 > **Payment-gate amount source (legacy single-order path):** This endpoint still works for single-order previews and pre-submission UX. For payment-gated submissions with one or more drops, prefer the campaign-level endpoint [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate) — one call returns the whole campaign breakdown plus a chargeable-now total. The fields `partner_cost_total_tcents` (authoritative wholesale debit) and `total_tcents` / `total_dollars` (display-only) have the same meaning on both endpoints.
 
@@ -481,10 +489,10 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
       "product_type": "4x6_printed",
       "postage_type": "first_class",
       "piece_count": 500,
-      "unit_price_tcents": 5054,
-      "total_tcents": 2527000,
-      "partner_cost_unit_price_tcents": 5054,
-      "partner_cost_total_tcents": 2527000,
+      "unit_price_tcents": 5388,
+      "total_tcents": 2694000,
+      "partner_cost_unit_price_tcents": 5388,
+      "partner_cost_total_tcents": 2694000,
       "price_source": "frozen",
       "excluded_from_totals": false,
       "exclusion_reason": null
@@ -496,10 +504,10 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
       "product_type": "4x6_printed",
       "postage_type": "first_class",
       "piece_count": 500,
-      "unit_price_tcents": 5054,
-      "total_tcents": 2527000,
-      "partner_cost_unit_price_tcents": 5054,
-      "partner_cost_total_tcents": 2527000,
+      "unit_price_tcents": 5388,
+      "total_tcents": 2694000,
+      "partner_cost_unit_price_tcents": 5388,
+      "partner_cost_total_tcents": 2694000,
       "price_source": "computed_from_persisted_order_inputs",
       "excluded_from_totals": false,
       "exclusion_reason": null
@@ -511,16 +519,16 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
       "product_type": "4x6_printed",
       "postage_type": "first_class",
       "piece_count": 500,
-      "unit_price_tcents": 5054,
-      "total_tcents": 2527000,
-      "partner_cost_unit_price_tcents": 5054,
-      "partner_cost_total_tcents": 2527000,
+      "unit_price_tcents": 5388,
+      "total_tcents": 2694000,
+      "partner_cost_unit_price_tcents": 5388,
+      "partner_cost_total_tcents": 2694000,
       "price_source": "frozen",
       "excluded_from_totals": true,
       "exclusion_reason": "already_confirmed"
     }
   ],
-  "campaign_partner_cost_total_tcents": 5054000
+  "campaign_partner_cost_total_tcents": 5388000
 }
 ```
 
@@ -566,7 +574,7 @@ Every other order is reported per-order (so you can audit) but **excluded** from
 
 This is by design — calling `POST /v1/billing/campaigns/preview` twice in a row (e.g. after one drop's `/confirm-payment` has succeeded) will return a lower `campaign_partner_cost_total_tcents` the second time, never re-billing the confirmed drop.
 
-**tcents convention.** All `*_tcents` fields are integer **tenth-cents**. Dollars = `tcents / 10000`. Example: `2527000` tcents = `$252.70`.
+**tcents convention.** All `*_tcents` fields are integer **tenth-cents**. Dollars = `tcents / 10000`. Example: `2694000` tcents = `$269.40`.
 
 **Errors**
 
@@ -658,13 +666,16 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
   "campaign_id": "camp_test",
   "product_type": "4x6_printed",
   "piece_count": 500,
-  "unit_price_tcents": 5054,
-  "total_price_tcents": 2527000,
+  "unit_price_tcents": 5388,
+  "total_price_tcents": 2694000,
   "external_id": "ps_order_12345",
   "external_user_id": "user_789",
-  "created_at": "2026-03-01T14:00:00Z"
+  "created_at": "2026-07-18T14:00:00Z"
 }
 ```
+
+Prices are frozen when the order is created. Orders created before the July 12,
+2026 cutover can therefore continue returning the prior base price.
 
 **Example — letter (requires `envelope_style`):**
 

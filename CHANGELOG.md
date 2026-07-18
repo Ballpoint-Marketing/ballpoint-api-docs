@@ -1,5 +1,13 @@
 # Changelog
 
+## Pricing schedule update — effective 2026-07-12
+
+- **The prepared 12-product/postage launch schedule includes the July 12 USPS increase.** The API Kit lists the exact matrix and continues using tenth-cents as the storage and wire convention.
+- **Existing partner markup configuration is unchanged.** Partner-authenticated catalog and preview display fields still apply the configured account markup; `partner_cost_*` preview fields remain the Ballpoint base price.
+- **Existing orders remain price-stable.** Prices already frozen on an order are not recomputed by the schedule change.
+- **No partner schema or enum changed.** OpenAPI and the Postman request collection were checked; neither contains a hard-coded base-price matrix requiring an update. Partner contract version remains `1.7.20`.
+- **Availability:** prepared for local and staging validation only. This entry is not a production deployment or external availability claim.
+
 ## v1.7.20 — 2026-07-18
 
 - **PROPS-3086 — Sender phone and ZIP validation now fails closed.** The embedded Direct Mail Setup, campaign customization, Dashboard sender edit, cached sender state, URL bootstrap, and `set_sender` ingress reject alphabetic or malformed contact values instead of treating any non-empty string as complete.

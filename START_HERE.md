@@ -35,11 +35,16 @@ curl -s -X POST https://api.ballpointmarketing.com/v1/billing/orders \
 {
   "order_id": "ord_...",
   "status": "accepted",
-  "billing": { "total_cents": 25270 }
+  "billing": {
+    "charged": false,
+    "amount_cents": 0,
+    "balance_after_cents": 0,
+    "billing_mode": "none"
+  }
 }
 ```
 
-No mail is printed with your test key — this is a safe sandbox order.
+No mail is printed and no amount is charged with your test key — this is a safe sandbox order. Use the preview endpoint to inspect the current displayed and base prices before creating it.
 
 ---
 
