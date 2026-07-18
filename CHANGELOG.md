@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.20 — 2026-07-18
+
+- **PROPS-3086 — Sender phone and ZIP validation now fails closed.** The embedded Direct Mail Setup, campaign customization, Dashboard sender edit, cached sender state, URL bootstrap, and `set_sender` ingress reject alphabetic or malformed contact values instead of treating any non-empty string as complete.
+- **Supported formats are explicit.** Sender ZIP accepts 5 digits, 9 digits, or ZIP+4 (`12345-6789`). Sender phone accepts 10 digits, or 11 digits beginning with `1`, with standard `+`, parentheses, space, period, and hyphen formatting. Existing values such as `(043) 452-1323` remain valid.
+- **The API is authoritative.** Partner-format `POST /orders` returns `422` for invalid non-empty `sender.zip` or `sender.phone` before authentication dependencies, idempotency, campaign creation, billing, or database mutation. Empty/null sender fields remain optional for backward-compatible partial profiles.
+- **Existing data and downstream rendering are unchanged.** No schema migration or automatic rewrite of historical order metadata is included. Valid formatted phone/ZIP values continue to be persisted and rendered as supplied by the API client; the iframe keeps its existing normalized phone display.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman partner-order example, API metadata, iframe metadata, deploy literals, internal one-pager, and cache-bust tokens report `1.7.20`.
+- **Availability:** prepared for local and staging validation only. This entry is not a production deployment or external availability claim.
+
 ## v1.7.19 — 2026-07-17
 
 - **Cross-origin sandbox diagnostics no longer report a false configuration warning.** When browser same-origin policy prevents the iframe from inspecting its parent `<iframe>` element, the sandbox state is treated as unavailable rather than incorrect. When inspection is available, Ballpoint checks the documented `allow-scripts allow-same-origin allow-forms allow-downloads` token set.

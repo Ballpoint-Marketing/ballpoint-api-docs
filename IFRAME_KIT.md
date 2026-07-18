@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.19** (prepared for local and staging validation; not a deployment or availability claim)
+Partner contract version: **v1.7.20** (prepared for local and staging validation; not a deployment or availability claim)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -600,8 +600,8 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 | `address` | string | Street address |
 | `city` | string | City |
 | `state` | string | Two-letter state code (e.g. `FL`) |
-| `zip` | string or number | ZIP code |
-| `phone` | string | Phone number |
+| `zip` | string or number | ZIP code: 5 digits, 9 digits, or ZIP+4 (`12345-6789`). Alphabetic/malformed values are rejected. |
+| `phone` | string | 10 digits, or 11 digits beginning with `1`. Standard `+`, parentheses, space, period, and hyphen formatting is accepted; letters are rejected. |
 | `email` | string | Optional email address |
 | `website` | string | Website URL |
 | `logo` | string | Optional. URL to sender logo image |
@@ -613,11 +613,12 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 - **First accepted payload is a snapshot.** The first `set_sender` in an iframe load/tenant scope clears any sender values cached for that scope before applying the supplied fields. This prevents stale Marketing Profile data from a prior session from surviving.
 - **Later payloads are patches.** A later `set_sender` in the same iframe load/tenant scope updates only fields present in the message. Omitted fields preserve their current values; a field sent explicitly as `""` clears that value.
 - **Name derivation is deterministic.** Send `fullName` when possible. If it is omitted and any name alias is present, `businessName` wins; otherwise `firstName` and `lastName` are joined.
+- **Invalid contact fields fail closed.** A non-empty `zip` or `phone` that does not match the formats above is discarded rather than stripped into a different value. The profile remains partial and cannot advance or submit until a valid replacement arrives.
 - **Tenant scope is locked.** After sender state is established for a tenant, a later `set_sender` cannot switch to another `tenantKey`; the mismatched message is rejected without changing sender state.
 
 #### Complete and partial profiles
 
-A sender profile is complete only when all six required values are non-empty: `fullName`, `address`, `city`, `state`, `zip`, and `phone`. `email`, `website`, and `logo` are optional.
+A sender profile is complete only when `fullName`, `address`, `city`, and `state` are non-empty and both `zip` and `phone` are valid according to the formats above. `email`, `website`, and `logo` are optional.
 
 | Profile received | Sender Information step | Direct Mail Dashboard |
 |------------------|-------------------------|-----------------------|
@@ -1813,8 +1814,8 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 | `address` | string | 200 | Sender street address |
 | `city` | string | 100 | Sender city |
 | `state` | string | 2 | Sender state (two-letter code) |
-| `zip` | string | 10 | Sender ZIP |
-| `phone` | string | 20 | Sender phone |
+| `zip` | string | 10 | Sender ZIP: 5 digits, 9 digits, or ZIP+4. Invalid values leave the sender profile incomplete. |
+| `phone` | string | 20 | Sender phone: 10 digits, or 11 beginning with `1`; standard formatting is accepted. Invalid values leave the sender profile incomplete. |
 | `website` | string | 200 | Sender website |
 
 > **Important:** The API token (`apiToken`) must **never** be passed as a URL parameter. It must always be sent via `postMessage` using `set_api_config`. URLs are visible in browser history, Referer headers, and server logs.
