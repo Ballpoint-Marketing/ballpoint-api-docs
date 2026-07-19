@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.21 · July 2026**
+> **v1.7.22 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -274,7 +274,7 @@ Envelope + insert. Letter orders **require** an `envelope_style` field.
 
 | Product Type | Envelope | Insert | Envelope Size | Postage Options |
 |-------------|----------|--------|---------------|-----------------|
-| `color_letter` | Printed | Printed 8.5x11 (folded) | #10 | `first_class`, `standard` |
+| `color_letter` | Printed | Full-color printed 8.5x11 (tri-folded to fit the envelope) | #10 | `first_class`, `standard` |
 | `hybrid_letter` | Handwritten | Printed | 5x7 | `first_class`, `presort` |
 | `greeting_letter` | Handwritten | Handwritten | 5x7 | `first_class`, `presort` |
 
@@ -283,6 +283,10 @@ Envelope + insert. Letter orders **require** an `envelope_style` field.
 Available styles: `candy`, `party`, `pastel`, `confetti`, `desert`, `floral`, `stone`, `retro`, `deco`, `doodle`, `plain_white`
 
 - **`color_letter`** uses #10 envelopes — only `plain_white` is supported.
+- **`color_letter` is full color only in V1.** There is no black-and-white print option; the end user chooses only between the supported postage classes.
+- **`color_letter` canvas artwork is one-sided in V1.** Send `canvas_json.front`; `canvas_json.back` is not required and is ignored for the printed insert. Two-sided canvas products continue sending both `front` and `back`.
+- The Color Letter editor stores the 11 V1 dynamic fields as canonical `#Token#` values. Ballpoint resolves sender fields from the saved sender profile and owner/property fields from each recipient's `placeHolders`; absent values print blank.
+- **`color_letter` V1 accepts at most 500 pieces per order.** Its complete `canvas_json` must be at most 20 MiB, 50 levels deep, 10,000 JSON nodes, and 1,000 Fabric objects. Embedded image sources must be base64 PNG, JPEG, or WebP and no more than 14 MiB encoded. Remote image sources must be HTTPS assets under Ballpoint's approved `/images/` or `/assets/` paths, or PropStream's approved `/direct-mail/` S3 prefix. Relative Ballpoint asset paths are also accepted. Other hosts, URL fragments, unsupported query parameters, and merge tokens inside image URLs are rejected before order creation. These request-validation limits do not change existing two-sided products.
 - **`hybrid_letter`** and **`greeting_letter`** use 5x7 envelopes — all decorative styles available.
 - **Postcards** — do not include `envelope_style` (the API will reject it).
 

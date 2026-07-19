@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.22 — 2026-07-19
+
+- **Color Letter V1 is full color, one sheet, and explicitly one-sided.** There is no black-and-white print option; the end user chooses postage only. Partner-format `POST /orders` accepts `canvas_json: { front }` for `product_type: "color_letter"`; `back` remains part of the existing canvas shape for two-sided products.
+- **Color Letter dynamic fields resolve at print time.** The 11 canonical PropStream `#Token#` fields from the editor now resolve from the sender profile or recipient `placeHolders`; missing fields render blank. Existing `{{snake_case}}` canvas tokens remain supported.
+- **Color Letter V1 has a fail-closed input boundary and a 500-piece order limit.** Its `canvas_json` is limited to 20 MiB, depth 50, 10,000 JSON nodes, 1,000 Fabric objects, and embedded PNG/JPEG/WebP sources up to 14 MiB of encoded data. Remote canvas images must use approved Ballpoint asset paths or the PropStream `/direct-mail/` asset prefix; tokenized image URLs and other remote hosts are rejected before order creation. Existing two-sided product request validation is unchanged.
+- **Color Letter rendering waits for the complete recipient list.** Initial uploads, Edit Leads, and campaign-level recipient deltas invalidate older output and enqueue a generation-isolated render only when the order has a non-empty complete list, preventing stale or partial print PDFs.
+- **Color Letter print assembly uses bounded memory.** Recipient PDFs are spooled to temporary storage, merged on disk, and uploaded with multipart-capable file transfer; the redundant per-recipient front copy is no longer stored for the one-sided product.
+- **Color Letter proof/print fonts are aligned.** The renderer preloads each selected family, weight, and style and uses the same bundled Lexi, Montserrat, Raleway, Open Sans, and Playfair files as the editor. Color Letter hides picker families that are not loaded in the iframe; existing postcard font options remain unchanged.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.22`.
+- **Availability:** prepared for local and staging validation only. This entry is not a production-deployment or availability claim.
+
 ## v1.7.21 — 2026-07-19
 
 - **Additive automatic iframe funnel telemetry is prepared for staging validation.** The embedded iframe sends one best-effort `POST /v1/partner/funnel-events` request for each `campaign_started`, `product_selected`, `copy_edited`, `proof_viewed`, `submit_clicked`, and `campaign_submitted_confirmed` milestone. Partners do not need to call the endpoint or change their integration.
