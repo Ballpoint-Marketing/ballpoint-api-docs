@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.21** (prepared for local and staging validation; not a deployment or availability claim)
+Partner contract version: **v1.7.22** (prepared for local and staging validation; not a deployment or availability claim)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -1661,6 +1661,11 @@ End-to-end timeline:
 **Standard Class** to the end user but submit `postage_type: "presort"` to the
 API. This is a display label only. `standard` remains a separate API value for
 supported postcards and Color Letter.
+
+**Color Letter V1 print options:** the 8.5x11 insert is full color, one sheet,
+one-sided, and tri-folded to fit the #10 envelope. The iframe does not expose a
+black-and-white selector; the end user chooses only between Standard Class and
+First Class postage.
 
 **Important distinction.** After `campaign_submitted`, the iframe lifecycle and payment lifecycle are separate. The iframe may emit `campaign_complete` / `done` once the iframe submission flow finishes, independent of the payment popup. That does not mean production is complete and does not replace `/confirm-payment`. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
 
