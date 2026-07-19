@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.20** (prepared for local and staging validation; not a deployment or availability claim)
+Partner contract version: **v1.7.21** (prepared for local and staging validation; not a deployment or availability claim)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -207,6 +207,37 @@ the browser check is not the security boundary. The flag introduces **no new
 button, checkbox, copy, or layout**. PropStream continues to own visibility of
 its Send Mail entry point; Ballpoint owns the submit decision after the user
 enters the iframe. Non-PropStream embeds are unchanged.
+
+### Automatic funnel analytics traffic (no partner action)
+
+During a staging campaign flow after this contract is deployed, the iframe is
+prepared to send one best-effort `POST /v1/partner/funnel-events` request per
+observed milestone:
+`campaign_started`, `product_selected`, `copy_edited`, `proof_viewed`,
+`submit_clicked`, and `campaign_submitted_confirmed`. These requests use the
+`apiToken` from `set_api_config` as `X-Partner-Key` and the active
+`externalUserId` as `X-External-User-ID`.
+
+This is Ballpoint-owned, log-only product telemetry. Partners do not need to
+call the endpoint, handle a response, add a listener, or change their
+integration. Telemetry failures never block or retry the campaign flow. The
+payload contains only a short-lived campaign session ID, sequence, client
+elapsed time, safe page ID, optional `single`/`multi`/`split` flow type, and the
+event name. It contains no account/tenant/user identity in the body, recipient
+PII, or copy entered by the user.
+
+The intake accepts up to 1,000 attempts with valid partner and user context per
+60 seconds for each account/source/external-account tuple, enforced per API
+process. A throttled telemetry request is dropped with an empty `429` and no
+retry.
+
+The same session may emit `submit_clicked` more than once if the payment handoff
+is reopened. `campaign_submitted_confirmed` is emitted only after payment
+success. Drop-off is derived by Ballpoint from the last event received; the
+iframe does not send a separate abandonment event.
+
+This contract is prepared for local and staging validation only. Its inclusion
+does not assert staging deployment or production availability.
 
 ### `set_list` — Recipient list info (required)
 
