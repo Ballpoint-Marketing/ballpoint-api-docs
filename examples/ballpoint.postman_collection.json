@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.20 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.21 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -716,6 +716,61 @@
                   }
                 },
                 "description": "Log-only client-error telemetry intake. Called AUTOMATICALLY by the embedded iframe (window.onerror / unhandledrejection) - partners do NOT need to integrate it. Documented here because it is partner-key authenticated and requests will appear in partner-side network monitoring. Response is 204 with an empty body on success; 413/422/429 error responses have empty bodies by design (401 returns the standard auth error envelope). Caps: 4096-byte request body, 60 requests/minute per partner key, per-field length caps (name<=50, message<=220, source<=300, pageId<=40, buildId<=64, contractVersions<=6 keys/20 chars). PII is scrubbed client-side by the iframe before send."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status 204', function () { pm.response.to.have.status(204); });",
+                      "pm.test('empty body (no payload echo)', function () {",
+                      "  pm.expect(pm.response.text() || '').to.eql('');",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Iframe Funnel Event (automatic) - POST",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-Partner-Key",
+                    "value": "{{partner_key}}"
+                  },
+                  {
+                    "key": "X-External-User-ID",
+                    "value": "{{external_user_id}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/partner/funnel-events",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "partner",
+                    "funnel-events"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"event\": \"product_selected\",\n  \"session_id\": \"sfe_9f2a1c4b7e3d0a11\",\n  \"sequence\": 2,\n  \"elapsed_ms_client\": 4230,\n  \"page_id\": \"products\",\n  \"flow_type\": \"single\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Log-only iframe funnel telemetry prepared for local and staging validation. Called AUTOMATICALLY by the embedded iframe; partners do NOT need to integrate it. One event is sent per POST with X-Partner-Key and X-External-User-ID. The 204 response has an empty body; 413/422/429 error responses are also empty, while 401 uses the standard auth error envelope. The endpoint-specific ceiling is 1,000 attempts with valid partner and user context per 60 seconds for each account/source/external-account tuple, enforced per API process; its 429 has no general rate-limit headers or Retry-After. The closed body is capped at 2048 bytes and contains no account/tenant/user identity, recipient PII, or typed copy. submit_clicked may repeat when payment is reopened; campaign_submitted_confirmed is emitted only after payment success; drop-off is derived from the last received event. Inclusion in this collection does not assert staging runtime deployment or production availability."
               },
               "event": [
                 {

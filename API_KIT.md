@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.20 · July 2026**
+> **v1.7.21 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -2508,6 +2508,71 @@ Payload example (fields the iframe sends):
 
 Available on staging now; production on the next API release.
 
+### Iframe Funnel Analytics (automatic)
+
+`POST /v1/partner/funnel-events` is prepared for the embedded iframe to send one
+funnel milestone per request. **Partners do not need to call or integrate this
+endpoint.** It is documented because the automatic request uses
+`X-Partner-Key` plus `X-External-User-ID` and may appear in partner-side network
+monitoring during staging validation.
+
+The intake is **log-only**: an accepted event produces a structured Ballpoint
+log entry and returns `204 No Content`. It does not create a database row, emit
+a webhook, change campaign/order state, or echo the request. Delivery is
+best-effort and never blocks or retries the user's campaign flow.
+
+One request carries exactly one of these events:
+
+- `campaign_started`
+- `product_selected`
+- `copy_edited`
+- `proof_viewed`
+- `submit_clicked`
+- `campaign_submitted_confirmed`
+
+`campaign_submitted_confirmed` is emitted only after a successful payment
+result. `submit_clicked` may appear more than once for the same session when a
+user reopens the payment handoff. Drop-off is not sent as a separate event; it
+is derived from the last accepted event for a session.
+
+```json
+{
+  "event": "product_selected",
+  "session_id": "sfe_9f2a1c4b7e3d0a11",
+  "sequence": 2,
+  "elapsed_ms_client": 4230,
+  "page_id": "products",
+  "flow_type": "single"
+}
+```
+
+The payload is capped at **2048 bytes**. `session_id` must match
+`sfe_` followed by 16 lowercase hexadecimal characters; `sequence` is 1–50;
+`elapsed_ms_client` is 0–86,400,000; `page_id` is a safe identifier up to 40
+characters; and optional `flow_type` is `single`, `multi`, or `split`. Extra
+fields are rejected. Account, tenant/source, and user attribution are not
+accepted in the JSON body: account and tenant/source are derived from the
+authenticated partner principal, and user context comes from the required
+`X-External-User-ID` header. The event schema accepts no recipient PII or typed
+copy.
+
+This intake has an endpoint-specific ceiling of **1,000 attempts with valid
+partner and user context per 60 seconds** for each
+account/source/external-account tuple, enforced per API process. Its dedicated
+empty `429` response does not include the general API rate-limit headers or
+`Retry-After` described elsewhere in this kit.
+
+| Status | Meaning | Body |
+|--------|---------|------|
+| `204 No Content` | Accepted and logged. | empty |
+| `401 Unauthorized` | Missing/invalid partner identity headers. | standard auth error envelope |
+| `413 Payload Too Large` | Request body larger than 2048 bytes. | empty |
+| `422 Unprocessable Entity` | Invalid or extra field. | empty |
+| `429 Too Many Requests` | Telemetry intake rate limit exceeded. | empty |
+
+This contract is prepared for local and staging validation. Its inclusion here
+does not assert staging runtime deployment or production availability.
+
 ---
 
 ## 11. Sandbox & Testing
@@ -2580,6 +2645,7 @@ Before switching to your live key:
 | Mint SSE token | `POST` | `/v1/billing/orders/{id}/sse-token` | `X-Partner-Key` |
 | SSE stream | `GET` | `/v1/billing/orders/{id}/events` | *(cookie auth via sse-token)* |
 | Client-error telemetry (iframe, automatic — no partner action needed) | `POST` | `/v1/partner/client-errors` | `X-Partner-Key` |
+| Funnel analytics (iframe, automatic — no partner action needed) | `POST` | `/v1/partner/funnel-events` | `X-Partner-Key`, `X-External-User-ID` |
 | Health check | `GET` | `/health` | *(none)* |
 
 ---

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.21 — 2026-07-19
+
+- **Additive automatic iframe funnel telemetry is prepared for staging validation.** The embedded iframe sends one best-effort `POST /v1/partner/funnel-events` request for each `campaign_started`, `product_selected`, `copy_edited`, `proof_viewed`, `submit_clicked`, and `campaign_submitted_confirmed` milestone. Partners do not need to call the endpoint or change their integration.
+- **The intake is log-only and non-blocking.** Accepted requests return `204 No Content`; there is no database row, webhook fan-out, campaign/order state change, body echo, batching, retry, unload beacon, or new analytics infrastructure.
+- **Identity and privacy boundaries are explicit.** Requests use `X-Partner-Key` and `X-External-User-ID`. Account and tenant/source are derived from the authenticated partner principal, user context is derived from the header, and none of those identifiers are accepted in the JSON body. The closed payload contains no recipient PII or typed copy and is capped at 2048 bytes.
+- **Funnel interpretation is stable.** `submit_clicked` may repeat when a user reopens the payment handoff; `campaign_submitted_confirmed` fires only after payment success. Drop-off is derived from the last event received for a session, not emitted as a separate event.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI contract metadata/schema/path, and the Postman collection report `1.7.21`. Postman environments were checked and contain no partner-contract version metadata, so they require no change.
+- **Availability:** prepared for local and staging validation only. This entry is not a staging runtime-deployment or production-availability claim.
+
 ## Pricing schedule update — effective 2026-07-12
 
 - **The prepared 12-product/postage launch schedule includes the July 12 USPS increase.** The API Kit lists the exact matrix and continues using tenth-cents as the storage and wire convention.
