@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — PROPS-3034 sender/tenant reconciliation
+
+- **Dashboard-first sender state survives the first tenant assignment.** If the iframe accepts `set_sender` before any tenant scope exists, a later first `tenantKey` from `set_list`, `set_lists`, `set_api_config`, or `set_tenant` preserves that sender snapshot instead of replacing it with an empty tenant-scoped cache.
+- **Validation behavior is unchanged.** A complete sender profile can continue to Direct Mail Type; a partial profile remains on Sender Information with its supplied fields preserved and the existing account-owner setup rules applied.
+- **Tenant isolation remains strict.** The temporary unscoped sender copy is removed only after the tenant-scoped write succeeds, and the reconciliation never copies data between two established tenants.
+- **No integration migration is required.** Message names, fields, ordering support, APIs, webhooks, billing, pricing, schemas, and database behavior are unchanged.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## v1.7.22 — 2026-07-19
 
 - **Color Letter V1 is full color, one sheet, and explicitly one-sided.** There is no black-and-white print option; the end user chooses postage only. Partner-format `POST /orders` accepts `canvas_json: { front }` for `product_type: "color_letter"`; `back` remains part of the existing canvas shape for two-sided products.
