@@ -3,6 +3,7 @@
 ## Pricing schedule update — effective 2026-07-12
 
 - **The prepared 12-product/postage launch schedule includes the July 12 USPS increase.** The API Kit lists the exact matrix and continues using tenth-cents as the storage and wire convention.
+- **PropStream launch terminology is explicit.** Hybrid Letter and Greeting Letter show **Standard Class** in the iframe and pricing dashboard while continuing to use the existing API value `postage_type: "presort"`; `standard` remains the separate API value used by supported postcards and Color Letter.
 - **Existing partner markup configuration is unchanged.** Partner-authenticated catalog and preview display fields still apply the configured account markup; `partner_cost_*` preview fields remain the Ballpoint base price.
 - **Existing orders remain price-stable.** Prices already frozen on an order are not recomputed by the schedule change.
 - **No partner schema or enum changed.** OpenAPI and the Postman request collection were checked; neither contains a hard-coded base-price matrix requiring an update. Partner contract version remains `1.7.20`.

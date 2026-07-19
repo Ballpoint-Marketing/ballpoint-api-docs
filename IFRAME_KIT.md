@@ -1626,6 +1626,11 @@ End-to-end timeline:
 9. Parent backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
 10. On success, Ballpoint debits the partner balance and moves the order to `accepted`. Production proceeds.
 
+**Postage label mapping:** Hybrid Letter and Greeting Letter display
+**Standard Class** to the end user but submit `postage_type: "presort"` to the
+API. This is a display label only. `standard` remains a separate API value for
+supported postcards and Color Letter.
+
 **Important distinction.** After `campaign_submitted`, the iframe lifecycle and payment lifecycle are separate. The iframe may emit `campaign_complete` / `done` once the iframe submission flow finishes, independent of the payment popup. That does not mean production is complete and does not replace `/confirm-payment`. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
 
 For payment, reconciliation, or backend workflows, key off `campaign_submitted.orders[].ballpointOrderId` — not `campaign_created.orderIds` (those are pre-API local IDs). Equivalently: **don't poll `GET /v1/billing/orders` mid-flow** to discover per-drop ids for Multi Send or A/B Split; orders only exist server-side after Continue to Payment fires `campaign_submitted`. See the [`campaign_created`](#campaign_created--campaign-created-before-submission) and [`order_added`](#order_added--new-order-added-multi-month-campaigns) timing notes for details.

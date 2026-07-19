@@ -305,11 +305,17 @@ fields; `partner_cost_*` preview fields retain the base price.
 | Color Letter (#10) | First Class | 8,620 | $0.8620 | $431.00 |
 | Color Letter (#10) | Standard | 5,970 | $0.5970 | $298.50 |
 | Hybrid Letter (5x7) | First Class | 10,900 | $1.0900 | $545.00 |
-| Hybrid Letter (5x7) | Presort | 8,037 | $0.8037 | $401.85 |
+| Hybrid Letter (5x7) | Standard Class (API: `presort`) | 8,037 | $0.8037 | $401.85 |
 | Greeting Letter (5x7) | First Class | 14,907 | $1.4907 | $745.35 |
-| Greeting Letter (5x7) | Presort | 9,737 | $0.9737 | $486.85 |
+| Greeting Letter (5x7) | Standard Class (API: `presort`) | 9,737 | $0.9737 | $486.85 |
 
 Total cost = `unit_price_tcents × piece_count`. No minimums, no surcharges.
+
+**PropStream label mapping:** for `hybrid_letter` and `greeting_letter`, the
+customer-facing iframe and pricing dashboard label is **Standard Class**, while
+the API value remains `postage_type: "presort"`. Do not send `standard` for
+those two products. The `standard` API value continues to identify Standard
+Class postage for supported postcards and `color_letter`.
 
 You can also fetch pricing programmatically:
 
