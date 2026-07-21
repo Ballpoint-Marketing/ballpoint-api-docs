@@ -1415,7 +1415,7 @@ paths:
                           enum:
                           - frozen
                           - computed_from_persisted_order_inputs
-                          description: '`frozen` = price snapshot persisted on the order is reused as-is. `computed_from_persisted_order_inputs` = recomputed from the persisted product/postage/piece_count inputs using current pricing tables (no raw client inputs accepted).'
+                          description: 'Always `computed_from_persisted_order_inputs` for this endpoint as of PROPS-3087: pricing is recomputed live from the persisted product/postage/piece_count inputs using the current pricing tables (no raw client inputs accepted), so the preview equals the `/confirm-payment` charge. `frozen` (a persisted price snapshot reused as-is) is retained in the enum for backward compatibility but is no longer emitted by this endpoint.'
                         excluded_from_totals:
                           type: boolean
                           description: '`true` when the order is not chargeable right now and its `partner_cost_total_tcents` is NOT included in `campaign_partner_cost_total_tcents`.'

@@ -503,7 +503,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
       "total_tcents": 2694000,
       "partner_cost_unit_price_tcents": 5388,
       "partner_cost_total_tcents": 2694000,
-      "price_source": "frozen",
+      "price_source": "computed_from_persisted_order_inputs",
       "excluded_from_totals": false,
       "exclusion_reason": null
     },
@@ -533,7 +533,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
       "total_tcents": 2694000,
       "partner_cost_unit_price_tcents": 5388,
       "partner_cost_total_tcents": 2694000,
-      "price_source": "frozen",
+      "price_source": "computed_from_persisted_order_inputs",
       "excluded_from_totals": true,
       "exclusion_reason": "already_confirmed"
     }
@@ -560,7 +560,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
 | `orders[].total_tcents` | integer | **Display/retail** total for this order (`unit_price_tcents × piece_count`). Not the debit amount. UX/display only. |
 | `orders[].partner_cost_unit_price_tcents` | integer | **Wholesale** per-piece price. |
 | `orders[].partner_cost_total_tcents` | integer | **Authoritative wholesale debit amount** for this order. This is the value Ballpoint will debit from the partner balance on `/confirm-payment` `status:success` for this order. Returned even for excluded orders (for reconciliation), but only chargeable-now orders contribute to the campaign total. |
-| `orders[].price_source` | string | `"frozen"` — pricing was already locked on the order row; or `"computed_from_persisted_order_inputs"` — pricing was recomputed from the persisted `product_type` / `postage_type` / `piece_count` via current pricing tables. |
+| `orders[].price_source` | string | Always `"computed_from_persisted_order_inputs"` for this endpoint as of PROPS-3087 — pricing is recomputed live from the persisted `product_type` / `postage_type` / `piece_count` via the **current** pricing tables (no raw client inputs accepted), so the preview equals the `/confirm-payment` charge. `"frozen"` (a price snapshot reused as-is) is retained in the enum for backward compatibility but is **no longer emitted** by this endpoint. |
 | `orders[].excluded_from_totals` | boolean | `true` if this order is **not** added into `campaign_partner_cost_total_tcents` (see "Chargeable-now semantics" below). |
 | `orders[].exclusion_reason` | string \| null | One of `"already_confirmed"`, `"cancelled"`, `"failed"`, `"payment_failed"`, `"not_chargeable_status"`. `null` when `excluded_from_totals=false`. |
 | `campaign_partner_cost_total_tcents` | integer | **The amount to charge now.** Sum of `partner_cost_total_tcents` across **chargeable-now orders only** (see below). Excludes already-confirmed and terminal/failed orders. tcents → dollars: divide by 10000. |
@@ -684,8 +684,15 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
 }
 ```
 
-Prices are frozen when the order is created. Orders created before the July 12,
-2026 cutover can therefore continue returning the prior base price.
+The `unit_price_tcents` / `total_price_tcents` above are a **creation-time
+estimate** persisted on the order row for display — they are **not** the amount
+debited. As of PROPS-3087 the wholesale charge is resolved against the
+**current** pricing tier at [`/confirm-payment`](#6k-confirm-payment-partner-payment-gate),
+and [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate)
+recomputes the same way — always refetch that preview immediately before
+charging. Because these estimate columns are captured at creation, an order
+created before the July 12, 2026 cutover may still show the prior base price in
+these fields, but the debit uses the pricing tier in effect at confirmation.
 
 **Example — letter (requires `envelope_style`):**
 
@@ -1066,7 +1073,7 @@ Where this call sits in the end-user journey for an iframe-driven order:
 2. End-user creates the campaign locally inside the iframe (picks list, product, drop type).
 3. iframe emits `campaign_created` to the parent. `orderIds` in this event are local iframe IDs only — no Ballpoint order exists yet.
 4. End-user customizes the campaign and clicks Submit.
-5. iframe calls `POST /orders` on the API base URL and sends the selected `postage_type` (`first_class`, `standard`, or `presort`). Ballpoint validates and persists that value, then freezes the corresponding price for payment-gated accounts. Only legacy requests that omit `postage_type` default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated); no charge occurs yet.
+5. iframe calls `POST /orders` on the API base URL and sends the selected `postage_type` (`first_class`, `standard`, or `presort`). Ballpoint validates and persists that value, then records a creation-time price **estimate** on the order for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at [`/confirm-payment`](#6k-confirm-payment-partner-payment-gate) — refetch [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate) before charging). Only legacy requests that omit `postage_type` default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated); no charge occurs yet.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger to start the payment popup. For partners that sent `piece_counts` on `set_list`, this event also carries `recipient_selection.piece_count` — per-drop, matches each `orders[].pieces`, useful for reconciliation. See [IFRAME_KIT.md](IFRAME_KIT.md#recipient-selection-contract-piece-count--dedup) for the full input/output contract.
 7. Partner backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then calls [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with that list. Read `campaign_partner_cost_total_tcents` (the authoritative "charge now" amount — already excludes already-confirmed drops) and per-order `partner_cost_total_tcents` (the per-order wholesale debit). The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step.
 8. Partner shows the payment popup; end-user pays via the partner's payment provider.
