@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — PROPS-3087 partner debit resolves the current pricing tier
+
+- **The partner wholesale debit is resolved against the current pricing tier at `/confirm-payment`.** Previously the debit reused the price frozen on the order at creation; as of PROPS-3087 the charge follows the pricing tier in effect at confirmation. This supersedes the earlier "prices already frozen on an order are not recomputed" and "price-stable" statements for the gated debit.
+- **`POST /v1/billing/campaigns/preview` recomputes live so preview equals the charge.** The endpoint no longer returns the order's frozen snapshot; `price_source` is now always `computed_from_persisted_order_inputs`. `frozen` is retained in the enum for backward compatibility but is no longer emitted by this endpoint. Partners must continue to refetch this preview immediately before charging — it remains the authoritative "charge now" amount.
+- **The order's `unit_price_tcents` / `total_price_tcents` columns are unchanged** — they remain a creation-time display **estimate** captured at `POST /orders`; only the debit source moved to the current tier. `POST /v1/billing/orders/preview` was already live and is unchanged.
+- **No message names, fields, endpoints, webhooks, schemas, or database columns change.** This is a pricing-semantics change on the existing debit path; partner request/response shapes are identical.
+- **Artifact sync:** API Kit, Iframe Kit, and OpenAPI updated. Version literals are unchanged in this entry; the coordinated contract-version bump is applied at release time.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## Unreleased — PROPS-3034 sender/tenant reconciliation
 
 - **Dashboard-first sender state survives the first tenant assignment.** If the iframe accepts `set_sender` before any tenant scope exists, a later first `tenantKey` from `set_list`, `set_lists`, `set_api_config`, or `set_tenant` preserves that sender snapshot instead of replacing it with an empty tenant-scoped cache.
