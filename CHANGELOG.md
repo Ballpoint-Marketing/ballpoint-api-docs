@@ -17,6 +17,14 @@
 - **No integration migration is required.** Message names, fields, ordering support, APIs, webhooks, billing, pricing, schemas, and database behavior are unchanged.
 - **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
 
+## v1.7.23 — 2026-07-22
+
+- **Direct Mail Dashboard: the Sender Information card is now fully hidden for non-owner users while sender info is unset.** Previously that state showed the card with the "Please contact your account owner to set up sender information" blocked message. Requested in partner QA (PROPS-3144) and approved by Ballpoint product; deny-by-default is unchanged, so partners that do not send `externalUserIsAccountOwner` get the new hidden-card presentation on the Dashboard.
+- **The Sender Information step is unchanged.** Non-owners with incomplete sender info still see the blocked-state message there, and the create flow still stops at that step. `sender_setup_requested` emission rules, `set_sender` / `set_list` semantics, and all message schemas are unchanged.
+- **Documentation-only contract alignment.** Runtime behavior shipped to staging on 2026-07-22; there are no API route, schema, webhook, billing, pricing, order, or database changes.
+- **Artifact sync:** Iframe Kit gate table, `set_list` field reference, sender-state matrix, and troubleshooting entry updated. API Kit, OpenAPI contract metadata, Postman collection description, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.23`.
+- **Availability:** **staging only.** This entry is not a production-deployment or production-availability claim.
+
 ## v1.7.22 — 2026-07-19
 
 - **Color Letter V1 is full color, one sheet, and explicitly one-sided.** There is no black-and-white print option; the end user chooses postage only. Partner-format `POST /orders` accepts `canvas_json: { front }` for `product_type: "color_letter"`; `back` remains part of the existing canvas shape for two-sided products.
