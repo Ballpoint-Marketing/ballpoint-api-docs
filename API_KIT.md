@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.23 · July 2026**
+> **v1.7.24 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.

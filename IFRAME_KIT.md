@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.23** (prepared for local and staging validation; not a deployment or availability claim)
+Partner contract version: **v1.7.24** (prepared for local and staging validation; not a deployment or availability claim)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -311,8 +311,8 @@ After PropStream's Edit Leads modal saves changes to the recipient list, the par
 
 - **Same `listId` required.** The refresh `set_list` payload MUST carry the same `listId` as the original first-receipt `set_list`. Any other `listId` is treated as a list switch attempt and REJECTED.
 - **Updatable fields on refresh:** `count`, `name`, `piece_counts`, `externalUserIsAccountOwner`. These are re-validated and re-applied. The iframe's count display, pricing UI, recipient selection state, and sender-info CTA visibility refresh in place.
-- **Preserving vs clearing `piece_counts` on refresh:** if the refresh payload OMITS the `piece_counts` key entirely, the iframe preserves the currently-active `piece_counts` table (the user's combo selection and pricing continue working). To explicitly replace the table, include `piece_counts` in the refresh payload with the new values. To explicitly clear it back to legacy single-count behavior, include `piece_counts: null`. Omitting the key is NOT the same as clearing.
-- **Pricing/display on refresh when `piece_counts` is active:** the refreshed count is applied to internal state, but the visible recipient count and price stay aligned with the user's current Deliver To + Remove duplicates selection (via the existing piece_counts lookup). If `piece_counts` is not active on the active list, the refreshed raw count drives display + price directly (legacy behavior).
+- **Preserving vs clearing `piece_counts` on refresh:** if the refresh payload OMITS the `piece_counts` key entirely, the iframe preserves the currently-active `piece_counts` table AND the user's combo selection (pricing continues working). To explicitly replace the table, include `piece_counts` in the refresh payload with the new values — this resets the Deliver To / Remove duplicates selection to the [default](#default-selection). To explicitly clear it back to legacy single-count behavior, include `piece_counts: null`. Omitting the key is NOT the same as clearing.
+- **Pricing/display on refresh when `piece_counts` is active:** on a refresh that OMITS `piece_counts`, the refreshed count is applied to internal state while the visible recipient count and price stay aligned with the user's current Deliver To + Remove duplicates selection (via the existing piece_counts lookup). A refresh that INCLUDES `piece_counts` resets the selection to the default first, so the displayed count and price follow the default combination, not the user's prior choice. If `piece_counts` is not active on the active list, the refreshed raw count drives display + price directly (legacy behavior).
 - **Immutable fields on refresh:** `externalAccountId`, `externalUserId`, `tenantKey`. The values from the first-receipt set_list are authoritative for the session. Refresh payloads attempting to change these are:
   - `externalAccountId` / `externalUserId`: ignored (existing values preserved).
   - `tenantKey` mismatch: ENTIRE refresh message rejected, no state change applied.
@@ -584,6 +584,30 @@ When `set_list.piece_counts` (or `set_lists[].piece_counts`) is present, the ifr
 4. **User selects** → iframe looks up the resolved count via `piece_counts[deliver_to][dedup_on ? "dedup_on" : "dedup_off"]` → displays the count and recomputes price.
 5. **User submits** → iframe echoes the final selection on `campaign_submitted.recipient_selection` (see [Section 6](#6-messages-you-receive-iframe--parent)).
 6. **Partner reconciles** `recipient_selection.piece_count` against each `orders[].pieces` for billing and recipient-upload sizing.
+
+#### Default selection
+
+The controls open on **`Deliver To = mailing`** with **`Remove duplicate addresses = off`**.
+
+This default is applied on first render and re-applied every time a new `piece_counts` table is received — a first-receipt `set_list`, a `set_lists` payload, the user picking a different list in the selector, **and a same-`listId` refresh that carries the `piece_counts` key** (the [Edit Leads sync](#set_list-refresh-post-modal-sync)). In every one of these the user's prior Deliver To / Remove duplicates choice is discarded and reset to the default. A refresh that OMITS the `piece_counts` key preserves both the table and the user's selection — the only case in which a prior choice survives.
+
+A user who submits without touching either control emits the default selection. Using the worked example below (where `piece_counts.mailing.dedup_off` is 498):
+
+```json
+"recipient_selection": {
+  "deliver_to": "mailing",
+  "remove_duplicate_addresses": false,
+  "piece_count": 498
+}
+```
+
+Always read the emitted `recipient_selection` rather than assuming a default — it is the authoritative value for billing and recipient-upload sizing.
+
+**If your `piece_counts` omits the `mailing` block**, the opening selection lands on an option that is not selectable. Consistent with the missing-key rule above, the iframe disables that option, shows a recipient count of 0, and blocks forward progress until the user chooses an available `Deliver To`: on the list step every campaign type is marked ineligible and **Next** stays disabled, and the final **Continue to Payment** on the Order Summary is fail-closed (see [Fail-closed submit](#fail-closed-submit) below). There is no automatic fallback to another option. Send a `mailing` block if you want the default to resolve to a count.
+
+#### Fail-closed submit
+
+The Order Summary's **Continue to Payment** is guarded: when a `piece_counts` table is active, the iframe will not create an order or emit `campaign_submitted` unless the resolved `piece_count` is a positive number. This protects the case where a same-`listId` refresh arrives while the user is on the Order Summary and its table no longer contains the active combination — the selection resets to a default that resolves to no count. Rather than emit a `null` `piece_count` or a placeholder order, the iframe stops, shows an actionable message, and leaves the flow interactive so the user can use **Previous** to go back and choose an available `Deliver To`. No order is created and no `campaign_submitted` fires in that state. Partners without `piece_counts` are unaffected — this guard applies only when a table is active.
 
 #### Worked example
 
