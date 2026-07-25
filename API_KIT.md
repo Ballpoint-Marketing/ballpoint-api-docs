@@ -800,6 +800,8 @@ GET /v1/billing/orders
 
 > The same repeated `list_id` filter (1–100 values, `422 LIST_ID_LIMIT_EXCEEDED` over the cap, present-but-empty = zero results) is also accepted on the partner dashboard reads `GET /v1/billing/partner/stats`, `GET /v1/billing/partner/orders`, and the insights endpoint `GET /v1/mail-tracking/account-summary`. The iframe's `set_dashboard_filter` postMessage drives these under the hood (see [IFRAME_KIT.md](IFRAME_KIT.md)).
 
+> **`total_pieces_mailed` counts every order in scope — cancelled and failed included.** The `GET /v1/mail-tracking/account-summary` piece total sums `piece_count` across all orders matching the account/tenant, `list_id`, and date scope, without excluding terminal orders. Read it as "pieces ordered", not "pieces handed to USPS". This is deliberate parity with the partner's own campaign totals (PROPS-3082), so the same campaign reports the same piece count on both surfaces. `active_campaigns`, `completed_campaigns`, and `total_rts` are unaffected and keep their existing definitions.
+
 **Example:**
 
 ```bash

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — PROPS-3082 Direct Mail metrics parity
+
+- **`total_pieces_mailed` now counts every order in scope, cancelled and failed included.** `GET /v1/mail-tracking/account-summary` previously excluded terminal orders from the piece total, so a campaign with a cancelled drop reported fewer pieces than the partner's own campaign view. The value is now "pieces ordered" for the account/tenant, `list_id`, and date scope, matching the partner surface for the same campaign.
+- **The iframe Insights "Scheduled" tile counts logical drops.** An A/B split is one drop (both variant orders share a `campaign_instance_id`); each independent Multi-Send drop still counts once. The status taxonomy and the Creation Date filter are unchanged, and the dashboard status tabs continue to count campaign groups.
+- **`active_campaigns`, `completed_campaigns`, and `total_rts` are unchanged**, as are all message names, fields, endpoints, webhooks, schemas, and database columns. No response shape changes — only the `total_pieces_mailed` value.
+- **Artifact sync:** API Kit only. OpenAPI and the partner contract version are unchanged by this entry.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## Unreleased — PROPS-3087 partner debit resolves the current pricing tier
 
 - **The partner wholesale debit is resolved against the current pricing tier at `/confirm-payment`.** Previously the debit reused the price frozen on the order at creation; as of PROPS-3087 the charge follows the pricing tier in effect at confirmation. This supersedes the earlier "prices already frozen on an order are not recomputed" and "price-stable" statements for the gated debit.
