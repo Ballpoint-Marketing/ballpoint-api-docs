@@ -25,6 +25,14 @@
 - **No integration migration is required.** Message names, fields, ordering support, APIs, webhooks, billing, pricing, schemas, and database behavior are unchanged.
 - **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
 
+## v1.7.25 — 2026-07-27
+
+- **PROPS-3144 now hides the Direct Mail Dashboard Sender Information card for every non-owner sender state.** The v1.7.23 correction hid the card only when the sender profile was empty, so a team member still saw the read-only card when PropStream supplied partial or complete sender data. A non-owner now sees no Sender Information card in empty, partial, or complete states.
+- **Account-owner and create-flow behavior are unchanged.** An account owner still sees **Set up now** for an empty sender and the summary plus **Edit** for partial or complete data. On the Sender Information step, a non-owner with incomplete sender data remains in the existing contact-owner blocked state and cannot emit `sender_setup_requested`.
+- **No integration payload changed.** `externalUserIsAccountOwner` remains strict, mutable through `set_list`, and deny-by-default. Message names, fields, ordering support, APIs, webhooks, billing, pricing, schemas, and database behavior are unchanged.
+- **Artifact sync:** Iframe Kit visibility rules and sender-state matrix, API Kit, OpenAPI contract metadata, Postman collection description, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.25`.
+- **Availability:** prepared for local validation only. This entry is not a staging or production deployment or availability claim.
+
 ## v1.7.24 — 2026-07-24
 
 - **The default `Deliver To` selection is now `mailing`.** When `set_list.piece_counts` (or `set_lists[].piece_counts`) is present, the recipient-selection controls open on `Deliver To = mailing` with `Remove duplicate addresses = off`. The previous default was `both`. The same default is re-applied whenever a new `piece_counts` table arrives, so switching lists resets the combination rather than carrying the previous one over. Requested by PropStream in partner review and approved by Ballpoint product ahead of this entry.
