@@ -837,7 +837,7 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
 - All orders have `paymentConfirmed` not null (defense: campaigns with any null are skipped — typically non-gated accounts)
 - At least one order is "affected" (see classification below)
 
-**Eligibility (v1.6.0).** Edit Leads is available **only** for payment-gated campaigns/orders that are still `scheduled` or `pending_payment` and unbilled (`paymentConfirmed === false`) — i.e. pre-production and not yet paid. Once an order is paid, `accepted`, in production, mailed, delivered, or terminal, it is **locked** and its Edit Leads button is hidden (the underlying `PATCH .../recipients` returns `409 RECIPIENTS_LOCKED` / `PAID_LOCKED`). **Non-gated accounts do not expose Edit Leads** because the payment gate is not active. Full per-order classification is in "Affected allowlist" below; see also `API_KIT.md §6n/§6o`. Tightened in CHANGELOG v1.6.0.
+**Eligibility (v1.6.0).** Edit Leads is available **only** for payment-gated campaigns/orders that are still `scheduled` or `pending_payment` and unbilled (`paymentConfirmed === false`) — i.e. pre-production and not yet paid. Once an order is paid, `accepted`, in production, mailed, delivered, or terminal, it is **locked** and its Edit Leads button is hidden (the underlying `PATCH .../recipients` returns `409 RECIPIENTS_LOCKED` / `PAID_LOCKED`). **Non-gated accounts do not expose Edit Leads** because the payment gate is not active. Full per-order classification is in "Affected allowlist" below; see also `API_KIT.md §6o`. Tightened in CHANGELOG v1.6.0.
 
 **Post-creation payload:**
 
@@ -847,10 +847,10 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
   "version": 1,
   "type": "edit_leads_requested",
   "scope": "multi_month_campaign",
-  "campaignId": "api_campaign_cmp_abc",
-  "ballpointCampaignId": "cmp_abc",
+  "campaignId": "api_campaign_camp_propstream_11115",
+  "ballpointCampaignId": "camp_mrxonsokyk0ljnk",
   "campaignType": "multi",
-  "campaignDeltaEndpoint": "/v1/billing/campaigns/cmp_abc/recipients",
+  "campaignDeltaEndpoint": "/v1/billing/campaigns/camp_propstream_11115/recipients",
   "campaignDeltaMethod": "PATCH",
   "listId": "ps_list_123",
   "listName": "Pre-Foreclosure Leads",
@@ -976,9 +976,9 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
 | `scope` | One of `creation_flow` \| `multi_month_campaign` \| `single_send` \| `ab_split`. `creation_flow` is pre-submission and has no Ballpoint orders yet. Other values are post-creation and reflect the campaign type so the parent listener can route to the right modal. `multi_month_campaign` value unchanged from prior releases for backwards compatibility. |
 | `creationStage` | Present for `scope: "creation_flow"`; currently `"customize"`. Omitted on post-creation campaign-card events. |
 | `campaignId` | Iframe-local group key (e.g. `api_campaign_<id>` for API-loaded campaigns; `cmp_<local>` for in-builder). Use `ballpointCampaignId` for cross-system reference. |
-| `ballpointCampaignId` | Server-side Ballpoint campaign ID (from API `campaign_id`). May be `null` for campaigns not yet persisted server-side. |
+| `ballpointCampaignId` | Persisted Direct Mail campaign ID sourced from the API order's `external_campaign_id`. May be `null` for campaigns not yet persisted server-side. |
 | `campaignType` | `"single"` \| `"multi"` \| `"split"`. Mirrors `campaign.type` in the iframe. |
-| `campaignDeltaEndpoint` | Campaign-level PATCH endpoint for delta add/remove (`/v1/billing/campaigns/{ballpointCampaignId}/recipients`). Preferred for multi-month campaigns. `null` if campaign not yet persisted server-side. See `API_KIT.md §6o`. |
+| `campaignDeltaEndpoint` | The authoritative campaign-level PATCH endpoint for delta add/remove. Its path contains the backend API `campaign_id`, not `ballpointCampaignId`. `null` if campaign not yet persisted server-side. See `API_KIT.md §6p`. |
 | `campaignDeltaMethod` | Always `"PATCH"`. |
 | `recipientCount` | Raw list recipient count at the time of click (not the affected/locked breakdown sum). |
 | `affectedOrders[]` | Orders eligible for edit. Each has `editRecipientsEndpoint` + `editRecipientsMethod: "PATCH"`. PropStream's Edit Leads modal should PATCH each one with the new recipient list after the user saves. |
@@ -1015,8 +1015,8 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
 1. Listen for `edit_leads_requested`.
 2. Open the Edit Leads modal (PropStream-hosted, on top of the iframe).
 3. **Creation flow (`scope: "creation_flow"`):** after modal save, send a same-list [`set_list` refresh](#set_list-refresh-post-modal-sync). Do not PATCH recipients and do not send `recipients_updated`.
-4. **Post-creation Option A (campaign-level, preferred for multi-month):** PATCH `campaignDeltaEndpoint` with delta `{added, removed, remove_all}`. One call distributes to all editable drops. See `API_KIT.md §6o`.
-5. **Post-creation Option B (per-order, required for A/B split variant allocation):** PATCH each `affectedOrders[].editRecipientsEndpoint` with the full replacement list. See `API_KIT.md §6n`.
+4. **Post-creation Option A (campaign-level, preferred for multi-month):** PATCH the emitted `campaignDeltaEndpoint` exactly with delta `{added, removed, remove_all}`. One call distributes to all editable drops. The consumer must not derive this URL from `ballpointCampaignId`; see `API_KIT.md §6p`.
+5. **Post-creation Option B (per-order, required for A/B split variant allocation):** PATCH each `affectedOrders[].editRecipientsEndpoint` with the full replacement list. See `API_KIT.md §6o`.
     - **A/B split:** the variant-specific slice goes to each variant's endpoint, not the full list. Use the `variant` field on each `affectedOrders[]` item to identify A vs B. PropStream's split allocation logic determines what slice goes to each.
 6. After all post-creation PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
 7. On modal close without changes, no postMessage required.
@@ -1043,7 +1043,7 @@ Emitted by the parent app (e.g. PropStream) after successfully PATCHing each `af
 |---|---|
 | `tenantKey` | MUST match the iframe's active tenant scope. The iframe rejects mismatches without mutating tenant state — this event cannot be used to establish or change tenant scope. |
 | `campaignId` | Iframe-local group key, echoed from the original `edit_leads_requested` event. |
-| `ballpointCampaignId` | Server-side campaign ID. |
+| `ballpointCampaignId` | Persisted Direct Mail campaign ID, echoed from the original `edit_leads_requested` request for correlation. |
 | `updatedBallpointOrderIds` | Array of `ballpointOrderId` strings that were PATCHed. Maximum 1000 IDs, each up to 256 chars. The iframe treats this as advisory (full refresh happens regardless). |
 
 **Iframe behavior on receipt:**
@@ -1749,7 +1749,7 @@ Content-Type: application/json
 | `contact_id` | No | Stable partner-side contact/lead identifier (e.g. PropStream contact id), max 64 chars. Stored verbatim, never interpreted by Ballpoint, round-tripped on the corresponding `GET .../recipients` response, and echoed verbatim on per-piece RTS push-back events so you can map returned pieces directly to the CRM contact. **For partners using the per-piece RTS push-back, `contact_id` must be populated on every recipient** — the V1 RTS payload carries `contact_id` only (no name/address fields). |
 | `address_type` | No | `PROPERTY` or `MAILING`. Optional for order-level upload; pair with `contact_id` when you need to distinguish a contact's property vs mailing address records. On the campaign-level Edit Leads / delta endpoint it is **required** and, together with `contact_id`, forms the upsert/remove key. |
 
-> For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6o`](API_KIT.md#6o-campaign-delta-recipients--addremove-across-editable-drops).
+> For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6p`](API_KIT.md#6p-campaign-delta-recipients--addremove-across-editable-drops).
 
 ### Batching Large Lists
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Edit Leads campaign identifier guidance correction
+
+- **Corrected the Edit Leads integration guidance.** `edit_leads_requested.ballpointCampaignId` is the persisted Direct Mail campaign-record ID from order `external_campaign_id`; `campaignDeltaEndpoint` is the authoritative emitted path containing the backend billing `campaign_id`, and consumers must PATCH that emitted endpoint exactly rather than derive a URL from `ballpointCampaignId`. Campaign-delta references now point to `API_KIT.md §6p`, while per-order replacement references remain on §6o.
+- **No payload, route, backend, or contract-version change.** This is a documentation-only integration guidance correction; no postMessage field, API route, backend behavior, or partner contract version changed.
+
 ## Unreleased — PROPS-3082 Direct Mail metrics parity
 
 - **`total_pieces_mailed` now counts every order in scope, cancelled and failed included.** `GET /v1/mail-tracking/account-summary` previously excluded terminal orders from the piece total, so a campaign with a cancelled drop reported fewer pieces than the partner's own campaign view. The value is now "pieces ordered" for the account/tenant, `list_id`, and date scope, matching the partner surface for the same campaign.

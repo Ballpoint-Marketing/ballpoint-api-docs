@@ -734,7 +734,8 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
 ```json
 {
   "id": "ord_7f3a2b",
-  "campaign_id": "cmp_abc123",
+  "campaign_id": "camp_propstream_11115",
+  "external_campaign_id": "camp_mrxonsokyk0ljnk",
   "account_id": "acct_partner_propstream",
   "source": "propstream",
   "external_account_id": "ps_acct_42",
@@ -776,7 +777,7 @@ Tenant scoping: partners only see their own orders. Both cross-tenant and unknow
 
 **`payment_confirmed`** (boolean or null): For accounts with partner-side payment confirmation gating (`requires_payment_confirmation = TRUE`, e.g. PropStream): `true` once `POST /v1/billing/orders/{order_id}/confirm-payment` has fired with `status: success`; `false` while the order is still awaiting partner confirmation. For accounts that do not use the payment gate, the value is always `null` and the field should be ignored — their billing lifecycle does not use partner-side payment confirmation.
 
-**ID reconciliation.** The `campaign_id` returned here (and on `GET /v1/billing/orders`, §6d) is Ballpoint's backend **grouping key**, derived from your account + `list_id` — one Ballpoint campaign per `list_id`. It is **not** the iframe `campaignId` from `campaign_created`/`campaign_submitted` (that one is an iframe-local, per-Direct-Mail id with no backend relationship). For **per-order** reconciliation, use **`campaign_submitted.orders[].ballpointOrderId`**, which equals the `id` on this response. Note: Get Orders does not return a standalone `list_id` field — it is encoded in `campaign_id`.
+**ID reconciliation.** The `campaign_id` returned here (and on `GET /v1/billing/orders`, §6d) is Ballpoint's backend **grouping key**, derived from your account + `list_id` — one Ballpoint campaign per `list_id`. It is the backend billing grouping key accepted by `PATCH /v1/billing/campaigns/{campaign_id}/recipients`. It is **not** the iframe `campaignId` from `campaign_created`/`campaign_submitted` (that one is an iframe-local, per-Direct-Mail id with no backend relationship). The `external_campaign_id` is the persisted Direct Mail campaign-record ID used for correlation; it is **not accepted** in that campaign-delta route. For **per-order** reconciliation, use **`campaign_submitted.orders[].ballpointOrderId`**, which equals the `id` on this response. Note: Get Orders does not return a standalone `list_id` field — it is encoded in `campaign_id`.
 
 > **Reminder — `campaign_submitted` is the discovery trigger, not a poll loop.** For Multi Send and A/B Split, do not call `GET /v1/billing/orders` or `GET /v1/billing/orders/{order_id}` per drop during the scheduling step looking for orders to appear — they won't, because no Ballpoint order is created until the end-user clicks **Continue to Payment**. Consume `campaign_submitted.orders[].ballpointOrderId` for each drop's authoritative id (one event covers all drops in the submission). If `orders[].ballpointOrderId` is `null` on an entry, that single drop is pending retry — only then is it appropriate to poll `GET /v1/billing/orders` (scoped to the same `external_user_id` / campaign) to discover the server-assigned id once the retry succeeds. See [IFRAME_KIT.md `campaign_submitted` field notes](IFRAME_KIT.md#campaign_submitted--campaign-submitted-to-ballpoint).
 
@@ -816,7 +817,8 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
   "orders": [
     {
       "id": "ord_7f3a2b",
-      "campaign_id": "camp_test",
+      "campaign_id": "camp_propstream_11115",
+      "external_campaign_id": "camp_mrxonsokyk0ljnk",
       "product_type": "4x6_printed",
       "postage_type": "first_class",
       "piece_count": 500,
@@ -1291,6 +1293,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/orders?days=30&li
       "sla_due_at": "2026-04-22T00:00:00Z",
       "sla_status": "on_time",
       "campaign_id": "camp_partner_marketing_q1_2026",
+      "external_campaign_id": "camp_mrxonsokyk0ljnk",
       "total_cost_cents": 28000
     }
   ],
