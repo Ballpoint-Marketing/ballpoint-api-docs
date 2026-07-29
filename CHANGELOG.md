@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — PROPS-3243 marketing-list CTA emits the persisted campaign id
+
+- **`add_to_marketing_list_requested.ballpointCampaignId` now carries the persisted cross-system campaign id** (`orders.external_campaign_id`, i.e. the iframe's original `campaign_created.campaignId`) instead of the Ballpoint-internal, list-derived API `campaign_id`. The internal id is unknown to the partner platform, so the forwarded value could not be resolved to a campaign on the partner side. This matches the identity semantics `edit_leads_requested.ballpointCampaignId` already uses.
+- **`null` contract preserved:** when the campaign's orders do not share a single persisted `external_campaign_id`, the event still emits `ballpointCampaignId: null` — it never falls back to the internal id.
+- **Ballpoint API calls are unchanged:** the suppression-list fetch, tracking, and campaign-delta endpoints continue to use the internal API `campaign_id`. Message names, envelope, `recipients[]` shape, no-PII guarantees, and CTA behavior are unchanged.
+- **Artifact sync:** Iframe Kit only — the `ballpointCampaignId` definitions on `add_to_marketing_list_requested` and the Edit Leads payload now distinguish the persisted cross-system id from the internal API campaign id. Partner contract version literals are unchanged; the version advances at the next coordinated release.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## Unreleased — PROPS-3236 zero-piece billing-state classification
 
 - **Payment preview and confirmation now distinguish an invalid zero-piece order from missing pricing.** `POST /v1/billing/campaigns/preview` and a successful `POST /v1/billing/orders/{order_id}/confirm-payment` return `409 INVALID_PIECE_COUNT` when a persisted order has `piece_count <= 0`; no debit or payment-state mutation occurs. A real missing pricing row for a positive quantity remains `400 NO_PRICING`.

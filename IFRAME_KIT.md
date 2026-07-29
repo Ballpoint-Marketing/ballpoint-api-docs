@@ -847,10 +847,10 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
   "version": 1,
   "type": "edit_leads_requested",
   "scope": "multi_month_campaign",
-  "campaignId": "api_campaign_cmp_abc",
-  "ballpointCampaignId": "cmp_abc",
+  "campaignId": "api_campaign_camp_propstream_4192",
+  "ballpointCampaignId": "camp_mrx17n8ccqe52ve",
   "campaignType": "multi",
-  "campaignDeltaEndpoint": "/v1/billing/campaigns/cmp_abc/recipients",
+  "campaignDeltaEndpoint": "/v1/billing/campaigns/camp_propstream_4192/recipients",
   "campaignDeltaMethod": "PATCH",
   "listId": "ps_list_123",
   "listName": "Pre-Foreclosure Leads",
@@ -976,9 +976,9 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
 | `scope` | One of `creation_flow` \| `multi_month_campaign` \| `single_send` \| `ab_split`. `creation_flow` is pre-submission and has no Ballpoint orders yet. Other values are post-creation and reflect the campaign type so the parent listener can route to the right modal. `multi_month_campaign` value unchanged from prior releases for backwards compatibility. |
 | `creationStage` | Present for `scope: "creation_flow"`; currently `"customize"`. Omitted on post-creation campaign-card events. |
 | `campaignId` | Iframe-local group key (e.g. `api_campaign_<id>` for API-loaded campaigns; `cmp_<local>` for in-builder). Use `ballpointCampaignId` for cross-system reference. |
-| `ballpointCampaignId` | Server-side Ballpoint campaign ID (from API `campaign_id`). May be `null` for campaigns not yet persisted server-side. |
+| `ballpointCampaignId` | The persisted cross-system campaign id shared by the campaign's orders (`orders.external_campaign_id`, i.e. the original `campaign_created.campaignId`) — **not** the Ballpoint-internal API `campaign_id`. `null` when the orders do not share a single persisted `external_campaign_id`. |
 | `campaignType` | `"single"` \| `"multi"` \| `"split"`. Mirrors `campaign.type` in the iframe. |
-| `campaignDeltaEndpoint` | Campaign-level PATCH endpoint for delta add/remove (`/v1/billing/campaigns/{ballpointCampaignId}/recipients`). Preferred for multi-month campaigns. `null` if campaign not yet persisted server-side. See `API_KIT.md §6o`. |
+| `campaignDeltaEndpoint` | Campaign-level PATCH endpoint for delta add/remove (`/v1/billing/campaigns/{campaign_id}/recipients`, where `{campaign_id}` is the Ballpoint-internal API campaign id — **not** `ballpointCampaignId`). Preferred for multi-month campaigns. `null` if campaign not yet persisted server-side. See `API_KIT.md §6o`. |
 | `campaignDeltaMethod` | Always `"PATCH"`. |
 | `recipientCount` | Raw list recipient count at the time of click (not the affected/locked breakdown sum). |
 | `affectedOrders[]` | Orders eligible for edit. Each has `editRecipientsEndpoint` + `editRecipientsMethod: "PATCH"`. PropStream's Edit Leads modal should PATCH each one with the new recipient list after the user saves. |
@@ -1033,8 +1033,8 @@ Emitted by the parent app (e.g. PropStream) after successfully PATCHing each `af
   "version": 1,
   "type": "recipients_updated",
   "tenantKey": "ps_acc_42",
-  "campaignId": "api_campaign_cmp_abc",
-  "ballpointCampaignId": "cmp_abc",
+  "campaignId": "api_campaign_camp_propstream_4192",
+  "ballpointCampaignId": "camp_mrx17n8ccqe52ve",
   "updatedBallpointOrderIds": ["ord_abc123", "ord_def456"]
 }
 ```
@@ -1043,7 +1043,7 @@ Emitted by the parent app (e.g. PropStream) after successfully PATCHing each `af
 |---|---|
 | `tenantKey` | MUST match the iframe's active tenant scope. The iframe rejects mismatches without mutating tenant state — this event cannot be used to establish or change tenant scope. |
 | `campaignId` | Iframe-local group key, echoed from the original `edit_leads_requested` event. |
-| `ballpointCampaignId` | Server-side campaign ID. |
+| `ballpointCampaignId` | Echo of the persisted cross-system campaign id from the original `edit_leads_requested` event (`orders.external_campaign_id`) — **not** the internal Ballpoint API `campaign_id`. |
 | `updatedBallpointOrderIds` | Array of `ballpointOrderId` strings that were PATCHed. Maximum 1000 IDs, each up to 256 chars. The iframe treats this as advisory (full refresh happens regardless). |
 
 **Iframe behavior on receipt:**
@@ -1268,7 +1268,7 @@ Sent when the user clicks the iframe's **Add to Marketing List** CTA on the RTS 
     { "contact_id": "ps_contact_8821", "contact_type": "PROPERTY" },
     { "contact_id": "ps_contact_4410", "contact_type": "MAILING" }
   ],
-  "ballpointCampaignId": "cmp_abc"
+  "ballpointCampaignId": "camp_mrx17n8ccqe52ve"
 }
 ```
 
@@ -1280,7 +1280,7 @@ Sent when the user clicks the iframe's **Add to Marketing List** CTA on the RTS 
 | `recipients` | array | Non-empty list of suppression entries the user is forwarding to the marketing list. Order mirrors the suppression list view. |
 | `recipients[].contact_id` | string | Partner-supplied opaque contact identifier echoed verbatim from the original recipient upload (the same value PropStream uploaded and that the `GET /v1/campaigns/{campaign_id}/mail-tracking/rts` suppression endpoint surfaces, documented in v1.7.1). |
 | `recipients[].contact_type` | string \| null | `"PROPERTY"` or `"MAILING"` when the partner supplied it; `null` when no address-type was supplied. Disambiguates two pieces sharing the same `contact_id`. |
-| `ballpointCampaignId` | string \| null | Server-side Ballpoint campaign id (the same id used on `recipients_updated` / `payment_result` — **not** the PropStream `listId`). Always present on this event; `null` when the iframe cannot resolve a campaign id for the active suppression list view. |
+| `ballpointCampaignId` | string \| null | The **persisted cross-system campaign id** — the value the iframe originally emitted as `campaign_created.campaignId` and that Ballpoint stores as `external_campaign_id` on each order (round-tripped on `GET /orders`). This is **not** the PropStream `listId`, and it is **not** the Ballpoint-internal API `campaign_id` (the list-derived grouping id used in Ballpoint campaign endpoints such as `GET /v1/campaigns/{campaign_id}/mail-tracking/rts` — that id is unknown to PropStream and must never appear here). Always present on this event; `null` when the campaign's orders do not share a single persisted `external_campaign_id` (e.g. legacy orders created without one). |
 
 No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` / `recipient_state` / `recipient_zip`) is included in this event. The parent already owns those values via its own CRM keyed by `(contact_id, contact_type)`.
 
