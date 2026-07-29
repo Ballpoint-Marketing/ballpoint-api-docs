@@ -144,6 +144,7 @@ components:
               - AMBIGUOUS_LOOKUP
               - IDEMPOTENCY_CONFLICT
               - INSUFFICIENT_BALANCE
+              - INVALID_PIECE_COUNT
               - RATE_LIMITED
               - NOT_FOUND
               - UNAUTHORIZED
@@ -1313,7 +1314,7 @@ paths:
       tags:
       - Campaigns
       summary: Campaign-level cost preview (server-to-server)
-      description: 'Server-to-server cost preview for a set of already-persisted orders that share the same campaign. Reads the persisted order inputs (no recomputation from raw inputs) and returns per-order pricing plus a single authoritative wholesale total to debit. `partner_cost_total_tcents` is the source of truth for what the partner is charged; `total_tcents` is display/retail and MUST NOT be used for debit. Replaces the prior per-order N-call preview pattern with a single call. Orders that are not chargeable right now (already confirmed, cancelled, failed, payment_failed, or otherwise not in a chargeable state) are still returned in `orders[]` with `excluded_from_totals=true` and an `exclusion_reason`, but are NOT added to `campaign_partner_cost_total_tcents`. Partner-only (non-partner principals receive `401`). Gated accounts only (`requires_payment_confirmation=TRUE`).'
+      description: 'Server-to-server cost preview for a set of already-persisted orders that share the same campaign. Call only after recipient upload has completed for every order and each upload reports `ready=true` with `piece_count>0`; A/B variants require address-disjoint recipient slices. Reads the persisted order inputs (no recomputation from raw inputs) and returns per-order pricing plus a single authoritative wholesale total to debit. `partner_cost_total_tcents` is the source of truth for what the partner is charged; `total_tcents` is display/retail and MUST NOT be used for debit. Replaces the prior per-order N-call preview pattern with a single call. Orders that are not chargeable right now (already confirmed, cancelled, failed, payment_failed, or otherwise not in a chargeable state) are still returned in `orders[]` with `excluded_from_totals=true` and an `exclusion_reason`, but are NOT added to `campaign_partner_cost_total_tcents`. Partner-only (non-partner principals receive `401`). Gated accounts only (`requires_payment_confirmation=TRUE`).'
       operationId: previewCampaignCost
       security:
       - partnerKeyAuth: []
@@ -1398,6 +1399,7 @@ paths:
                           type: string
                         piece_count:
                           type: integer
+                          minimum: 1
                         unit_price_tcents:
                           type: integer
                           description: Display/retail unit price in tenths of a cent. NOT the partner debit amount.
@@ -1445,7 +1447,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: 'Account is not gated for payment confirmation. `error.code` = `PAYMENT_GATE_NOT_ACTIVE` (requires `requires_payment_confirmation=TRUE`).'
+          description: 'Persisted state conflict. `error.code` values: `PAYMENT_GATE_NOT_ACTIVE` (account requires `requires_payment_confirmation=TRUE`), `INVALID_PIECE_COUNT` (at least one order has `piece_count<=0` and cannot be priced or confirmed).'
           content:
             application/json:
               schema:

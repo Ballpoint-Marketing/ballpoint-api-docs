@@ -463,7 +463,7 @@ Content-Type: application/json
 
 **Auth.** Partner-only. `X-Partner-Key` required; non-partner keys (e.g. `X-API-Key`) get `401 Unauthorized`.
 
-**When to call.** Server-to-server, after the iframe emits `campaign_submitted` and **every** `campaign_submitted.orders[].ballpointOrderId` is non-null. Those `ballpointOrderId` values are the authoritative per-submission order ids and the ones to pass here. If any are still `null`, that drop's submission is pending retry — wait for the retry to populate the id (see [API_KIT.md §6k](#6k-confirm-payment-partner-payment-gate) and [IFRAME_KIT.md](IFRAME_KIT.md) on the review-before-pay timeline) before calling this endpoint.
+**When to call.** Server-to-server, after the iframe emits `campaign_submitted`, **every** `campaign_submitted.orders[].ballpointOrderId` is non-null, and recipient upload has completed for every order. For each [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload) response, verify `ready === true` and `piece_count > 0` before previewing. For A/B Split, upload a different recipient slice to each variant; do not reuse the full list for both orders. Those `ballpointOrderId` values are the authoritative per-submission order ids and the ones to pass here. If any id is still `null` or any recipient upload is incomplete/zeroed, do not open the payment step or call this endpoint yet.
 
 **Request body**
 
@@ -598,6 +598,7 @@ This is by design — calling `POST /v1/billing/campaigns/preview` twice in a ro
 | `400` | `ORDER_COUNT_MISMATCH` | `expected_order_count !== len(order_ids)`. |
 | `404` | `ORDER_NOT_FOUND` | Any id in `order_ids` is missing **or** belongs to a different tenant. The whole request is rejected — there is **no partial response**. |
 | `400` | `MIXED_CAMPAIGN_IDS` | The provided `order_ids` do not all belong to the same backend campaign. |
+| `409` | `INVALID_PIECE_COUNT` | At least one persisted order has `piece_count <= 0`. The order cannot be priced or confirmed; correct its recipient slice before collecting payment. This is distinct from `NO_PRICING`: the product/postage price may exist, but zero pieces are not billable. |
 
 **Why a campaign-level endpoint (vs N calls to `/v1/billing/orders/preview`)**
 
@@ -1065,7 +1066,7 @@ For accounts where Ballpoint waits for the partner to debit the end-user before 
 
 - The end-user payment is captured **on the partner side** using the partner's own payment provider. Ballpoint never sees card data, payment-method data, or any PCI-relevant payload.
 - `/confirm-payment` is a **server-to-server** call by integration contract. It must be issued from the partner backend after the partner has confirmed the payment outcome with its payment provider. The customer browser must **not** call this endpoint directly — the partner key would be exposed.
-- Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. After `campaign_submitted` and before reporting payment success, the partner backend must call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once for the whole submission**, passing the full list of `ballpointOrderId`s from `campaign_submitted.orders[]`. Read `campaign_partner_cost_total_tcents` as the authoritative "charge now" amount (already excludes any already-confirmed drops), and per-order `partner_cost_total_tcents` as the authoritative per-order debit. Browser-provided values must never be treated as authoritative.
+- Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. After `campaign_submitted`, the partner backend must first upload and validate recipients for every order. Only after every upload reports `ready === true` with `piece_count > 0` may it call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once for the whole submission**, passing the full list of `ballpointOrderId`s from `campaign_submitted.orders[]`. Read `campaign_partner_cost_total_tcents` as the authoritative "charge now" amount (already excludes any already-confirmed drops), and per-order `partner_cost_total_tcents` as the authoritative per-order debit. Browser-provided values must never be treated as authoritative.
 
 **User-flow timing**
 
@@ -1076,11 +1077,12 @@ Where this call sits in the end-user journey for an iframe-driven order:
 3. iframe emits `campaign_created` to the parent. `orderIds` in this event are local iframe IDs only — no Ballpoint order exists yet.
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /orders` on the API base URL and sends the selected `postage_type` (`first_class`, `standard`, or `presort`). Ballpoint validates and persists that value, then records a creation-time price **estimate** on the order for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at [`/confirm-payment`](#6k-confirm-payment-partner-payment-gate) — refetch [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate) before charging). Only legacy requests that omit `postage_type` default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated); no charge occurs yet.
-6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger to start the payment popup. For partners that sent `piece_counts` on `set_list`, this event also carries `recipient_selection.piece_count` — per-drop, matches each `orders[].pieces`, useful for reconciliation. See [IFRAME_KIT.md](IFRAME_KIT.md#recipient-selection-contract-piece-count--dedup) for the full input/output contract.
-7. Partner backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then calls [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with that list. Read `campaign_partner_cost_total_tcents` (the authoritative "charge now" amount — already excludes already-confirmed drops) and per-order `partner_cost_total_tcents` (the per-order wholesale debit). The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step.
-8. Partner shows the payment popup; end-user pays via the partner's payment provider.
-9. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
-10. On success, Ballpoint debits the partner balance and moves the order from `pending_payment` to `accepted`. Production proceeds.
+6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger for the backend handoff, not as authorization to collect payment yet. For partners that sent `piece_counts` on `set_list`, this event also carries `recipient_selection.piece_count`; for A/B Split, each `orders[].pieces` is the size of that variant's slice. See [IFRAME_KIT.md](IFRAME_KIT.md#recipient-selection-contract-piece-count--dedup) for the full input/output contract.
+7. Partner backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, uploads the matching recipient slice to each order with [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload), and verifies every response has `ready === true` and `piece_count > 0`. For A/B Split, the slices must be address-disjoint.
+8. Partner backend calls [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with the full order-id list. Read `campaign_partner_cost_total_tcents` (the authoritative "charge now" amount — already excludes already-confirmed drops) and per-order `partner_cost_total_tcents` (the per-order wholesale debit). The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step.
+9. Partner shows the payment popup; end-user pays via the partner's payment provider.
+10. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
+11. On success, Ballpoint debits the partner balance and moves the order from `pending_payment` to `accepted`. Production proceeds.
 
 After step 6, the iframe lifecycle and the payment lifecycle run in parallel: the iframe may emit `campaign_complete` / `done` once its own submission flow finishes, independent of the payment popup. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
 
@@ -1135,6 +1137,22 @@ Content-Type: application/json
 - **Cancelled orders** — calling `/confirm-payment` against a cancelled order returns `409 ORDER_CANCELLED`.
 - **Late confirmation** — if the order's `scheduled_production_date` passes without a `success` call, a Ballpoint cron flips it to `payment_failed` automatically. A subsequent `/confirm-payment` returns `409 PAYMENT_ALREADY_FAILED`.
 - **No-gate accounts** — calling `/confirm-payment` against an account where `requires_payment_confirmation = FALSE` returns `409 PAYMENT_GATE_NOT_ACTIVE` (the order was already debited at creation).
+- **Zero-piece orders** — `status:success` returns `409 INVALID_PIECE_COUNT` before any debit or payment-state mutation when the persisted `piece_count <= 0`. Correct the recipient slice and re-preview before collecting or confirming payment. Unlike the other `409`s on this endpoint (top-level `error` object), this error uses the `detail`-wrapped envelope — the same shape [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) returns:
+
+  ```json
+  {
+    "detail": {
+      "error": {
+        "type": "conflict",
+        "code": "INVALID_PIECE_COUNT",
+        "message": "Order ord_... must have piece_count greater than zero before billing.",
+        "trace_id": "tr_...",
+        "order_id": "ord_...",
+        "piece_count": 0
+      }
+    }
+  }
+  ```
 - **Tenant isolation** — orders owned by a different account return `404 ORDER_NOT_FOUND`. Never `403`, to avoid leaking which order ids exist on other accounts.
 
 **Response — success**
@@ -1468,6 +1486,10 @@ The PropStream flow is create the order first (with `piece_count`, via `POST /or
 - `accepted` / `rejected` — counts of rows written vs soft-rejected. `rejected_details` — `[{index, reason}]`.
 - `total_recipients` — existing (if `append`) + accepted. `piece_count` — the order's current piece_count.
 - `ready` — `true` when `total_recipients == piece_count` (the order has all of its addresses).
+
+Before opening the payment step, require both `ready === true` **and** `piece_count > 0` for every order, then call the campaign preview. A response with `piece_count: 0` is not billable even if `ready` is mathematically `true` after all submitted A/B recipients were rejected as cross-order duplicates.
+
+If an initial A/B upload has already reduced an order to `piece_count: 0`, retrying this POST with a non-empty list cannot repair it because the new list would exceed the order's current piece count. For an eligible gated, unconfirmed order, use the [Edit Leads PATCH](#6o-edit-leads--replace--resize--reprice-recipients-patch) with a verified address-disjoint slice so the order is resized and repriced; otherwise cancel and recreate the order. If you cancel, drop the cancelled order's id from subsequent [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) calls — a cancelled order that still has `piece_count: 0` keeps returning `409 INVALID_PIECE_COUNT` and blocks the preview for its healthy siblings. The PATCH is a replacement operation and does not construct or validate the A/B split for the partner.
 
 **Allowed order statuses:** `scheduled`, `pending_payment`, `accepted`, `prep`. Any other status → `409 RECIPIENTS_LOCKED`.
 
