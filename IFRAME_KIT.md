@@ -1676,11 +1676,12 @@ End-to-end timeline:
 3. iframe emits `campaign_created` to the parent. `orderIds` in this event are local iframe IDs only — no Ballpoint order exists yet.
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /orders` on the API base URL with the selected `postage_type`. Ballpoint persists that exact class and records a creation-time price **estimate** for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at `/confirm-payment`; refetch `POST /v1/billing/campaigns/preview` before charging); only legacy requests that omit the field default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated). No charge occurs yet.
-6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX). This is the trigger to start the payment popup on the parent side.
-7. Parent backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then calls [`POST /v1/billing/campaigns/preview`](https://github.com/Ballpoint-Marketing/ballpoint-api-docs/blob/main/API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) **once** with that list of `ballpointOrderId`s. Read `campaign_partner_cost_total_tcents` as the authoritative "charge now" amount (already excludes any already-confirmed drops to prevent double-charge) and per-order `partner_cost_total_tcents` as the per-order wholesale debit. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.
-8. Parent shows the payment popup; end-user pays via the parent's payment provider.
-9. Parent backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
-10. On success, Ballpoint debits the partner balance and moves the order to `accepted`. Production proceeds.
+6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX). This triggers the backend handoff; it is not authorization to collect payment yet.
+7. Parent backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then uploads the matching recipients to every order with `POST /v1/billing/orders/{order_id}/recipients`. For A/B Split, upload a different address-disjoint slice to each variant. Verify every upload reports `ready === true` and `piece_count > 0`.
+8. Parent backend calls [`POST /v1/billing/campaigns/preview`](https://github.com/Ballpoint-Marketing/ballpoint-api-docs/blob/main/API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) **once** with the full list of `ballpointOrderId`s. Read `campaign_partner_cost_total_tcents` as the authoritative "charge now" amount (already excludes any already-confirmed drops to prevent double-charge) and per-order `partner_cost_total_tcents` as the per-order wholesale debit. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.
+9. Parent shows the payment popup; end-user pays via the parent's payment provider.
+10. Parent backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
+11. On success, Ballpoint debits the partner balance and moves the order to `accepted`. Production proceeds.
 
 **Postage label mapping:** Hybrid Letter and Greeting Letter display
 **Standard Class** to the end user but submit `postage_type: "presort"` to the
@@ -1825,7 +1826,9 @@ Dedup matches on `(address, city, state, zip)`, trimmed and case-insensitive. We
 
 The `piece_count` went from 847 → 800. Order enters production with 800 unique pieces.
 
-For cross-order duplicates within the same campaign, you don't need to handle dedup on your end — the API takes care of it. Check `rejected_details` if you want to see which addresses were skipped. For same-order (intra-payload) duplicates, see below.
+Cross-order dedup is a server-side safety net, not a substitute for constructing the A/B split. The partner must upload address-disjoint slices and inspect `accepted`, `rejected`, `rejected_details`, `ready`, and `piece_count` on every response. Do not proceed to preview or payment unless every variant reports `ready === true` and `piece_count > 0`. If every submitted address for a variant overlaps a sibling, the API rejects those rows as `duplicate_in_campaign`, the variant may end at `piece_count: 0`, and billing endpoints return `409 INVALID_PIECE_COUNT` until the recipient slice is corrected. For same-order (intra-payload) duplicates, see below.
+
+Once the initial POST has reduced an order to zero, a positive retry on that same endpoint exceeds the order's current piece count. Recover an eligible gated, unconfirmed order with the Edit Leads `PATCH /v1/billing/orders/{order_id}/recipients` using a verified address-disjoint replacement slice, or cancel and recreate the order. The PATCH does not perform cross-order A/B dedup, so slice correctness remains the partner's responsibility. If you recover by cancelling, drop the cancelled order's id from every later `POST /v1/billing/campaigns/preview` call — a cancelled order that is still at `piece_count: 0` keeps returning `409 INVALID_PIECE_COUNT` for the whole preview; pass only the ids of the orders you intend to charge (the recreated submission's `campaign_submitted.orders[]`).
 
 #### What this does NOT do
 

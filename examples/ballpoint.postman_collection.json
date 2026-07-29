@@ -286,7 +286,7 @@
                     }
                   }
                 },
-                "description": "Campaign-level preview for payment-gate flows. Pass the full list of ballpointOrderIds from campaign_submitted.orders[] (wait until all are non-null). Returns per-order partner_cost_total_tcents and the authoritative chargeable-now total via campaign_partner_cost_total_tcents (which excludes already-confirmed/cancelled/failed drops). Replaces the legacy pattern of looping POST /v1/billing/orders/preview once per drop. Partner-only (X-Partner-Key); X-API-Key is rejected with 401. Returns 409 PAYMENT_GATE_NOT_ACTIVE on non-gated accounts. Auto-skips in Newman if {{ballpoint_order_id}} is unseeded."
+                "description": "Campaign-level preview for payment-gate flows. Wait until every ballpointOrderId from campaign_submitted.orders[] is non-null, upload the matching recipients to every order, and verify every upload reports ready=true with piece_count>0 before calling. A/B variants require address-disjoint recipient slices. Returns per-order partner_cost_total_tcents and the authoritative chargeable-now total via campaign_partner_cost_total_tcents (which excludes already-confirmed/cancelled/failed drops). Replaces the legacy pattern of looping POST /v1/billing/orders/preview once per drop. Partner-only (X-Partner-Key); X-API-Key is rejected with 401. Returns 409 PAYMENT_GATE_NOT_ACTIVE on non-gated accounts and 409 INVALID_PIECE_COUNT when any persisted order has zero pieces. Auto-skips in Newman if {{ballpoint_order_id}} is unseeded."
               },
               "event": [
                 {
@@ -1727,7 +1727,7 @@
                 }
               }
             },
-            "description": "GATED, server-to-server ONLY (never from a browser - exposes the key). Gated accounts only (requires_payment_confirmation=TRUE). status:success debits the partner balance and advances pending_payment -> accepted. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
+            "description": "GATED, server-to-server ONLY (never from a browser - exposes the key). Gated accounts only (requires_payment_confirmation=TRUE). Upload and validate recipients first, then refetch POST /v1/billing/campaigns/preview before collecting payment. status:success debits the partner balance and advances pending_payment -> accepted. A persisted piece_count<=0 returns 409 INVALID_PIECE_COUNT before any debit or payment-state mutation. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
           },
           "event": [
             {

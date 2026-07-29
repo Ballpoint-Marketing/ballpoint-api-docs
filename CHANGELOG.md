@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — PROPS-3236 zero-piece billing-state classification
+
+- **Payment preview and confirmation now distinguish an invalid zero-piece order from missing pricing.** `POST /v1/billing/campaigns/preview` and a successful `POST /v1/billing/orders/{order_id}/confirm-payment` return `409 INVALID_PIECE_COUNT` when a persisted order has `piece_count <= 0`; no debit or payment-state mutation occurs. A real missing pricing row for a positive quantity remains `400 NO_PRICING`.
+- **The A/B recipient-upload obligation is explicit.** Partners must upload address-disjoint slices per variant, inspect the complete recipient-upload response, and require `ready === true` with `piece_count > 0` for every order.
+- **The payment sequence is explicit:** `campaign_submitted` → wait for all Ballpoint order ids → upload and validate all recipient slices → campaign preview → collect partner-side payment → confirm payment. `campaign_submitted` alone is not authorization to open the payment step.
+- **Current dedup semantics are preserved.** Partial overlap still rejects the overlapping addresses and reduces `piece_count`; full overlap may still leave the variant at zero. The new billing-state guard reports that state accurately instead of claiming the product/postage combination lacks pricing.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI campaign-preview operation, and Postman preview/confirm descriptions. The static OpenAPI does not yet describe the `confirm-payment` operation; that pre-existing gap is tracked separately.
+- Partner contract version literals are unchanged; the version advances at the next coordinated release.
+
 ## Unreleased — PROPS-3082 Direct Mail metrics parity
 
 - **`total_pieces_mailed` now counts every order in scope, cancelled and failed included.** `GET /v1/mail-tracking/account-summary` previously excluded terminal orders from the piece total, so a campaign with a cancelled drop reported fewer pieces than the partner's own campaign view. The value is now "pieces ordered" for the account/tenant, `list_id`, and date scope, matching the partner surface for the same campaign.
