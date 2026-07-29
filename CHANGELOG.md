@@ -34,6 +34,14 @@
 - **No integration migration is required.** Message names, fields, ordering support, APIs, webhooks, billing, pricing, schemas, and database behavior are unchanged.
 - **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
 
+## v1.7.26 — 2026-07-29
+
+- **`add_to_marketing_list_requested.ballpointCampaignId` now carries the persisted cross-system campaign id** (`orders.external_campaign_id`, i.e. the iframe's original `campaign_created.campaignId`) instead of the Ballpoint-internal, list-derived API `campaign_id`. The internal id is unknown to the partner platform, so the forwarded value could not be resolved to a campaign on the partner side. This matches the identity semantics `edit_leads_requested.ballpointCampaignId` already uses.
+- **`null` contract preserved:** when the campaign's orders do not share a single persisted `external_campaign_id`, the event still emits `ballpointCampaignId: null` — it never falls back to the internal id.
+- **Ballpoint API calls are unchanged:** the suppression-list fetch, tracking, and campaign-delta endpoints continue to use the internal API `campaign_id`. Message names, envelope, `recipients[]` shape, no-PII guarantees, and CTA behavior are unchanged.
+- **Artifact sync:** Iframe Kit `ballpointCampaignId` definitions and examples on `add_to_marketing_list_requested`, `edit_leads_requested`, and `recipients_updated` now distinguish the persisted cross-system id from the internal API campaign id. This is the coordinated partner contract release **v1.7.26**: Iframe Kit, API Kit, OpenAPI contract metadata, Postman collection description, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.26`.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## v1.7.25 — 2026-07-27
 
 - **PROPS-3144 now hides the Direct Mail Dashboard Sender Information card for every non-owner sender state.** The v1.7.23 correction hid the card only when the sender profile was empty, so a team member still saw the read-only card when PropStream supplied partial or complete sender data. A non-owner now sees no Sender Information card in empty, partial, or complete states.
