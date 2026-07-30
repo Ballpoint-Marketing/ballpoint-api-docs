@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — RTS webhook campaign identity correction
+
+- **`campaign.mail_tracking.rts_update.data.campaign_id` carries the partner-facing Ballpoint campaign ID.** This is the ID returned by the iframe's `campaign_created` event and stored by PropStream as `ballpoint_campaign_id`; it is not PropStream's numeric `list_id` and is not Ballpoint's internal list-grouping key.
+- **Existing transport and per-piece identities remain stable.** The legacy wrapped `id`, canonical transport `event_id`, and each opaque `new_rts_pieces[].piece_id` are unchanged by this correction.
+- **Ambiguous historical identity fails closed.** If one internal tracking campaign contains mixed legacy/external identities or more than one external campaign ID, Ballpoint does not enqueue or mark RTS pieces as sent; the existing dirty-summary retry path retains them for remediation instead of guessing an ID.
+- **No partner payload shape, event name, field type, endpoint, or database column changes.** API Kit and the canonical RTS logical schema now state the existing field semantics. OpenAPI requires no structural change because it references this schema. The Postman collection and environments were source-reviewed and do not model this outbound webhook, so no Postman update is required.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## Unreleased — PROPS-3236 zero-piece billing-state classification
 
 - **Payment preview and confirmation now distinguish an invalid zero-piece order from missing pricing.** `POST /v1/billing/campaigns/preview` and a successful `POST /v1/billing/orders/{order_id}/confirm-payment` return `409 INVALID_PIECE_COUNT` when a persisted order has `piece_count <= 0`; no debit or payment-state mutation occurs. A real missing pricing row for a positive quantity remains `400 NO_PRICING`.

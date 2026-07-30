@@ -2267,6 +2267,7 @@ See the exact [completion fixture](contracts/webhooks/order.drop_completed/fixtu
 
 **Field notes on the rollup counters.**
 
+- `campaign_id` — the Ballpoint campaign ID returned by the iframe's `campaign_created` event and stored by PropStream as `ballpoint_campaign_id`. It is not PropStream's numeric `list_id` and is not Ballpoint's internal list-grouping key.
 - `mail_status` — rolled-up campaign delivery status string.
 - `total_pieces` / `scanned_pieces` / `delivered` / `in_transit` / `out_for_delivery` / `rts` / `forwarded` — integer campaign-wide counters.
 - `scan_coverage` / `delivered_rate` / `rts_rate` — percentages on the inclusive `0`–`100` scale.
