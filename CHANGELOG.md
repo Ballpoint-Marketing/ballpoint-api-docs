@@ -34,6 +34,15 @@
 - **No integration migration is required.** Message names, fields, ordering support, APIs, webhooks, billing, pricing, schemas, and database behavior are unchanged.
 - **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
 
+## v1.7.28 — 2026-07-30
+
+- **Production SLA policy is now 3/4/6 business days.** `GET /v1/billing/pricing` reports **3** for printed postcards (`4x6_printed`, `6x9_printed`), **4** for cursive/written postcards (`4x6_cursive`, `6x9_cursive`, including legacy handwritten postcard aliases), and **6** for every letter product (`color_letter`, `printed_letter`, `hybrid_letter`, `greeting_letter`, including legacy letter aliases). The conservative legacy fallback is also **6**.
+- **The iframe date-picker and reschedule floors consume the same values.** Product-specific rows remain authoritative; missing, malformed, or not-yet-loaded pricing data now falls back to 6 business days instead of 5 (and removes the remaining legacy 2-day fallback).
+- **Scheduling semantics are otherwise unchanged.** Business days remain Monday–Friday with no holiday calendar, and the existing UTC scheduling behavior is unchanged. The 3/4/6 policy applies when Ballpoint computes a schedule for a new or rescheduled order; existing orders keep their persisted `scheduled_production_date` and are not backfilled automatically.
+- **No billing-window, Bill Date, Due Today, or price-rounding behavior changed.** This release implements only the confirmed production-SLA table.
+- **Artifact sync:** API Kit, Iframe Kit version metadata, OpenAPI pricing schema/operation, Postman collection metadata, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.28`.
+- **Availability:** prepared for staging validation only. This entry is not a staging or production deployment or availability claim.
+
 ## v1.7.27 — 2026-07-29
 
 - **`POST /v1/billing/campaigns/preview` now returns the exact `/confirm-payment` ledger result in whole cents.** New additive response fields: per-order `partner_debit_cents` (`ceil(partner_cost_total_tcents / 100)` for stripe/manual billing, `0` for `billing_mode=none`, and `null` when `excluded_from_totals=true`) and campaign-level `campaign_partner_debit_cents` (sum of the per-order values). For stripe/manual accounts, Ballpoint settles each order independently in whole cents, rounding a fractional cent **up, never down** — so the campaign result is the sum of per-order ceilings, not one ceiling of the summed raw tcents (two orders of `5001` tcents debit `51 + 51 = 102` cents, not `101`). The debit-cents values equal the eventual `/confirm-payment` result provided the pricing tier, billing mode, and persisted product/postage/piece-count inputs do not change between preview and confirm; callers must re-preview after any order/recipient edit.

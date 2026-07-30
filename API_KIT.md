@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.27 · July 2026** · _deployed to staging; not yet deployed to production_
+> **v1.7.28 · July 2026** · _prepared for staging validation; not yet deployed to staging or production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -347,7 +347,7 @@ Response when no partner markup is configured (partner markup changes only
     "min_quantity": 1,
     "max_quantity": null,
     "description": "4x6 printed postcard - 1st class",
-    "sla_business_days": 2
+    "sla_business_days": 3
   },
   {
     "product_type": "4x6_printed",
@@ -356,25 +356,24 @@ Response when no partner markup is configured (partner markup changes only
     "min_quantity": 1,
     "max_quantity": null,
     "description": "4x6 printed postcard - standard",
-    "sla_business_days": 2
+    "sla_business_days": 3
   }
 ]
 ```
 
 #### `sla_business_days` (integer, additive since v1.7.7)
 
-Business days of production lead time between the scheduled production start date and `mail_date` for the row's `product_type`. Range: **1–15** (practically **2–5** today). Identical across all postage variants of the same product type.
+Business days of production lead time between the scheduled production start date and `mail_date` for the row's `product_type`. Range: **1–15** (practically **3–6** today). Identical across all postage variants of the same product type.
 
 Current values per partner-sendable product type:
 
 | Product | `sla_business_days` |
 |---------|---------------------|
-| `4x6_printed`, `6x9_printed` | **2** |
-| `color_letter` | **3** |
+| `4x6_printed`, `6x9_printed` | **3** |
 | `4x6_cursive`, `6x9_cursive` | **4** |
-| `hybrid_letter`, `greeting_letter` | **5** |
+| `color_letter`, `hybrid_letter`, `greeting_letter` | **6** |
 
-This value is a UX affordance so partners can render an accurate date-picker minimum (earliest selectable `mail_date` = today + `sla_business_days` business days, skipping Saturday/Sunday). It is not currently enforced server-side at order creation — server-side enforcement is planned separately. Partners that hard-code a uniform lead time will under-restrict cursive (4bd) and hybrid/greeting (5bd) product types; read this field per row and pass it into your date-picker instead.
+This value is a UX affordance so partners can render an accurate date-picker minimum (earliest selectable `mail_date` = today + `sla_business_days` business days, skipping Saturday/Sunday). It is not currently enforced server-side at order creation — server-side enforcement is planned separately. Read this field per row and pass it into your date-picker instead of hard-coding a uniform lead time.
 
 ---
 
@@ -1762,17 +1761,19 @@ Ballpoint computes `scheduled_production_date` by subtracting the product's SLA 
 
 | `product_type` | SLA (business days) |
 |---|---|
-| `4x6_printed` | 2 |
-| `6x9_printed` | 2 |
-| `color_letter` | 3 |
+| `4x6_printed` | 3 |
+| `6x9_printed` | 3 |
 | `4x6_cursive` | 4 |
 | `6x9_cursive` | 4 |
-| `hybrid_letter` | 5 |
-| `greeting_letter` | 5 |
+| `color_letter` | 6 |
+| `hybrid_letter` | 6 |
+| `greeting_letter` | 6 |
 
-**Example:** `mail_date = 2026-07-13` (Monday) with `product_type = 4x6_printed` (2 business days) → `scheduled_production_date = 2026-07-09` (previous Thursday, skipping Sat+Sun).
+**Example:** `mail_date = 2026-07-13` (Monday) with `product_type = 4x6_printed` (3 business days) → `scheduled_production_date = 2026-07-08` (previous Wednesday, skipping Sat+Sun).
 
-Unknown product types are rejected by validation (`INVALID_PRODUCT_CONFIG`). If an unrecognized type reaches the scheduler through a legacy path, the conservative default is 5 business days.
+Unknown product types are rejected by validation (`INVALID_PRODUCT_CONFIG`). If an unrecognized type reaches the scheduler through a legacy path, the conservative default is 6 business days.
+
+The 3/4/6 policy applies when Ballpoint computes a schedule for a new order or a rescheduled order. Existing orders keep their persisted `scheduled_production_date`; this release does not backfill them automatically.
 
 The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date ≤ today + 1 day`.
 
