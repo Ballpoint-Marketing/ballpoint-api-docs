@@ -44,6 +44,7 @@
 - **`/confirm-payment` is now enforced as partner/internal-only.** Same-account `live`/`test` Bearer principals are rejected with `401 PARTNER_KEY_REQUIRED`, and partner calls must match the full tenant identity (`account_id + source + external_account_id`) the campaign preview uses; mismatches keep returning `404` (no cross-tenant existence disclosure). This enforces the endpoint's documented server-to-server contract — no request shape or version semantics change.
 - **`/confirm-payment` now enforces preview status parity on the first charge.** `status:success` is accepted only from `{scheduled, pending_payment, accepted}` with `payment_confirmed=false` — the same allowlist the preview quotes. Other unconfirmed states return `409 ORDER_NOT_CHARGEABLE` with no ledger, usage, or payment-state movement. Idempotent already-confirmed, cancelled, and payment-failed behaviors are unchanged.
 - **Artifact sync:** API Kit §6a-ii and §6k, Iframe Kit payment-flow references, OpenAPI campaign-preview operation, Postman collection description/tests.
+- **Availability:** deployed to staging and validated there (2026-07-30). **Not deployed to production** — production availability will be announced by a future entry; this entry is not a production deployment or availability claim.
 
 ## v1.7.26 — 2026-07-29
 
