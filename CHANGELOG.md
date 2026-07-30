@@ -41,7 +41,7 @@
 - **Scheduling semantics are otherwise unchanged.** Business days remain Monday–Friday with no holiday calendar, and the existing UTC scheduling behavior is unchanged. The 3/4/6 policy applies when Ballpoint computes a schedule for a new or rescheduled order; existing orders keep their persisted `scheduled_production_date` and are not backfilled automatically.
 - **No billing-window, Bill Date, Due Today, or price-rounding behavior changed.** This release implements only the confirmed production-SLA table.
 - **Artifact sync:** API Kit, Iframe Kit version metadata, OpenAPI pricing schema/operation, Postman collection metadata, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.28`.
-- **Availability:** prepared for staging validation only. This entry is not a staging or production deployment or availability claim.
+- **Availability:** deployed to staging and validated there (2026-07-30). **Not deployed to production** — production availability will be announced by a future entry; this entry is not a production deployment or availability claim.
 
 ## v1.7.27 — 2026-07-29
 
