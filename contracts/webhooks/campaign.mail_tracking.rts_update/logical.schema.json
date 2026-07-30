@@ -68,7 +68,11 @@
         "last_scan_at", "integration", "new_rts_pieces", "new_rts_count"
       ],
       "properties": {
-        "campaign_id": { "type": "string", "minLength": 1 },
+        "campaign_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Ballpoint campaign ID returned by the iframe campaign_created event and stored by PropStream as ballpoint_campaign_id; never the partner list_id or Ballpoint's internal list-grouping key."
+        },
         "mail_status": { "type": "string", "minLength": 1 },
         "total_pieces": { "type": "integer", "minimum": 0 },
         "scanned_pieces": { "type": "integer", "minimum": 0 },
