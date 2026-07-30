@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.26 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.27 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -230,7 +230,7 @@
                     }
                   }
                 },
-                "description": "Preview cost WITHOUT creating an order (single-order/pre-submission UX). partner_cost_total_tcents is the authoritative Ballpoint debit amount for payment-gate flows. total_tcents/total_dollars are partner-display only. For payment-gated submissions with one or more drops, prefer the campaign-level 'Preview campaign cost (payment-gate)' request below."
+                "description": "Preview cost WITHOUT creating an order (single-order/pre-submission UX). partner_cost_total_tcents is raw wholesale tenth-cent math and may contain a fractional cent; total_tcents/total_dollars are partner-display only. For payment-gated submissions, use the campaign-level 'Preview campaign cost (payment-gate)' request below and read partner_debit_cents / campaign_partner_debit_cents for the exact successful-confirmation cents."
               },
               "event": [
                 {
@@ -286,7 +286,7 @@
                     }
                   }
                 },
-                "description": "Campaign-level preview for payment-gate flows. Wait until every ballpointOrderId from campaign_submitted.orders[] is non-null, upload the matching recipients to every order, and verify every upload reports ready=true with piece_count>0 before calling. A/B variants require address-disjoint recipient slices. Returns per-order partner_cost_total_tcents and the authoritative chargeable-now total via campaign_partner_cost_total_tcents (which excludes already-confirmed/cancelled/failed drops). Replaces the legacy pattern of looping POST /v1/billing/orders/preview once per drop. Partner-only (X-Partner-Key); X-API-Key is rejected with 401. Returns 409 PAYMENT_GATE_NOT_ACTIVE on non-gated accounts and 409 INVALID_PIECE_COUNT when any persisted order has zero pieces. Auto-skips in Newman if {{ballpoint_order_id}} is unseeded."
+                "description": "Campaign-level preview for payment-gate flows. Wait until every selected ballpointOrderId is non-null, upload the matching recipients to every selected order, and verify every selected upload reports ready=true with piece_count>0 before calling. A/B variants require address-disjoint recipient slices. Prices exactly the caller-selected set of order IDs (any subset of one campaign; the endpoint does not compute billing windows). After preview, call /confirm-payment only for response rows where excluded_from_totals=false, and re-preview after any order/recipient edit. Returns per-order raw wholesale tcents (partner_cost_total_tcents) plus the exact whole-cent /confirm-payment ledger result: per-order partner_debit_cents (ceil for stripe/manual, 0 for billing_mode=none, null for excluded orders) and campaign_partner_debit_cents (sum of the per-order values). campaign_partner_cost_total_tcents remains the raw chargeable-now tcents sum (excludes already-confirmed/cancelled/failed drops); use campaign_partner_debit_cents as the exact ledger result. Replaces the legacy pattern of looping POST /v1/billing/orders/preview once per drop. Partner-only (X-Partner-Key); X-API-Key is rejected with 401. Returns 409 PAYMENT_GATE_NOT_ACTIVE on non-gated accounts and 409 INVALID_PIECE_COUNT when any persisted order has zero pieces. Auto-skips in Newman if {{ballpoint_order_id}} is unseeded."
               },
               "event": [
                 {
@@ -315,9 +315,11 @@
                       "  pm.expect(b).to.have.property('order_ids');",
                       "  pm.expect(b).to.have.property('orders');",
                       "  pm.expect(b).to.have.property('campaign_partner_cost_total_tcents');",
+                      "  pm.expect(b).to.have.property('campaign_partner_debit_cents');",
                       "  pm.expect(b.orders).to.be.an('array');",
                       "  if (b.orders.length > 0) {",
                       "    var o = b.orders[0];",
+                      "    pm.expect(o).to.have.property('partner_debit_cents');",
                       "    pm.expect(o).to.have.property('order_id');",
                       "    pm.expect(o).to.have.property('production_status');",
                       "    pm.expect(o).to.have.property('payment_confirmed');",
@@ -1727,7 +1729,7 @@
                 }
               }
             },
-            "description": "GATED, server-to-server ONLY (never from a browser - exposes the key). Gated accounts only (requires_payment_confirmation=TRUE). Upload and validate recipients first, then refetch POST /v1/billing/campaigns/preview before collecting payment. status:success debits the partner balance and advances pending_payment -> accepted. A persisted piece_count<=0 returns 409 INVALID_PIECE_COUNT before any debit or payment-state mutation. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
+            "description": "GATED, server-to-server ONLY (never from a browser - exposes the key). Gated accounts only (requires_payment_confirmation=TRUE). v1.7.27: partner key (full tenant identity) or internal ops key required - same-account live/test Bearer tokens get 401 PARTNER_KEY_REQUIRED; a first status:success is accepted only from scheduled/pending_payment/accepted unconfirmed states, otherwise 409 ORDER_NOT_CHARGEABLE with no debit. Upload and validate recipients first, then refetch POST /v1/billing/campaigns/preview before collecting payment. status:success applies the account billing policy (stripe debits balance; manual records usage; none records no charge/usage) and advances pending_payment -> accepted. A persisted piece_count<=0 returns 409 INVALID_PIECE_COUNT before any debit or payment-state mutation. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
           },
           "event": [
             {
