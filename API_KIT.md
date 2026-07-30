@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.26 · July 2026**
+> **v1.7.27 · July 2026**
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -447,13 +447,15 @@ The preview runs the same limit checks as real order creation but reports result
 > is configured, the primary price fields show the marked-up value while the
 > `partner_cost_*` fields remain the Ballpoint base price.
 
-> **Payment-gate amount source (legacy single-order path):** This endpoint still works for single-order previews and pre-submission UX. For payment-gated submissions with one or more drops, prefer the campaign-level endpoint [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate) — one call returns the whole campaign breakdown plus a chargeable-now total. The fields `partner_cost_total_tcents` (authoritative wholesale debit) and `total_tcents` / `total_dollars` (display-only) have the same meaning on both endpoints.
+> **Payment-gate amount source (legacy single-order path):** This endpoint still works for single-order previews and pre-submission UX. For payment-gated submissions with one or more drops, prefer the campaign-level endpoint [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate) — one call returns the selected-order breakdown plus a chargeable-now total. On both endpoints `partner_cost_total_tcents` is the raw wholesale tenth-cent math and `total_tcents` / `total_dollars` are display-only. Only the campaign endpoint exposes the exact successful-confirmation cents via `partner_debit_cents` / `campaign_partner_debit_cents`.
 
 ---
 
 ### 6a-ii. Preview Campaign Cost (Payment-Gate)
 
-One call returns wholesale (partner-cost) pricing for **every order in a payment-gated campaign submission**, plus a campaign-level total that is safe to use as the "charge now" amount. This is the canonical pricing endpoint for the payment gate — it **replaces** the legacy pattern of calling `POST /v1/billing/orders/preview` once per order/drop after `campaign_submitted`.
+One call prices a **caller-selected set of order IDs from one campaign** and returns, per order and campaign-wide, both the raw wholesale amount in tenth-cents and the **exact `/confirm-payment` ledger result in whole cents**. This is the canonical pricing endpoint for the payment gate — it **replaces** the legacy pattern of calling `POST /v1/billing/orders/preview` once per order/drop after `campaign_submitted`.
+
+The endpoint prices exactly the set it is given. It does **not** compute billing windows or decide which drops are due — the caller selects the intended set of orders (for example, only the drops inside its own billing window) and is responsible for that selection until a future contract decision changes this. After previewing, call `/confirm-payment` only for response rows where `excluded_from_totals=false`; rows marked excluded are not part of the quoted campaign debit.
 
 ```
 POST /v1/billing/campaigns/preview
@@ -463,7 +465,7 @@ Content-Type: application/json
 
 **Auth.** Partner-only. `X-Partner-Key` required; non-partner keys (e.g. `X-API-Key`) get `401 Unauthorized`.
 
-**When to call.** Server-to-server, after the iframe emits `campaign_submitted`, **every** `campaign_submitted.orders[].ballpointOrderId` is non-null, and recipient upload has completed for every order. For each [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload) response, verify `ready === true` and `piece_count > 0` before previewing. For A/B Split, upload a different recipient slice to each variant; do not reuse the full list for both orders. Those `ballpointOrderId` values are the authoritative per-submission order ids and the ones to pass here. If any id is still `null` or any recipient upload is incomplete/zeroed, do not open the payment step or call this endpoint yet.
+**When to call.** Server-to-server, after the iframe emits `campaign_submitted` and every selected order has a non-null `ballpointOrderId`. Recipient upload must be complete for each order selected for this payment event; for every selected [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload) response, verify `ready === true` and `piece_count > 0` before previewing. For A/B Split, upload a different recipient slice to each selected variant; do not reuse the full list for both orders. Pass the **subset you intend to charge in this payment event** (any subset of one campaign is accepted — from a single drop to the full submission). If any selected id is still `null` or any selected order's recipient upload is incomplete/zeroed, do not open the payment step or call this endpoint yet.
 
 **Request body**
 
@@ -503,6 +505,7 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
       "total_tcents": 2694000,
       "partner_cost_unit_price_tcents": 5388,
       "partner_cost_total_tcents": 2694000,
+      "partner_debit_cents": 26940,
       "price_source": "computed_from_persisted_order_inputs",
       "excluded_from_totals": false,
       "exclusion_reason": null
@@ -513,11 +516,12 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
       "payment_confirmed": false,
       "product_type": "4x6_printed",
       "postage_type": "first_class",
-      "piece_count": 500,
+      "piece_count": 97,
       "unit_price_tcents": 5388,
-      "total_tcents": 2694000,
+      "total_tcents": 522636,
       "partner_cost_unit_price_tcents": 5388,
-      "partner_cost_total_tcents": 2694000,
+      "partner_cost_total_tcents": 522636,
+      "partner_debit_cents": 5227,
       "price_source": "computed_from_persisted_order_inputs",
       "excluded_from_totals": false,
       "exclusion_reason": null
@@ -533,12 +537,14 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
       "total_tcents": 2694000,
       "partner_cost_unit_price_tcents": 5388,
       "partner_cost_total_tcents": 2694000,
+      "partner_debit_cents": null,
       "price_source": "computed_from_persisted_order_inputs",
       "excluded_from_totals": true,
       "exclusion_reason": "already_confirmed"
     }
   ],
-  "campaign_partner_cost_total_tcents": 5388000
+  "campaign_partner_cost_total_tcents": 3216636,
+  "campaign_partner_debit_cents": 32167
 }
 ```
 
@@ -559,11 +565,13 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/campaigns/preview \
 | `orders[].unit_price_tcents` | integer | **Display/retail** per-piece price (may include markup). Not the debit amount. |
 | `orders[].total_tcents` | integer | **Display/retail** total for this order (`unit_price_tcents × piece_count`). Not the debit amount. UX/display only. |
 | `orders[].partner_cost_unit_price_tcents` | integer | **Wholesale** per-piece price. |
-| `orders[].partner_cost_total_tcents` | integer | **Authoritative wholesale debit amount** for this order. This is the value Ballpoint will debit from the partner balance on `/confirm-payment` `status:success` for this order. Returned even for excluded orders (for reconciliation), but only chargeable-now orders contribute to the campaign total. |
+| `orders[].partner_cost_total_tcents` | integer | **Raw wholesale total in tenth-cents** (`partner_cost_unit_price_tcents × piece_count`). May contain a fractional cent (e.g. `522636` = $52.2636). **Not the exact ledger debit** — the ledger settles whole cents; see `partner_debit_cents`. Returned even for excluded orders (for reconciliation), but only chargeable-now orders contribute to the campaign totals. |
+| `orders[].partner_debit_cents` | integer \| null | **Exact whole-cent ledger amount recorded when `/confirm-payment` succeeds, provided the pricing tier, billing mode, and persisted product/postage/piece-count inputs remain unchanged.** For `stripe` / `manual` billing it is `ceil(partner_cost_total_tcents / 100)`: a fractional cent rounds **up, never down** (`522636` tcents → `5227` cents). It is `0` when the account has billing disabled (`billing_mode=none`, which records no charge or usage), and `null` when `excluded_from_totals=true`. The field is always present. Do **not** call `/confirm-payment` for an excluded row as part of this quoted payment event. This is an amount quote, not authorization: confirmation can still fail account, balance, piece-cap, or spending-limit checks. |
 | `orders[].price_source` | string | Always `"computed_from_persisted_order_inputs"` for this endpoint as of PROPS-3087 — pricing is recomputed live from the persisted `product_type` / `postage_type` / `piece_count` via the **current** pricing tables (no raw client inputs accepted), so the preview equals the `/confirm-payment` charge. `"frozen"` (a price snapshot reused as-is) is retained in the enum for backward compatibility but is **no longer emitted** by this endpoint. |
 | `orders[].excluded_from_totals` | boolean | `true` if this order is **not** added into `campaign_partner_cost_total_tcents` (see "Chargeable-now semantics" below). |
 | `orders[].exclusion_reason` | string \| null | One of `"already_confirmed"`, `"cancelled"`, `"failed"`, `"payment_failed"`, `"not_chargeable_status"`. `null` when `excluded_from_totals=false`. |
-| `campaign_partner_cost_total_tcents` | integer | **The amount to charge now.** Sum of `partner_cost_total_tcents` across **chargeable-now orders only** (see below). Excludes already-confirmed and terminal/failed orders. tcents → dollars: divide by 10000. |
+| `campaign_partner_cost_total_tcents` | integer | **Raw wholesale sum in tenth-cents** of `partner_cost_total_tcents` across **chargeable-now orders only** (see below). May contain fractional cents; **not the exact ledger amount** — use `campaign_partner_debit_cents` for that. Excludes already-confirmed and terminal/failed orders. tcents → dollars: divide by 10000. |
+| `campaign_partner_debit_cents` | integer | **Exact total ledger amount in whole cents when `/confirm-payment` succeeds, provided the pricing tier, billing mode, and persisted product/postage/piece-count inputs remain unchanged.** Sum of the per-order `partner_debit_cents` — each stripe/manual order settles **independently**, so this is the sum of per-order ceilings, **not** one ceiling of the summed raw tcents (two orders of `5001` tcents debit `51 + 51 = 102` cents, not `101`). Returns `0` for `billing_mode=none`. This does not guarantee that confirmation will pass account, balance, piece-cap, or spending-limit checks. |
 
 **Chargeable-now semantics — IMPORTANT**
 
@@ -576,13 +584,23 @@ Every other order is reported per-order (so you can audit) but **excluded** from
 
 | `exclusion_reason` | Meaning |
 |---|---|
-| `already_confirmed` | `payment_confirmed === true`. The partner balance was already debited for this order on a prior `/confirm-payment` success. Re-charging would be a double-charge. |
+| `already_confirmed` | `payment_confirmed === true`. The payment outcome was already confirmed and the account's billing policy already ran for this order. Do not collect or confirm it again. |
 | `cancelled` | Order is cancelled — no charge is due. |
 | `failed` | Order is in a non-recoverable failed state. |
 | `payment_failed` | `/confirm-payment` was previously called with `status:failed` and the order is in `payment_failed` (terminal). |
 | `not_chargeable_status` | `production_status` is outside `{scheduled, pending_payment, accepted}` (e.g. already in `prep`/`printing`/`complete`). |
 
-This is by design — calling `POST /v1/billing/campaigns/preview` twice in a row (e.g. after one drop's `/confirm-payment` has succeeded) will return a lower `campaign_partner_cost_total_tcents` the second time, never re-billing the confirmed drop.
+This is by design — calling `POST /v1/billing/campaigns/preview` twice in a row (e.g. after one drop's `/confirm-payment` has succeeded) will return a lower total the second time, never re-billing the confirmed drop.
+
+**Three price layers — do not mix them**
+
+| Layer | Fields | Unit | Use for |
+|---|---|---|---|
+| Customer display/retail | `unit_price_tcents`, `total_tcents` | tenth-cents | What the end customer sees/pays (includes partner markup). Never the partner debit. |
+| Raw Ballpoint wholesale | `partner_cost_unit_price_tcents`, `partner_cost_total_tcents`, `campaign_partner_cost_total_tcents` | tenth-cents | Reconciliation and audit of exact per-piece wholesale math (may carry fractional cents). |
+| Exact ledger result | `partner_debit_cents`, `campaign_partner_debit_cents` | whole cents | The amount Ballpoint records on `/confirm-payment` success (`0` when billing is disabled). Use it for stripe balance forecasting and for manual-billing statement/usage reconciliation. |
+
+The debit-cents values equal the amount recorded on successful `/confirm-payment` **provided the pricing tier, billing mode, and persisted `product_type` / `postage_type` / `piece_count` inputs do not change between preview and confirm** (pricing is resolved live from those inputs at both moments — see `price_source`). For `stripe` and `manual`, each chargeable order is ceilinged independently to whole cents; for `billing_mode=none`, the result is `0` because no charge or usage entry is recorded. This preview quotes the amount but does not run every confirmation-time eligibility/limit/balance check. Re-preview after any order/recipient edit or if the tier or billing mode changes.
 
 **tcents convention.** All `*_tcents` fields are integer **tenth-cents**. Dollars = `tcents / 10000`. Example: `2694000` tcents = `$269.40`.
 
@@ -603,7 +621,7 @@ This is by design — calling `POST /v1/billing/campaigns/preview` twice in a ro
 **Why a campaign-level endpoint (vs N calls to `/v1/billing/orders/preview`)**
 
 - **One round-trip** per campaign instead of N — simpler partner code, fewer rate-limit concerns, atomic snapshot of all orders' pricing at one instant.
-- **Authoritative campaign total** — Ballpoint computes `campaign_partner_cost_total_tcents` server-side with the chargeable-now filter applied; partners do not have to re-implement that filter.
+- **Server-computed totals** — Ballpoint applies the chargeable-now filter and the exact whole-cent ledger settlement (`campaign_partner_debit_cents`) server-side; partners do not have to re-implement either.
 - **No double-charge risk on retries** — re-previewing after partial success drops already-confirmed orders out of the total automatically.
 
 For pre-submission per-product previews (e.g. "show the user a price for a 500-piece postcard before they click Submit"), the single-order `POST /v1/billing/orders/preview` endpoint ([§6a](#6a-preview-cost)) remains the right tool — it doesn't require created orders.
@@ -1066,7 +1084,8 @@ For accounts where Ballpoint waits for the partner to debit the end-user before 
 
 - The end-user payment is captured **on the partner side** using the partner's own payment provider. Ballpoint never sees card data, payment-method data, or any PCI-relevant payload.
 - `/confirm-payment` is a **server-to-server** call by integration contract. It must be issued from the partner backend after the partner has confirmed the payment outcome with its payment provider. The customer browser must **not** call this endpoint directly — the partner key would be exposed.
-- Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. After `campaign_submitted`, the partner backend must first upload and validate recipients for every order. Only after every upload reports `ready === true` with `piece_count > 0` may it call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once for the whole submission**, passing the full list of `ballpointOrderId`s from `campaign_submitted.orders[]`. Read `campaign_partner_cost_total_tcents` as the authoritative "charge now" amount (already excludes any already-confirmed drops), and per-order `partner_cost_total_tcents` as the authoritative per-order debit. Browser-provided values must never be treated as authoritative.
+- **Principal enforcement (v1.7.27):** only a **partner principal** (`X-Partner-Key`, matched on the full tenant identity `account_id + source + external_account_id` — the same triple the campaign preview enforces) or Ballpoint's internal ops key may call this endpoint. Same-account `live`/`test` Bearer tokens are rejected with `401 PARTNER_KEY_REQUIRED`; a malformed partner principal missing `source`/`external_account_id` gets `401 MISSING_PARTNER_CONTEXT` (defensive — real partner keys always carry both). Like `INVALID_PIECE_COUNT` below, these `401`s use the `detail`-wrapped envelope rather than the endpoint's top-level `error` object. A partner key whose tenant identity does not match the order returns `404 ORDER_NOT_FOUND` (never `403` — no cross-tenant existence disclosure).
+- Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. After `campaign_submitted`, the partner backend must upload and validate recipients for each order it intends to charge in the current payment event. Only after every selected upload reports `ready === true` with `piece_count > 0` may it call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) once with that selected set of `ballpointOrderId`s. Read `campaign_partner_debit_cents` as the exact whole-cent amount Ballpoint records when confirmation succeeds (already excludes any already-confirmed drops), and use the `partner_cost_*_tcents` fields only for raw wholesale reconciliation. Browser-provided values must never be treated as authoritative.
 
 **User-flow timing**
 
@@ -1078,11 +1097,11 @@ Where this call sits in the end-user journey for an iframe-driven order:
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /orders` on the API base URL and sends the selected `postage_type` (`first_class`, `standard`, or `presort`). Ballpoint validates and persists that value, then records a creation-time price **estimate** on the order for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at [`/confirm-payment`](#6k-confirm-payment-partner-payment-gate) — refetch [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate) before charging). Only legacy requests that omit `postage_type` default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated); no charge occurs yet.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger for the backend handoff, not as authorization to collect payment yet. For partners that sent `piece_counts` on `set_list`, this event also carries `recipient_selection.piece_count`; for A/B Split, each `orders[].pieces` is the size of that variant's slice. See [IFRAME_KIT.md](IFRAME_KIT.md#recipient-selection-contract-piece-count--dedup) for the full input/output contract.
-7. Partner backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, uploads the matching recipient slice to each order with [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload), and verifies every response has `ready === true` and `piece_count > 0`. For A/B Split, the slices must be address-disjoint.
-8. Partner backend calls [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with the full order-id list. Read `campaign_partner_cost_total_tcents` (the authoritative "charge now" amount — already excludes already-confirmed drops) and per-order `partner_cost_total_tcents` (the per-order wholesale debit). The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step.
+7. Partner backend selects the orders due in the current payment event, waits until each selected `ballpointOrderId` is non-null, uploads the matching recipient slice with [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload), and verifies every selected response has `ready === true` and `piece_count > 0`. For A/B Split, the slices must be address-disjoint.
+8. Partner backend calls [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with that selected order-id set. Read `campaign_partner_debit_cents` as the exact successful-confirmation ledger amount; the `partner_cost_*_tcents` fields remain the raw wholesale math for reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`; do not confirm rows excluded from the quoted total. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step.
 9. Partner shows the payment popup; end-user pays via the partner's payment provider.
 10. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
-11. On success, Ballpoint debits the partner balance and moves the order from `pending_payment` to `accepted`. Production proceeds.
+11. On success, Ballpoint applies the account billing policy (stripe debits balance; manual records usage without moving balance; none records no charge/usage) and moves the order from `pending_payment` to `accepted`. Production proceeds.
 
 After step 6, the iframe lifecycle and the payment lifecycle run in parallel: the iframe may emit `campaign_complete` / `done` once its own submission flow finishes, independent of the payment popup. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
 
@@ -1131,10 +1150,11 @@ Content-Type: application/json
 
 **Behavior**
 
-- **`status:success`** — wholesale charge runs (debits the partner balance), `payment_confirmed` flips to `TRUE`. Send-now orders advance from `pending_payment` to `accepted`. Scheduled orders stay `scheduled` until the production date hits.
+- **`status:success`** — the account billing policy runs: `stripe` debits balance, `manual` records usage without moving balance, and `none` records neither charge nor usage. `payment_confirmed` flips to `TRUE`; send-now orders advance from `pending_payment` to `accepted`, while scheduled orders stay `scheduled` until the production date hits.
 - **`status:failed`** — order moves to `payment_failed` (terminal) and `failure_reason` is stored. No partner balance debit happens.
 - **Idempotency** — repeating the same status is a no-op (last call wins for `transaction_id` and `failure_reason`). Repeating with the **opposite** status is rejected with `409` — payment outcome is unidirectional once recorded.
 - **Cancelled orders** — calling `/confirm-payment` against a cancelled order returns `409 ORDER_CANCELLED`.
+- **Chargeable-status parity (v1.7.27)** — a **first** `status:success` is accepted only from the same chargeable allowlist the campaign preview quotes: `production_status ∈ {scheduled, pending_payment, accepted}` with `payment_confirmed = false`. Any other unconfirmed state (`failed`, `prep`, `printing`, `complete`, …) returns `409 ORDER_NOT_CHARGEABLE` with **no** ledger movement, usage entry, or payment-state change — you can never charge a row the preview excluded from its totals. Already-confirmed orders keep the idempotent no-op behavior above.
 - **Late confirmation** — if the order's `scheduled_production_date` passes without a `success` call, a Ballpoint cron flips it to `payment_failed` automatically. A subsequent `/confirm-payment` returns `409 PAYMENT_ALREADY_FAILED`.
 - **No-gate accounts** — calling `/confirm-payment` against an account where `requires_payment_confirmation = FALSE` returns `409 PAYMENT_GATE_NOT_ACTIVE` (the order was already debited at creation).
 - **Zero-piece orders** — `status:success` returns `409 INVALID_PIECE_COUNT` before any debit or payment-state mutation when the persisted `piece_count <= 0`. Correct the recipient slice and re-preview before collecting or confirming payment. Unlike the other `409`s on this endpoint (top-level `error` object), this error uses the `detail`-wrapped envelope — the same shape [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) returns:
@@ -1176,7 +1196,7 @@ Content-Type: application/json
 }
 ```
 
-`billing.amount_cents` is the wholesale amount Ballpoint debited from the partner balance — this is the value carried on the cancellation webhook as `ballpoint_billed_amount_tcents` if the order is later cancelled. It is **not** the same as `amount_charged_to_user_cents`, which is what the partner billed the end-user.
+`billing.amount_cents` is the whole-cent wholesale settlement amount: debited from balance in `stripe`, recorded as usage in `manual`, and `0` in `none`. The corresponding billed amount is carried on the cancellation webhook as `ballpoint_billed_amount_tcents` if the order is later cancelled (`0` / `ballpoint_billed=false` for `none`). It is **not** the same as `amount_charged_to_user_cents`, which is what the partner billed the end-user.
 
 **Response — failed**
 
@@ -1208,7 +1228,7 @@ Payment retry logic lives **on the partner side**. Ballpoint does not retry the 
 
 These endpoints power partner-side operational dashboards (per-account aggregate stats, paginated order list with SLA, drill-down by user or campaign list). Both require an `X-Partner-Key` header and are scoped to your `source` + `external_account_id`.
 
-> **For payment-gate flows:** do not use these dashboard endpoints for pre-confirmation pricing. After `campaign_submitted`, call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with the full list of `ballpointOrderId`s from `campaign_submitted.orders[]`. Use `campaign_partner_cost_total_tcents` as the authoritative "charge now" amount and per-order `partner_cost_total_tcents` as the per-order debit. Browser-side values like `campaign_submitted.total_dollars` are UX/display only. See [§6k](#6k-confirm-payment-partner-payment-gate) and [IFRAME_KIT.md](IFRAME_KIT.md) for the full payment-gate context.
+> **For payment-gate flows:** do not use these dashboard endpoints for pre-confirmation pricing. After `campaign_submitted`, call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with the caller-selected set of `ballpointOrderId`s intended for the current payment event. Use `campaign_partner_debit_cents` as the exact whole-cent amount recorded when confirmation succeeds and the `partner_cost_*_tcents` fields only for raw wholesale reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`. Browser-side values like `campaign_submitted.total_dollars` are UX/display only. See [§6k](#6k-confirm-payment-partner-payment-gate) and [IFRAME_KIT.md](IFRAME_KIT.md) for the full payment-gate context.
 
 #### `GET /v1/billing/partner/stats`
 
@@ -1319,7 +1339,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/orders?days=30&li
 }
 ```
 
-Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders or billing configurations where no partner-facing amount is set. For payment-gated accounts, this endpoint is for dashboard/post-confirmation reads, not for pre-confirmation charge authorization; use [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) (campaign-level, recommended) — or [`POST /v1/billing/orders/preview`](#6a-preview-cost) for single-order/pre-submission previews — for that flow. For payment-gated accounts, orders created on/after the 2026-06-23 price-freeze carry a non-null `total_cost_cents` as soon as they are created, but it remains a dashboard/display value and is **not** the authoritative charge amount — always source the debit from the preview path's `partner_cost_total_tcents` (see [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate)).
+Filters compose with AND. `total_cost_cents` may be `null` for unpriced orders or billing configurations where no partner-facing amount is set. For payment-gated accounts, this endpoint is for dashboard/post-confirmation reads, not for pre-confirmation charge authorization; use [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) (campaign-level, recommended) — or [`POST /v1/billing/orders/preview`](#6a-preview-cost) for single-order/pre-submission previews — for that flow. For payment-gated accounts, orders created on/after the 2026-06-23 price-freeze carry a non-null `total_cost_cents` as soon as they are created, but it remains a dashboard/display value and is **not** the authoritative current-price charge amount. Source the exact successful-confirmation cents from `partner_debit_cents` / `campaign_partner_debit_cents` in the campaign preview; use `partner_cost_*_tcents` only for raw wholesale reconciliation (see [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate)).
 
 #### `GET /v1/billing/partner/health`
 
@@ -2442,7 +2462,7 @@ POST /orders (partner-billed)
                                            with no /confirm-payment   ──► payment_failed (terminal, no debit)
 ```
 
-Wholesale charge runs on `/confirm-payment success` (same `charge_order` flow used for direct accounts at creation time). Cancelling from `pending_payment` or `payment_failed` is free — no debit ever happened. Cancelling from `accepted` (or `scheduled` after a successful confirmation) still triggers the auto-refund. See [§6k. Confirm Payment](#6k-confirm-payment-partner-payment-gate) for the full endpoint contract.
+The account billing policy runs on `/confirm-payment success` (same `charge_order` flow used for direct accounts at creation time): stripe debits balance, manual records usage, and none records no charge/usage. Cancelling from `pending_payment` or `payment_failed` is free — no debit ever happened. Cancelling from `accepted` (or `scheduled` after a successful confirmation) applies the mode-specific refund policy. See [§6k. Confirm Payment](#6k-confirm-payment-partner-payment-gate) for the full endpoint contract.
 
 ---
 
