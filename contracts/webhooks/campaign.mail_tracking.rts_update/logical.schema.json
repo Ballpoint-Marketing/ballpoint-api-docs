@@ -49,12 +49,16 @@
         "last_scan_at": {
           "anyOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }]
         },
-        "contact_id": { "$ref": "#/$defs/nullableString" },
+        "contact_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "description": "Partner contact identifier echoed verbatim from the recipient upload; always present and non-empty on emitted partner RTS events."
+        },
         "contact_type": {
-          "anyOf": [
-            { "type": "string", "enum": ["PROPERTY", "MAILING"] },
-            { "type": "null" }
-          ]
+          "type": "string",
+          "enum": ["PROPERTY", "MAILING"],
+          "description": "Always one of the two enum values on emitted partner RTS events; pieces without a resolvable type block the event instead of emitting null."
         }
       }
     },

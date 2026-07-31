@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.28 · July 2026** · _deployed to staging; not yet deployed to production_
+> **v1.7.29 · July 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -2282,8 +2282,8 @@ Per-piece fields:
 - `status` — string — Always `RTS` on this event.
 - `recipient_name` / `recipient_address` / `recipient_city` / `recipient_state` / `recipient_zip` — string — Mailed PII, exactly as mailed. Retained for suppression.
 - `last_scan_at` — string | null — ISO 8601 timestamp of the last scan associated with the returned piece.
-- `contact_id` — string | null — Partner-side recipient identifier, echoed verbatim from the `/recipients` upload. `null` when none was supplied (Ballpoint-direct uploads).
-- `contact_type` — string | null — `PROPERTY` or `MAILING`. Disambiguates two pieces with the same `contact_id` (one contact may have both a property and a mailing address mailed in the same campaign). `null` when no address-type was supplied.
+- `contact_id` — string — Partner-side recipient identifier, echoed verbatim from the `/recipients` upload. Always present and non-empty on every emitted partner RTS piece.
+- `contact_type` — string — Always `PROPERTY` or `MAILING`. Disambiguates two pieces with the same `contact_id` (one contact may have both a property and a mailing address mailed in the same campaign).
 
 Note: the unique recipient key is `(contact_id, contact_type)`. A single `contact_id` may appear twice in one payload (both PROPERTY and MAILING came back RTS). These are **pass-through** — Ballpoint does not address-match; the partner pre-resolves the key at manifest-upload time. The existing `recipient_*` PII is unchanged (kept for suppression).
 
@@ -2343,14 +2343,14 @@ When the USPS scan pipeline detects a returned-to-sender piece, Ballpoint emits 
 | `recipient_state` | string | yes | 2-letter state as mailed. |
 | `recipient_zip` | string | yes | 5 or 5+4 zip as mailed. |
 | `last_scan_at` | string \| null | yes | ISO 8601 timestamp of the last scan associated with the returned piece. |
-| `contact_id` | string \| null | yes | Opaque partner-side contact identifier (e.g. PropStream `contact_id`). Echoed verbatim from the `/recipients` upload. `null` when no partner contact was supplied (Ballpoint-direct uploads). |
-| `contact_type` | string \| null | yes | `PROPERTY` or `MAILING` — disambiguates two pieces with the same `contact_id` (one contact may have both a property address and a separate mailing address mailed in the same campaign). `null` when no partner address-type was supplied. |
+| `contact_id` | string | yes | Opaque partner-side contact identifier (e.g. PropStream `contact_id`). Echoed verbatim from the `/recipients` upload and always non-empty on an emitted partner RTS piece. |
+| `contact_type` | string | yes | Always `PROPERTY` or `MAILING` — disambiguates two pieces with the same `contact_id` (one contact may have both a property address and a separate mailing address mailed in the same campaign). |
 
 **Notes**
 
 - The unique recipient key is `(contact_id, contact_type)`. A single `contact_id` may appear twice in a single payload when both a PROPERTY and a MAILING address for the same contact were mailed and both came back RTS.
 - Recipient PII (`recipient_name`/`recipient_address`/`recipient_city`/`recipient_state`/`recipient_zip`) is included on every entry so partners can suppress by mailed address even when no CRM key is present.
-- Both `contact_id` and `contact_type` are pass-through. Ballpoint does not interpret or address-match — the partner pre-resolves the recipient key at manifest-upload time. Manifests without these columns ingest cleanly — they just emit `null` for both fields on the RTS event.
+- Both `contact_id` and `contact_type` originate from the partner recipient upload. Ballpoint never infers either value from postal-address equality or supplies a default. If a partner RTS piece cannot be resolved to one unambiguous `(contact_id, contact_type)`, Ballpoint holds the event, emits an operational alert, and retries after the recipient identity is corrected instead of sending a value the consumer would discard.
 - This event is distinct from `order.status_changed`. The two events use the same delivery channel but carry different payloads.
 
 ---
