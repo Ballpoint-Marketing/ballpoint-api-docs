@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.30 — 2026-07-31 — PROPS-3323 dashboard recipient-search isolation
+
+- **Dashboard recipient search now follows the active campaign-list scope.** The iframe repeats the parent-provided dashboard `list_id` filter on `GET /v1/mail-tracking/recipients/search`, so recipients from unrelated or abandoned campaigns cannot appear beside a list-scoped campaign view.
+- **Server-side scope is authoritative.** The API applies the resolved campaign IDs to both `order_recipients` and `piece_tracking` before search, grouping, totals, and pagination. Existing tenant/account and optional external-user predicates remain mandatory.
+- **Account-wide search remains compatible.** `list_id` is optional and repeatable; omitting it preserves authorized account-wide behavior. An explicitly empty scope returns zero results and never falls back to global data.
+- **Client state is scope-safe.** A dashboard-filter change aborts in-flight work and clears rendered recipient results before the next scoped query.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, and Postman. No response field, postMessage, webhook, billing, or lifecycle semantic changed.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## v1.7.29 — 2026-07-31
 
 - **`campaign.mail_tracking.rts_update` now fails closed when a PropStream recipient identity is unresolved.** Every emitted `data.new_rts_pieces[]` entry carries a non-empty `contact_id` and `contact_type: PROPERTY | MAILING`. Ballpoint no longer emits `null` values that the PropStream consumer would acknowledge but discard.

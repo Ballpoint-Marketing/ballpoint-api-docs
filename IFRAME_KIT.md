@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.29** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.30** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -516,7 +516,10 @@ does not have to wait for USPS piece tracking to be indexed. Recipient name
 tokens are order-independent, so `Gregory, Debra` can find `Debra Gregory`.
 
 The iframe sends the active `X-External-User-ID` when one was supplied by the
-parent, merges campaign and recipient results, and shows an empty state only
+parent and repeats the active dashboard `list_id` filter on recipient searches.
+Changing that filter clears pending and rendered recipient results before the
+new scope loads. With no dashboard filter, the existing authorized account-wide
+search remains available. The iframe merges campaign and recipient results and shows an empty state only
 when neither source matched. Clearing the query restores the normal campaign
 list. An order-only recipient match can show its campaign, but does not expose
 an **Opt Out** action until a piece-tracking record exists. This behavior is
@@ -730,7 +733,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.29"
+    "partner": "1.7.30"
   }
 }
 ```
