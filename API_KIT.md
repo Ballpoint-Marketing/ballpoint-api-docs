@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.29 · July 2026** · _prepared for staging validation; not yet deployed to production_
+> **v1.7.30 · July 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1823,13 +1823,16 @@ the partner holding the shared partner key.
 `GET /v1/mail-tracking/recipients/search` searches recipient names and mailing
 addresses across the authenticated tenant's direct-mail campaigns. The embedded
 iframe calls this endpoint automatically; partners do not need to add a new
-postMessage handler.
+postMessage handler. When the dashboard is filtered to campaign lists, repeat
+`list_id` so recipient results use the identical scope. Omit `list_id` only for
+an authorized account-wide search.
 
 ```bash
 curl --get https://api.ballpointmarketing.com/v1/mail-tracking/recipients/search \
   -H "X-Partner-Key: ${BALLPOINT_PARTNER_KEY}" \
   -H "X-External-User-ID: user_456" \
   --data-urlencode "q=Gregory, Debra" \
+  --data-urlencode "list_id=list_123" \
   --data-urlencode "limit=20" \
   --data-urlencode "offset=0"
 ```
@@ -1839,6 +1842,7 @@ curl --get https://api.ballpointmarketing.com/v1/mail-tracking/recipients/search
 | `q` | Yes | 2–200 characters. Punctuation and whitespace split the query into tokens; every token must match the combined recipient name/address text in any order. For example, `Gregory, Debra` matches `Debra Gregory`. |
 | `limit` | No | 1–100, default `20`. |
 | `offset` | No | Zero-based result offset, default `0`. |
+| `list_id` | No | Repeatable campaign-list filter, maximum 100 values. Omit for authorized account-wide search. Present-but-empty returns zero results and never falls back to account-wide data. |
 | `X-Partner-Key` | Yes | Authenticates and tenant-scopes the request. |
 | `X-External-User-ID` | No | When present, limits partner results to campaigns attributed to that user. Omit only for an authorized tenant-wide search. |
 
@@ -2695,7 +2699,7 @@ Before switching to your live key:
 | Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` (server-to-server only) |
 | Partner dashboard stats | `GET` | `/v1/billing/partner/stats?days=30&list_id=...&external_user_id=...` | `X-Partner-Key` |
 | Partner dashboard orders | `GET` | `/v1/billing/partner/orders?days=30&list_id=...&status=...` | `X-Partner-Key` |
-| Recipient/direct-mail search (iframe automatic) | `GET` | `/v1/mail-tracking/recipients/search?q=...&limit=20&offset=0` | `X-Partner-Key`, optional `X-External-User-ID` |
+| Recipient/direct-mail search (iframe automatic) | `GET` | `/v1/mail-tracking/recipients/search?q=...&limit=20&offset=0&list_id=...` | `X-Partner-Key`, optional `X-External-User-ID` |
 | Order tracking | `GET` | `/v1/orders/{id}/mail-tracking` | `X-Partner-Key` |
 | Campaign tracking | `GET` | `/v1/campaigns/{id}/mail-tracking` | `X-Partner-Key` |
 | Pricing catalog | `GET` | `/v1/billing/pricing?product_type=...` | `X-Partner-Key` |
