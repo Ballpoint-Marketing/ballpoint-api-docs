@@ -25,3 +25,10 @@ identifier and must not be used in place of `event_id` for transport dedup.
 
 RTS rates are percentages on the inclusive 0–100 scale. The runtime emits at
 most 100 `new_rts_pieces` in one event; the golden fixture exercises all 100.
+
+Every emitted partner RTS piece carries a non-null
+`(contact_id, contact_type)`. The emitter holds the event, alerts, and
+retries rather than sending an unresolved identity that the consumer would
+discard. This requirement applies to the partner RTS webhook; other API and
+iframe suppression surfaces retain their separately documented nullable
+historical-data behavior.

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.29 — 2026-07-31
+
+- **`campaign.mail_tracking.rts_update` now fails closed when a PropStream recipient identity is unresolved.** Every emitted `data.new_rts_pieces[]` entry carries a non-empty `contact_id` and `contact_type: PROPERTY | MAILING`. Ballpoint no longer emits `null` values that the PropStream consumer would acknowledge but discard.
+- **Recipient identity remains partner-authored.** Ballpoint preserves the uploaded `(contact_id, address_type)`, may recover it only through deterministic agreement with canonical recipient data, and never infers a type from postal-address equality or supplies a default. Missing, conflicting, or ambiguous identity holds the whole RTS batch, leaves it retryable, and emits an operational data-integrity alert.
+- **Historical recovery is separate from the runtime guarantee.** Campaigns created before the partner supplied `address_type` require an authoritative partner mapping before replay; this release does not guess or rewrite those historical values.
+- **Artifact sync:** API Kit and the canonical `campaign.mail_tracking.rts_update` webhook schema report `1.7.29`. Other suppression and RTS read surfaces retain their separately documented nullable historical-data behavior.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## Unreleased — RTS webhook campaign identity correction
 
 - **`campaign.mail_tracking.rts_update.data.campaign_id` carries the partner-facing Ballpoint campaign ID.** This is the ID returned by the iframe's `campaign_created` event and stored by PropStream as `ballpoint_campaign_id`; it is not PropStream's numeric `list_id` and is not Ballpoint's internal list-grouping key.
