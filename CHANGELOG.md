@@ -42,6 +42,12 @@
 - **No integration migration is required.** Message names, fields, ordering support, APIs, webhooks, billing, pricing, schemas, and database behavior are unchanged.
 - **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
 
+## v1.7.28 — production availability — 2026-07-31
+
+- **The v1.7.28 partner contract is now live on production.** The production API and the partner iframe were promoted on 2026-07-31, and production now serves the same partner contract as staging (1.7.28). The "not deployed to production" availability notes on the entries from v1.7.22 through v1.7.28 below are superseded by this announcement.
+- **PropStream direct-mail submission remains disabled on production.** The partner rollout gate stays off and no partner webhook endpoints are registered; enabling the PropStream flow is a separate, explicitly announced activation with its own entry.
+- **No contract change.** This entry announces availability only: no message names, fields, endpoints, webhooks, schemas, billing rules, or database behavior change.
+
 ## v1.7.28 — 2026-07-30
 
 - **Production SLA policy is now 3/4/6 business days.** `GET /v1/billing/pricing` reports **3** for printed postcards (`4x6_printed`, `6x9_printed`), **4** for cursive/written postcards (`4x6_cursive`, `6x9_cursive`, including legacy handwritten postcard aliases), and **6** for every letter product (`color_letter`, `printed_letter`, `hybrid_letter`, `greeting_letter`, including legacy letter aliases). The conservative legacy fallback is also **6**.
