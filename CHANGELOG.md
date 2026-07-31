@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.31 — 2026-07-31 — PROPS-3317 authoritative payment completion
+
+- **Payment success is now derived from committed order state.** A matching `payment_result: success` prompts authenticated order-history reconciliation; the success screen renders only after every expected order reports `payment_confirmed=true`.
+- **Pending and unknown states fail closed.** The iframe locks the checkout CTA during bounded reconciliation. **Check Payment Status** performs read-only reconciliation and never re-emits the billing trigger or invites another charge.
+- **Callbacks are checkout-bound.** Same-tenant stale `payment_result` messages whose campaign/order identifiers do not match the active handoff are rejected.
+- **Result screens cannot be overwritten by host dashboard navigation.** `open_direct_mail_dashboard` is held during active post-payment reconciliation and terminal result acknowledgement; the success CTA remains the explicit path to the Dashboard.
+- **Artifact sync:** Iframe Kit and iframe/API partner-contract version metadata report `1.7.31`. No HTTP route, request/response schema, webhook payload, database migration, or Postman request changes are required.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## v1.7.30 — 2026-07-31 — PROPS-3323 dashboard recipient-search isolation
 
 - **Dashboard recipient search now follows the active campaign-list scope.** The iframe repeats the parent-provided dashboard `list_id` filter on `GET /v1/mail-tracking/recipients/search`, so recipients from unrelated or abandoned campaigns cannot appear beside a list-scoped campaign view.
