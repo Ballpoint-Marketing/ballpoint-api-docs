@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.32 · August 2026** · _prepared for staging validation; not yet deployed to production_
+> **v1.7.33 · August 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1875,7 +1875,8 @@ piece status and opt-out state.
           "status": "accepted",
           "mail_date": "2026-07-18",
           "last_scan_at": null,
-          "piece_status": null
+          "piece_status": null,
+          "variant": null
         }
       ]
     }
@@ -1892,6 +1893,15 @@ order-only result, `last_scan_at` and `piece_status` are `null`; this means USPS
 tracking is not available yet, not that the search failed. Principals with full
 PII access receive all recipient fields. Limited PII access omits
 `recipient_address`; principals with no PII access receive `403`.
+
+`variant` reports which side of an A/B split test the recipient was mailed —
+`"a"`, `"b"`, or `null`. It answers "which creative did this lead receive?"
+without the caller having to describe the mail piece. The value is derived from
+the variant order the recipient belongs to, so it is available both before
+mailing (from the accepted order) and after USPS tracking is indexed. It is
+`null` for single-send and multi-send campaigns, and also `null` in the rare
+case where the same address appears under both variants of one campaign — a
+missing badge is preferable to a wrong attribution.
 
 ---
 

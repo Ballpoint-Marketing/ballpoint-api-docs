@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.33 — 2026-08-01 — A/B split-test variant attribution per recipient
+
+- **`GET /v1/mail-tracking/recipients/search` now reports which A/B variant each recipient was mailed.** Every entry in `campaigns[]` carries an additive, optional `variant` field: `"a"`, `"b"`, or `null`. This answers "which creative did this lead receive?" when a lead calls in, without relying on the caller to describe the mail piece.
+- **Additive and backward compatible.** No existing field, status, grouping, total, or pagination behavior changed; result sets are byte-identical apart from the new key. Clients that ignore `variant` are unaffected, and no partner-side change is required.
+- **Derived, not stored.** The variant comes from the variant order the recipient belongs to, so it resolves in both phases: from the accepted order before mailing, and through the piece→order link once USPS tracking is indexed.
+- **Fails closed on ambiguity.** `variant` is `null` for single-send and multi-send campaigns, and also `null` in the rare case where one address appears under both variants of the same campaign — a missing attribution is preferable to a wrong one.
+- **Iframe surface:** the Direct Mail dashboard recipient search shows a `Variant A` / `Variant B` badge on the campaign line of a matched lead. Single-send and multi-send rows are unchanged.
+- **Artifact sync:** API Kit, OpenAPI, and iframe/API partner-contract version metadata report `1.7.33`. No HTTP route, request schema, webhook payload, database migration, or Postman request changes are required.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## v1.7.32 — 2026-08-01 — PROPS-3322 fulfillment lock: Cancel/Reschedule until production, paid or not
 
 - **The campaign-detail action lock is now the fulfillment lock, not payment.** A paid `scheduled` piece keeps **Cancel** and **Reschedule** on the iframe Campaign Detail page until it enters production (`accepted`). Previously any `payment_confirmed=true` row was locked from the moment of checkout — for PropStream single sends (charged at checkout) that meant locked from minute one, contradicting the PRD (pp. 20–25) and the on-screen copy. Sign-off: Ryan 2026-08-01 ("once it's marked as accepted on our end it can't be cancelled is the real lock").
