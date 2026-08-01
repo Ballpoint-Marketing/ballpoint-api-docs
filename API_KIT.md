@@ -192,7 +192,9 @@ For the full endpoint contract, see [§6k Confirm Payment](#6k-confirm-payment-p
 
 ### Pricing
 
-Cost = `unit_price_tcents × piece_count`. No minimums, no surcharges, no per-request fees. See [§5 Product Catalog & Pricing](#5-product-catalog--pricing) for the full price list.
+Cost = `unit_price_tcents × pieces mailed`. No minimums, no surcharges, no per-request fees. See [§5 Product Catalog & Pricing](#5-product-catalog--pricing) for the full price list.
+
+**You are invoiced for pieces actually mailed, never for the ordered quantity.** When addresses are suppressed the drop mails fewer pieces than were ordered, and only the mailed pieces are billed — the invoice line names the suppressed count. `order.drop_completed` reports the same figures per drop (`billed_count`, `actual_mailed`, `rts_suppressed_count`), so every invoice reconciles against events you already receive. An order whose mailed quantity cannot yet be established is held out of the invoice and billed on a later one, never estimated.
 
 ### Cancellations
 
@@ -313,7 +315,7 @@ fields; `partner_cost_*` preview fields retain the base price.
 | Greeting Letter (5x7) | First Class | 14,907 | $1.4907 | $745.35 |
 | Greeting Letter (5x7) | Standard Class (API: `presort`) | 9,737 | $0.9737 | $486.85 |
 
-Total cost = `unit_price_tcents × piece_count`. No minimums, no surcharges.
+Total cost = `unit_price_tcents × pieces mailed`. No minimums, no surcharges. The table prices an order at its full quantity; suppressed pieces are not mailed and not invoiced (see [§4 Pricing](#pricing)).
 
 **PropStream label mapping:** for `hybrid_letter` and `greeting_letter`, the
 customer-facing iframe and pricing dashboard label is **Standard Class**, while
