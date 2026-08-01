@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.7.32 — 2026-08-01 — PROPS-3322 fulfillment lock: Cancel/Reschedule until production, paid or not
+
+- **The campaign-detail action lock is now the fulfillment lock, not payment.** A paid `scheduled` piece keeps **Cancel** and **Reschedule** on the iframe Campaign Detail page until it enters production (`accepted`). Previously any `payment_confirmed=true` row was locked from the moment of checkout — for PropStream single sends (charged at checkout) that meant locked from minute one, contradicting the PRD (pp. 20–25) and the on-screen copy. Sign-off: Ryan 2026-08-01 ("once it's marked as accepted on our end it can't be cancelled is the real lock").
+- **`POST /v1/billing/orders/{order_id}/reschedule` accepts paid orders** while `production_status='scheduled'`. The `409 PAID_LOCKED` rejection is **retired** on this endpoint (API_KIT §6m). Rescheduling a paid order is **date-only**: no re-billing, no repricing, no balance movement. All other guards unchanged (`MAIL_DATE_TOO_SOON`/`TOO_FAR`, `SEND_NOW_PROCESSING`, `IN_PRODUCTION`, `TERMINAL`, `STATE_CHANGED`).
+- **Cancel is unchanged at the API** (already allowed from `scheduled`/`accepted` with auto-refund of the partner debit, §6g) — the iframe now actually offers it on paid pre-production rows, with the prepaid-credits refund copy. The iframe UI stops offering Cancel at `accepted` (the API's `accepted` allowance remains as staff/ops margin).
+- **Locked-row messaging is per product**: "up to X business days before the scheduled mail date", where X is the product's production SLA (§6q — 3 printed / 4 cursive / 6 letters). Replaces the hardcoded "3 days" string.
+- **Scheduler race guard:** the scheduled→accepted promotion pass now re-checks `scheduled_production_date <= now` inside its CAS UPDATE, so a paid order rescheduled between the worker's snapshot and its write can no longer be promoted off a stale date.
+- **Edit Leads is NOT part of this change** — `PATCH /orders/{id}/recipients` still rejects paid orders with `409 PAID_LOCKED` (recipient edits reprice, which is a separate product decision).
+- **Partner-side dependency (ship gate):** end-user prepaid-credit auto-crediting on cancel of a paid order is PropStream-side; confirmation requested (Ryan → Evren, 2026-08-01). Cancel visibility does not reach production before that confirmation.
+- **Artifact sync:** Iframe Kit and iframe/API partner-contract version metadata report `1.7.32`.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## v1.7.31 — 2026-07-31 — PROPS-3317 authoritative payment completion
 
 - **Payment success is now derived from committed order state.** A matching `payment_result: success` prompts authenticated order-history reconciliation; the success screen renders only after every expected order reports `payment_confirmed=true`.
