@@ -1025,7 +1025,7 @@ paths:
       tags:
       - Orders
       summary: Reschedule order (same-order)
-      description: Update an order's scheduled mail date without creating a replacement order. Allowed only when `production_status='scheduled'` AND `payment_confirmed=FALSE`. The same `order_id` is preserved; the backend recomputes `scheduled_production_date` from the product SLA (in business days, Mon–Fri; see `API_KIT.md §6q` for per-product table). Idempotent on no-op (when the supplied `mail_date` equals the order's current value, the call returns 200 with no webhook/audit side-effects). See `API_KIT.md §6m` for the full contract and `order.rescheduled` webhook event payload.
+      description: Update an order's scheduled mail date without creating a replacement order. Allowed while `production_status='scheduled'` — paid or unpaid (v1.7.32 / PROPS-3322; the lock is entering production, not payment; `PAID_LOCKED` retired). Rescheduling a paid order is date-only — no re-billing, no repricing. The same `order_id` is preserved; the backend recomputes `scheduled_production_date` from the product SLA (in business days, Mon–Fri; see `API_KIT.md §6q` for per-product table). Idempotent on no-op (when the supplied `mail_date` equals the order's current value, the call returns 200 with no webhook/audit side-effects). See `API_KIT.md §6m` for the full contract and `order.rescheduled` webhook event payload.
       operationId: rescheduleOrder
       parameters:
       - name: order_id
@@ -1097,7 +1097,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: 'Order is not in a reschedulable state. `error.code` values: `PAID_LOCKED` (`payment_confirmed=TRUE`), `SEND_NOW_PROCESSING` (`pending_payment` awaiting `/confirm-payment`), `IN_PRODUCTION` (status is accepted/prep/printing/writing/inserting/stamping/ shipping), `TERMINAL` (status is complete/cancelled/failed/ payment_failed), `STATE_CHANGED` (concurrent state transition between read and write; retry once).'
+          description: 'Order is not in a reschedulable state. `error.code` values: `SEND_NOW_PROCESSING` (`pending_payment` awaiting `/confirm-payment`), `IN_PRODUCTION` (status is accepted/prep/printing/writing/inserting/stamping/ shipping), `TERMINAL` (status is complete/cancelled/failed/ payment_failed), `STATE_CHANGED` (concurrent state transition between read and write; retry once).'
           content:
             application/json:
               schema:

@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.31** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.32** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -736,7 +736,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.31"
+    "partner": "1.7.32"
   }
 }
 ```
@@ -1538,7 +1538,7 @@ Only emitted after Ballpoint has confirmed the cancellation server-side. If the 
 
 #### `order_rescheduled` — Drop mail date changed (v1.4.0+)
 
-Emitted after a successful **Reschedule** operation initiated from the iframe UI on a `scheduled` order whose payment has not yet been processed (`payment_confirmed=false` server-side). The same `orderId` is preserved — Ballpoint does **not** create a replacement order for V1 same-order reschedule. The Reschedule button is hidden by the iframe on paid / terminal / in-production rows; if the partner triggers the underlying API directly on a blocked state, the backend rejects with a `409` (see `API_KIT.md §6m`) and no postMessage is emitted.
+Emitted after a successful **Reschedule** operation initiated from the iframe UI on a `scheduled` order — **paid or unpaid** (contract v1.7.32 / PROPS-3322: the lock is the fulfillment lock at `accepted`, not payment). The same `orderId` is preserved — Ballpoint does **not** create a replacement order for same-order reschedule. The Reschedule button is hidden by the iframe on in-production and terminal rows; if the partner triggers the underlying API directly on a blocked state, the backend rejects with a `409` (see `API_KIT.md §6m`) and no postMessage is emitted.
 
 ```json
 {
@@ -1559,9 +1559,9 @@ Notes:
 - `campaignId` is the local iframe campaign identifier captured at campaign creation time. It can be `null` for single-order canvas-builder paths where no campaign id was generated client-side.
 - The Ballpoint webhook (`order.rescheduled`) carries `previous_mail_date` / `new_mail_date` (`YYYY-MM-DD` strings) — see `API_KIT.md §7`. It does **NOT** carry `previous_scheduled_production_date` / `new_scheduled_production_date`; those are returned only in the synchronous reschedule API response (`API_KIT.md §6m`). The iframe postMessage intentionally omits all of these mail/production-date fields (the parent app rarely needs them directly; if you do, consume the webhook or the API response).
 
-**How to Test.** The order must be in `scheduled` status and **unbilled** (`payment_confirmed = false`). Open it on the Campaign Detail page, click **Reschedule**, pick a new mail date, and Save — you'll receive one `order_rescheduled` (suppressed if the date is unchanged). Paid (`payment_confirmed = true`), `accepted`, `prep`, in-production, and terminal orders do **not** offer Reschedule.
+**How to Test.** The order must be in `scheduled` status — paid or unpaid. Open it on the Campaign Detail page, click **Reschedule**, pick a new mail date, and Save — you'll receive one `order_rescheduled` (suppressed if the date is unchanged). `accepted`, `prep`, in-production, and terminal orders do **not** offer Reschedule.
 
-**Blocked attempts.** Paid rows (`payment_confirmed = true`) show a locked note in place of the Reschedule button; `accepted` / `prep` / in-production / terminal rows simply do not render a Reschedule button. If a reschedule is submitted on an order the backend no longer permits (e.g. it advanced or was paid after the row rendered → `409 PAID_LOCKED` / `SEND_NOW_PROCESSING` / `IN_PRODUCTION`, see `API_KIT.md §6m`), the iframe surfaces a **"Can't Modify Order"** modal and emits **no** `order_rescheduled`.
+**Blocked attempts.** Rows at or past the fulfillment lock (`accepted` and every later production/delivery status except terminal rows — `delivered`/`cancelled`/`failed`/`payment_failed` render their own states) show a locked note ("You can only make changes to this mailing up to X business days before the scheduled mail date", X = the product's production SLA; when live pricing rows have not loaded the note falls back to "You can only make changes to this mailing before it enters production" without a number) in place of the Reschedule/Cancel buttons. If a reschedule is submitted on an order the backend no longer permits (e.g. it advanced into production after the row rendered → `409 SEND_NOW_PROCESSING` / `IN_PRODUCTION` / `TERMINAL`, see `API_KIT.md §6m`; `PAID_LOCKED` retired in v1.7.32), the iframe surfaces a **"Can't Modify Order"** modal and emits **no** `order_rescheduled`.
 
 #### `payment_retry_requested` — User clicked "Try Again" on the failure screen
 
