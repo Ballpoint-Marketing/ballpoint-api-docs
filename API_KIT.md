@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.34 · August 2026** · _prepared for staging validation; not yet deployed to production_
+> **v1.7.35 · August 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1891,11 +1891,13 @@ curl --get https://api.ballpointmarketing.com/v1/mail-tracking/recipients/search
 | `X-Partner-Key` | Yes | Authenticates and tenant-scopes the request. |
 | `X-External-User-ID` | No | When present, limits partner results to campaigns attributed to that user. Omit only for an authorized tenant-wide search. |
 
-The search reads both accepted/uploaded order recipients and USPS piece-tracking
-rows. A newly accepted campaign is therefore searchable before USPS tracking is
-indexed. Duplicate records for the same normalized address and campaign are
+The search reads both available order recipients associated with non-deleted
+orders/campaigns and USPS piece-tracking rows. A campaign with available order
+recipients is therefore searchable before USPS tracking is indexed. Duplicate
+records for the same normalized address and campaign are
 collapsed; once tracking exists, the tracking row supplies the authoritative
-piece status and opt-out state.
+piece status. `is_opted_out` always comes from the tenant-wide normalized-address
+suppression state, so it is authoritative both before and after tracking exists.
 
 ```json
 {
@@ -1938,10 +1940,117 @@ PII access receive all recipient fields. Limited PII access omits
 `"a"`, `"b"`, or `null`. It answers "which creative did this lead receive?"
 without the caller having to describe the mail piece. The value is derived from
 the variant order the recipient belongs to, so it is available both before
-mailing (from the accepted order) and after USPS tracking is indexed. It is
+mailing (from the available order-recipient identity) and after USPS tracking
+is indexed. It is
 `null` for single-send and multi-send campaigns, and also `null` in the rare
 case where the same address appears under both variants of one campaign — a
 missing badge is preferable to a wrong attribution.
+
+#### Opt Out / Undo by Address
+
+The same address-bearing search result can be opted out before USPS tracking or
+an IMB exists. Both operations accept the same JSON body and require a principal
+with recipient PII access:
+
+```http
+POST /v1/mail-tracking/recipients/opt-out
+DELETE /v1/mail-tracking/recipients/opt-out
+```
+
+```json
+{
+  "recipient_address": "123 Example St",
+  "recipient_city": "Austin",
+  "recipient_state": "TX",
+  "recipient_zip": "78701"
+}
+```
+
+| Field | Required | Validation / matching |
+|---|---|---|
+| `recipient_address` | Yes | 1–200 characters; matched case-insensitively after trimming. |
+| `recipient_city` | Yes | 1–100 characters; matched case-insensitively after trimming. |
+| `recipient_state` | Yes | 1–10 characters; matched case-insensitively after trimming. |
+| `recipient_zip` | Yes | 1–10 characters; only the first 5 digits participate in the normalized-address match. |
+
+The established public normalized key is intentionally unchanged:
+`recipient_address + recipient_city + recipient_state + ZIP5`. These operations
+do not accept or compare a separate `address2` field. Adding a separate unit
+component would be a breaking contract decision and is not part of v1.7.35.
+
+Example opt-out request:
+
+```bash
+curl -X POST https://api.ballpointmarketing.com/v1/mail-tracking/recipients/opt-out \
+  -H "X-Partner-Key: ${BALLPOINT_PARTNER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipient_address": "123 Example St",
+    "recipient_city": "Austin",
+    "recipient_state": "TX",
+    "recipient_zip": "78701"
+  }'
+```
+
+`DELETE` uses the identical path and body to undo the opt-out. A successful
+response has the same shape in both directions:
+
+```json
+{
+  "opted_out": true,
+  "rows_affected": 0,
+  "recipient_address": "123 Example St",
+  "recipient_city": "Austin",
+  "recipient_state": "TX",
+  "recipient_zip": "78701",
+  "recipients": [
+    { "contact_id": "ps_contact_001", "contact_type": "PROPERTY" }
+  ]
+}
+```
+
+`opted_out` is `true` for `POST` and `false` for `DELETE`. The state is
+tenant-wide and address-level, persisted independently of tracking, and is what
+subsequent recipient searches return. `rows_affected` is intentionally
+backward-compatible: it counts only existing legacy `piece_tracking` rows whose
+flag changed. It can therefore be `0` for a successful pre-tracking toggle or
+an idempotent repeat. Treat `opted_out` plus a subsequent search—not
+`rows_affected`—as authoritative.
+
+`recipients[]` contains distinct partner contact references known for that
+address from available order-recipient identities on non-deleted
+orders/campaigns and indexed tracking identities. Entries without a valid
+`contact_id` are omitted. `contact_type` is the uploaded address type (`PROPERTY`
+or `MAILING`) when supplied and may be `null`. The embedded
+iframe emits the unchanged fire-and-forget `recipient_opt_out_changed` event
+only when this array is non-empty; the server-side state change still succeeds
+when it is empty.
+
+If the normalized address has no authorized canonical suppression record,
+order-recipient identity, or tracking identity, both operations return
+`404 RECIPIENT_NOT_FOUND` and do not mutate state or emit the iframe event. This
+is distinct from an authorized pre-tracking or idempotent toggle that succeeds
+with HTTP `200` and may legitimately return `rows_affected: 0`.
+
+```json
+{
+  "detail": {
+    "error": {
+      "type": "not_found",
+      "code": "RECIPIENT_NOT_FOUND",
+      "message": "No recipient matching this address was found for the authenticated tenant"
+    }
+  }
+}
+```
+
+The standard `trace_id` field is also included under `detail.error` when one is
+available.
+
+Ballpoint does not rewrite future partner recipient uploads or independently
+remove these contacts from future drops. PropStream should consume
+`recipient_opt_out_changed` and apply the mirrored contact-level suppression in
+its own future-drop selection.
 
 ---
 
@@ -2756,6 +2865,8 @@ Before switching to your live key:
 | Account insights summary (iframe automatic) | `GET` | `/v1/mail-tracking/account-summary?from=...&to=...&list_id=...` | `X-Partner-Key` |
 | Partner dashboard orders | `GET` | `/v1/billing/partner/orders?days=30&list_id=...&status=...` | `X-Partner-Key` |
 | Recipient/direct-mail search (iframe automatic) | `GET` | `/v1/mail-tracking/recipients/search?q=...&limit=20&offset=0&list_id=...` | `X-Partner-Key`, optional `X-External-User-ID` |
+| Opt out recipient address (iframe automatic; manual API use is state-changing) | `POST` | `/v1/mail-tracking/recipients/opt-out` | `X-Partner-Key` |
+| Undo recipient opt-out (iframe automatic; manual API use is state-changing) | `DELETE` | `/v1/mail-tracking/recipients/opt-out` | `X-Partner-Key` |
 | Order tracking | `GET` | `/v1/orders/{id}/mail-tracking` | `X-Partner-Key` |
 | Campaign tracking | `GET` | `/v1/campaigns/{id}/mail-tracking` | `X-Partner-Key` |
 | Pricing catalog | `GET` | `/v1/billing/pricing?product_type=...` | `X-Partner-Key` |

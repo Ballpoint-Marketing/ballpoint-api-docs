@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.34** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.35** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -517,8 +517,9 @@ Recommended bootstrap order in dashboard-first mode:
 
 The Dashboard search box combines locally loaded campaign matches with a
 tenant-scoped recipient/address search performed by the iframe. Campaigns are
-searchable as soon as their order recipients are accepted/uploaded; the user
-does not have to wait for USPS piece tracking to be indexed. Recipient name
+searchable as soon as they have available recipients on non-deleted
+orders/campaigns; the user does not have to wait for USPS piece tracking to be
+indexed. Recipient name
 tokens are order-independent, so `Gregory, Debra` can find `Debra Gregory`.
 
 The iframe sends the active `X-External-User-ID` when one was supplied by the
@@ -527,10 +528,12 @@ Changing that filter clears pending and rendered recipient results before the
 new scope loads. With no dashboard filter, the existing authorized account-wide
 search remains available. The iframe merges campaign and recipient results and shows an empty state only
 when neither source matched. Clearing the query restores the normal campaign
-list. An order-only recipient match can show its campaign, but does not expose
-an **Opt Out** action until a piece-tracking record exists. This behavior is
-automatic: there is no new parent → iframe command, iframe → parent event, or
-partner-side listener to implement.
+list. Every address-bearing match exposes **Opt Out** (or **Undo** when already
+suppressed), including scheduled recipients and handwritten pieces
+before a piece-tracking record exists. The tenant-wide address state is stored
+independently of USPS tracking and remains authoritative after tracking is
+indexed. The existing `recipient_opt_out_changed` event and payload are
+unchanged; no new parent → iframe command or partner-side listener is required.
 
 ### `payment_result` — Payment popup outcome (parent → iframe)
 
@@ -740,7 +743,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.34"
+    "partner": "1.7.35"
   }
 }
 ```
@@ -1349,7 +1352,7 @@ The event contains no recipients, contact identifiers, recipient PII, counts, pr
 
 #### `recipient_opt_out_changed` — User toggled Opt Out on a recipient row
 
-Sent when the user clicks the iframe's **Opt Out** control on a recipient row (either opting them out, `opted_out: true`, or undoing a previous opt-out, `opted_out: false`). The event hands the partner-side `contact_id`s for every piece at the affected address so PropStream can mirror the suppression state in its own CRM.
+Sent when the user clicks the iframe's **Opt Out** control on a recipient row (either opting them out, `opted_out: true`, or undoing a previous opt-out, `opted_out: false`). The event hands the partner-side contact references known for the affected address—from available order-recipient identities on non-deleted orders/campaigns and/or indexed tracking identities—so PropStream can mirror the suppression state in its own CRM. The event type and payload shape are unchanged when the toggle happens before tracking exists.
 
 **Fire-and-forget semantics (not a blocking handshake).** This event is a one-way notification. The iframe emits `recipient_opt_out_changed` and does NOT pause, await an ack, or wait for any parent response. The server-side opt-out has already been applied (via `POST /v1/mail-tracking/recipients/opt-out` or `DELETE /v1/mail-tracking/recipients/opt-out`) before the event is emitted; the parent takes whatever CRM action it wants and the iframe takes no further UI action.
 
@@ -1377,14 +1380,17 @@ Sent when the user clicks the iframe's **Opt Out** control on a recipient row (e
 
 No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` / `recipient_state` / `recipient_zip`) is included in this event. The parent already owns those values via its own CRM keyed by `(contact_id, contact_type)`.
 
-**Suppression is tenant-wide and address-level, not user- or campaign-scoped.** The server matches the target row by normalized address (case-insensitive `address`/`city`/`state` + first 5 digits of `zip`) across every campaign the tenant owns, and the opt-out flag is written to **every** piece_tracking row at that address for the tenant. Consequently, `recipients[]` lists **all distinct `contact_id`s** the tenant has ever mailed to that address across their campaigns — not just the piece the user clicked and not just the current campaign. The parent should mirror the suppression state at the same scope on its side (tenant-scoped, keyed by contact or by address, whichever the partner CRM uses).
+**Suppression is tenant-wide and address-level, not user- or campaign-scoped.** The server matches by the established public normalized key (case-insensitive `recipient_address`/`recipient_city`/`recipient_state` + first 5 digits of `recipient_zip`) across the tenant and persists the authoritative state independently of `piece_tracking`. There is no separate `address2` component in this v1.7.35 contract. Consequently, `recipients[]` lists all distinct valid partner contact references known at that address from available order-recipient identities on non-deleted orders/campaigns and indexed tracking identities—not just the row the user clicked or the current campaign. The parent should mirror the state at the same scope on its side (tenant-scoped, keyed by contact or by address, whichever the partner CRM uses).
+
+This Ballpoint state does **not** rewrite future partner recipient uploads or independently remove contacts from future drops. PropStream remains responsible for applying the mirrored contact-level suppression to its future-drop recipient selection.
 
 **Visibility / lifecycle**
 
 - Emitted only in **embed (iframe) mode**. In standalone (non-embedded) mode the CTA is present but this event is not emitted.
 - Emitted on **both directions** — `opted_out: true` when the user opts a recipient out, `opted_out: false` when the user undoes a previous opt-out. The `recipients[]` set is computed identically in both directions (the full tenant-scoped address group).
-- `recipients[]` is **filtered to affected pieces that carry a `contact_id`** — pieces without a `contact_id` (e.g. legacy uploads or Ballpoint-direct manifests with no partner key column) are omitted. **If no piece at the address carries a `contact_id`, the event is suppressed entirely** (the iframe does not emit an empty `recipients[]`). The server-side opt-out still applies in that case — it is only the parent-side notification that is skipped. This means `contact_id` on the original recipient upload is what makes the opt-out state round-trip to the partner CRM.
-- Emitted on **every user toggle**, including idempotent repeats where the server-side `rows_affected` is `0` (e.g. re-opting-out an already opted-out recipient). The server always returns the full contact set for the address group regardless of `rows_affected`, so the iframe can safely re-emit.
+- `recipients[]` is assembled from available order-recipient identities on non-deleted orders/campaigns and indexed tracking identities, then filtered to entries with a valid `contact_id` and deduplicated by `(contact_id, contact_type)`. Entries without a valid `contact_id` are omitted. **If none remain for an otherwise authorized canonical address, the event is suppressed entirely** (the iframe does not emit an empty `recipients[]`). The server-side address state still changes; only the parent-side notification is skipped.
+- Emitted on **every successful user toggle** that returns at least one valid contact reference. `rows_affected` counts only legacy `piece_tracking` rows whose flag changed, so it can be `0` for a successful pre-tracking toggle as well as an idempotent repeat. The response's `opted_out` value and a subsequent recipient search are authoritative; `rows_affected` is not a success flag.
+- If the API returns `404 RECIPIENT_NOT_FOUND` because the normalized address has no authorized canonical, order-recipient, or tracking match, the iframe restores the previous button state, shows its generic error toast, and emits no event. This is different from a valid HTTP `200` response with `rows_affected: 0`, which remains a successful toggle.
 - **Pre-lock behavior:** queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Not broadcast to all allowlisted origins. Identical treatment to [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail).
 
 **Expected PropStream behavior**
