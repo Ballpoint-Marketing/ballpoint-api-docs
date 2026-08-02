@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Edit Leads campaign identifier guidance correction
+
+- **Corrected the Edit Leads identifier guidance and examples.** `campaign_id` is Ballpoint's internal list-derived grouping id and is the value embedded in `campaignDeltaEndpoint`; `ballpointCampaignId` is the persisted cross-system Direct Mail id from `orders.external_campaign_id`. Consumers must PATCH the emitted `campaignDeltaEndpoint` exactly and must not derive that path from `ballpointCampaignId`.
+- **No payload, route, backend, or contract-version change.** This is a documentation-only clarification of behavior already implemented and shipped to staging; partner contract version remains v1.7.35.
+
 ## v1.7.35 — 2026-08-02 — PROPS-3328 opt-out before mail tracking
 
 - **Opt Out and Undo are now available for every address-bearing recipient-search result, including scheduled recipients and handwritten pieces before a `piece_tracking` row exists.** `POST /v1/mail-tracking/recipients/opt-out` and `DELETE /v1/mail-tracking/recipients/opt-out` persist a tenant-wide, normalized-address suppression state independently of USPS tracking. `GET /v1/mail-tracking/recipients/search` returns that same authoritative `is_opted_out` state before and after tracking is indexed.
