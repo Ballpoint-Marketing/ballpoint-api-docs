@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.34 — 2026-08-01 — PROPS-3331 canonical Scheduled drops and purchased Multi-Send parity
+
+- **Two aggregate reads now expose `scheduled_drops` as a top-level non-negative integer.** `GET /v1/billing/partner/stats` and `GET /v1/mail-tracking/account-summary` use the same canonical computation, so PropStream and the iframe can read the Scheduled KPI directly instead of trying to reconstruct it from raw order statuses.
+- **Scheduled counts logical drops.** An A/B sibling pair counts once, each Multi-Send drop counts once, and accepted drops are included. `orders_by_status` on `/stats` remains a raw per-order breakdown and therefore must not be summed to derive Scheduled.
+- **Payment visibility for `scheduled_drops` and account-summary Pieces fails closed, with one purchased-campaign exception.** Ordinary orders with `payment_confirmed=false` remain excluded from those KPIs. A canonical purchased Multi-Send—one consistent external campaign identity, a complete unique `1..N` sequence matching `total_drops=N`, and a confirmed first drop—includes every committed drop even while future drops remain unconfirmed. Incomplete or malformed groups do not receive the exception. The pre-existing raw order totals on `/stats` are unchanged.
+- **Pieces Mailed now applies that same purchased Multi-Send exception.** `total_pieces_mailed` includes all committed drops of the canonical purchased group and continues to include cancelled/failed orders in scope. `active_campaigns`, `completed_campaigns`, and `total_rts` retain their previous behavior.
+- **Date semantics are explicit.** `/stats` keeps its rolling `days` window over order Creation Date. On `/account-summary`, `scheduled_drops` applies inclusive UTC `from`/`to` bounds to order Creation Date (`orders.created_at`); the pre-existing Pieces/Active/Completed/RTS fields continue to use campaign Creation Date (`campaigns.created_at`).
+- **Additive and backward compatible.** Existing fields, raw status counts, status taxonomy, order lifecycle, webhooks, and postMessage shapes are unchanged. No database migration or partner request change is required.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, and iframe/API partner-contract version metadata report `1.7.34`.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## v1.7.33 — 2026-08-01 — A/B split-test variant attribution per recipient
 
 - **`GET /v1/mail-tracking/recipients/search` now reports which A/B variant each recipient was mailed.** Every entry in `campaigns[]` carries an additive, optional `variant` field: `"a"`, `"b"`, or `null`. This answers "which creative did this lead receive?" when a lead calls in, without relying on the caller to describe the mail piece.
@@ -64,14 +75,6 @@
 - **Current dedup semantics are preserved.** Partial overlap still rejects the overlapping addresses and reduces `piece_count`; full overlap may still leave the variant at zero. The new billing-state guard reports that state accurately instead of claiming the product/postage combination lacks pricing.
 - **Artifact sync:** API Kit, Iframe Kit, OpenAPI campaign-preview operation, and Postman preview/confirm descriptions. The static OpenAPI does not yet describe the `confirm-payment` operation; that pre-existing gap is tracked separately.
 - Partner contract version literals are unchanged; the version advances at the next coordinated release.
-
-## Unreleased — PROPS-3082 Direct Mail metrics parity
-
-- **`total_pieces_mailed` now counts every order in scope, cancelled and failed included.** `GET /v1/mail-tracking/account-summary` previously excluded terminal orders from the piece total, so a campaign with a cancelled drop reported fewer pieces than the partner's own campaign view. The value is now "pieces ordered" for the account/tenant, `list_id`, and date scope, matching the partner surface for the same campaign.
-- **The iframe Insights "Scheduled" tile counts logical drops.** An A/B split is one drop (both variant orders share a `campaign_instance_id`); each independent Multi-Send drop still counts once. The status taxonomy and the Creation Date filter are unchanged, and the dashboard status tabs continue to count campaign groups.
-- **`active_campaigns`, `completed_campaigns`, and `total_rts` are unchanged**, as are all message names, fields, endpoints, webhooks, schemas, and database columns. No response shape changes — only the `total_pieces_mailed` value.
-- **Artifact sync:** API Kit only. OpenAPI and the partner contract version are unchanged by this entry.
-- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
 
 ## Unreleased — PROPS-3087 partner debit resolves the current pricing tier
 

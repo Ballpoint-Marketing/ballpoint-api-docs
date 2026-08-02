@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.33 · August 2026** · _prepared for staging validation; not yet deployed to production_
+> **v1.7.34 · August 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -820,7 +820,7 @@ GET /v1/billing/orders
 
 > The same repeated `list_id` filter (1–100 values, `422 LIST_ID_LIMIT_EXCEEDED` over the cap, present-but-empty = zero results) is also accepted on the partner dashboard reads `GET /v1/billing/partner/stats`, `GET /v1/billing/partner/orders`, and the insights endpoint `GET /v1/mail-tracking/account-summary`. The iframe's `set_dashboard_filter` postMessage drives these under the hood (see [IFRAME_KIT.md](IFRAME_KIT.md)).
 
-> **`total_pieces_mailed` counts every order in scope — cancelled and failed included.** The `GET /v1/mail-tracking/account-summary` piece total sums `piece_count` across all orders matching the account/tenant, `list_id`, and date scope, without excluding terminal orders. Read it as "pieces ordered", not "pieces handed to USPS". This is deliberate parity with the partner's own campaign totals (PROPS-3082), so the same campaign reports the same piece count on both surfaces. `active_campaigns`, `completed_campaigns`, and `total_rts` are unaffected and keep their existing definitions.
+> **`total_pieces_mailed` is the canonical "Pieces Mailed" parity total.** `GET /v1/mail-tracking/account-summary` sums `piece_count` for orders in the authorized account/tenant, repeated `list_id`, and legacy campaign Creation Date scope. Ordinary orders with `payment_confirmed=false` are excluded. Once a canonical Multi-Send is purchased, however, every committed drop is included even when a future drop still has `payment_confirmed=false`: the group must have one consistent, non-empty external campaign identity, one complete and unique `drop_index` sequence `1..N` matching `total_drops=N`, and a confirmed first drop. Incomplete or malformed groups fail closed. Cancelled and failed orders remain included in Pieces Mailed. `active_campaigns`, `completed_campaigns`, and `total_rts` are unchanged and keep their existing definitions.
 
 **Example:**
 
@@ -1227,13 +1227,13 @@ Payment retry logic lives **on the partner side**. Ballpoint does not retry the 
 
 ### 6l. Partner Dashboard Endpoints
 
-These endpoints power partner-side operational dashboards (per-account aggregate stats, paginated order list with SLA, drill-down by user or campaign list). Both require an `X-Partner-Key` header and are scoped to your `source` + `external_account_id`.
+These endpoints power partner-side operational dashboards (per-account aggregate stats, paginated order list with SLA, drill-down by user or campaign list). The `/v1/billing/partner/*` reads require an `X-Partner-Key`; `account-summary` accepts that same partner principal as well as the other authenticated principals described in this kit. Every response remains scoped to the caller's authorized tenant.
 
 > **For payment-gate flows:** do not use these dashboard endpoints for pre-confirmation pricing. After `campaign_submitted`, call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with the caller-selected set of `ballpointOrderId`s intended for the current payment event. Use `campaign_partner_debit_cents` as the exact whole-cent amount recorded when confirmation succeeds and the `partner_cost_*_tcents` fields only for raw wholesale reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`. Browser-side values like `campaign_submitted.total_dollars` are UX/display only. See [§6k](#6k-confirm-payment-partner-payment-gate) and [IFRAME_KIT.md](IFRAME_KIT.md) for the full payment-gate context.
 
 #### `GET /v1/billing/partner/stats`
 
-Aggregate counts for a dashboard top panel: order totals, status breakdown, SLA buckets, RTS summary.
+Aggregate counts for a dashboard top panel: raw order totals, the canonical Scheduled drop KPI, status breakdown, SLA buckets, and RTS summary.
 
 **Query parameters:**
 
@@ -1241,7 +1241,7 @@ Aggregate counts for a dashboard top panel: order totals, status breakdown, SLA 
 |-------|------|---------|-------------|
 | `days` | integer | 7 | Range of recent days to aggregate (1–365) |
 | `external_user_id` | string | — | Narrow to a single end-user within the account. Omit for account-wide totals |
-| `list_id` | string | — | Narrow to a single campaign list. Echoes the same `list_id` originally passed when creating orders. Combinable with `external_user_id` (AND) |
+| `list_id` | string (repeatable) | — | Narrow to one or more campaign lists. Repeat the parameter (`?list_id=a&list_id=b`) for multiple lists; max 100. Omit for account-wide totals. Present-but-empty returns zero results. Combinable with `external_user_id` (AND) |
 
 **Example:**
 
@@ -1256,6 +1256,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/stats?days=30&lis
 {
   "total_orders": 8,
   "total_pieces": 3000,
+  "scheduled_drops": 5,
   "orders_by_status": {
     "pending": 0,
     "pending_payment": 0,
@@ -1286,7 +1287,46 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/stats?days=30&lis
 }
 ```
 
-Unknown `list_id` (or one with no orders in the partner's scope) returns the same shape with all counts zero.
+`scheduled_drops` is a non-negative integer and is the canonical Scheduled KPI. It counts logical drops, not raw orders: an A/B sibling pair is one drop, while each Multi-Send drop is one. Accepted drops are included. Ordinary unconfirmed/abandoned orders are excluded; all committed drops of a canonical purchased Multi-Send are included under the same fail-closed rule documented for `total_pieces_mailed` in [§6d](#6d-list-orders). Do **not** derive this KPI by summing `orders_by_status`: that object intentionally remains a raw per-order breakdown, so an A/B pair contributes two orders there.
+
+The `days` window is evaluated against order `created_at`. Unknown `list_id` (or one with no orders in the partner's scope) returns the same shape with all counts, including `scheduled_drops`, zero.
+
+#### `GET /v1/mail-tracking/account-summary`
+
+Account-level insights used by the iframe's Direct Mail dashboard header. The response exposes the same canonical `scheduled_drops` metric as `/v1/billing/partner/stats`, together with the legacy Pieces Mailed, Active, Completed, and RTS KPIs.
+
+**Query parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `from` | date (`YYYY-MM-DD`) | — | Inclusive start date. `scheduled_drops` interprets it as a UTC order Creation Date bound; legacy KPIs continue to apply their existing campaign Creation Date semantics |
+| `to` | date (`YYYY-MM-DD`) | — | Inclusive end date, with the same per-field date-source rule as `from` |
+| `list_id` | string (repeatable) | — | Narrow to one or more campaign lists. Repeat for multiple lists; max 100. Omit for account-wide totals. Present-but-empty returns zero results |
+
+**Example:**
+
+```bash
+curl -s "https://api.ballpointmarketing.com/v1/mail-tracking/account-summary?from=2026-04-01&to=2026-04-30&list_id=marketing_q1_2026" \
+  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
+```
+
+**Response (`200`):**
+
+```json
+{
+  "total_pieces_mailed": 3000,
+  "scheduled_drops": 5,
+  "active_campaigns": 3,
+  "completed_campaigns": 2,
+  "total_rts": 20,
+  "date_from": "2026-04-01",
+  "date_to": "2026-04-30"
+}
+```
+
+`scheduled_drops` follows the exact same logical-drop, payment-visibility, and canonical purchased Multi-Send rule as `/v1/billing/partner/stats`. Its `from`/`to` filter is inclusive in UTC and uses the logical drop's order Creation Date (`orders.created_at`; an A/B pair uses its earliest sibling Creation Date). The pre-existing fields `total_pieces_mailed`, `active_campaigns`, `completed_campaigns`, and `total_rts` retain their legacy campaign Creation Date filter (`campaigns.created_at`). Omitting a bound returns `null` for the corresponding `date_from` or `date_to` echo.
+
+Pieces Mailed includes every committed drop of a canonical purchased Multi-Send even when future drops remain unconfirmed; ordinary unconfirmed orders stay excluded, cancelled/failed orders stay included, and Active/Completed/RTS behavior is unchanged. These are aggregate semantics only—no status taxonomy, status tab, order lifecycle, or webhook changed.
 
 #### `GET /v1/billing/partner/orders`
 
@@ -2713,6 +2753,7 @@ Before switching to your live key:
 | Cancel order | `POST` | `/orders/{id}/cancel` | `X-Partner-Key` |
 | Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` (server-to-server only) |
 | Partner dashboard stats | `GET` | `/v1/billing/partner/stats?days=30&list_id=...&external_user_id=...` | `X-Partner-Key` |
+| Account insights summary (iframe automatic) | `GET` | `/v1/mail-tracking/account-summary?from=...&to=...&list_id=...` | `X-Partner-Key` |
 | Partner dashboard orders | `GET` | `/v1/billing/partner/orders?days=30&list_id=...&status=...` | `X-Partner-Key` |
 | Recipient/direct-mail search (iframe automatic) | `GET` | `/v1/mail-tracking/recipients/search?q=...&limit=20&offset=0&list_id=...` | `X-Partner-Key`, optional `X-External-User-ID` |
 | Order tracking | `GET` | `/v1/orders/{id}/mail-tracking` | `X-Partner-Key` |
