@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.35 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.36 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -1764,7 +1764,7 @@
                 }
               }
             },
-            "description": "GATED, server-to-server ONLY (never from a browser - exposes the key). Gated accounts only (requires_payment_confirmation=TRUE). v1.7.27: partner key (full tenant identity) or internal ops key required - same-account live/test Bearer tokens get 401 PARTNER_KEY_REQUIRED; a first status:success is accepted only from scheduled/pending_payment/accepted unconfirmed states, otherwise 409 ORDER_NOT_CHARGEABLE with no debit. Upload and validate recipients first, then refetch POST /v1/billing/campaigns/preview before collecting payment. status:success applies the account billing policy (stripe debits balance; manual records usage; none records no charge/usage) and advances pending_payment -> accepted. A persisted piece_count<=0 returns 409 INVALID_PIECE_COUNT before any debit or payment-state mutation. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
+            "description": "GATED, server-to-server ONLY (never from a browser - exposes the key). Gated accounts only (requires_payment_confirmation=TRUE). This call is authoritative for Ballpoint billing and production state and is separate from the browser payment_result UX signal; neither replaces the other. v1.7.27: partner key (full tenant identity) or internal ops key required - same-account live/test Bearer tokens get 401 PARTNER_KEY_REQUIRED; a first status:success is accepted only from scheduled/pending_payment/accepted unconfirmed states, otherwise 409 ORDER_NOT_CHARGEABLE with no debit. Upload and validate recipients first, then refetch POST /v1/billing/campaigns/preview before collecting payment. status:success applies the account billing policy (stripe debits balance; manual records usage; none records no charge/usage) and advances pending_payment -> accepted. A persisted piece_count<=0 returns 409 INVALID_PIECE_COUNT before any debit or payment-state mutation. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
           },
           "event": [
             {
@@ -1821,7 +1821,7 @@
                 }
               }
             },
-            "description": "GATED, server-to-server only. status:failed moves the order to payment_failed (terminal); no balance debit. Replaying the opposite status returns 409. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
+            "description": "GATED, server-to-server only. This call is authoritative for Ballpoint billing and production state and is separate from the browser payment_result UX signal; neither replaces the other. status:failed moves the order to payment_failed (terminal); no balance debit. Replaying the opposite status returns 409. Set order_id and transaction_id in your environment before sending. Tolerant test. Manual only."
           },
           "event": [
             {

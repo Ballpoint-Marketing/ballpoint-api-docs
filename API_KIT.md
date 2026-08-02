@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.35 · August 2026** · _prepared for staging validation; not yet deployed to production_
+> **v1.7.36 · August 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1102,11 +1102,12 @@ Where this call sits in the end-user journey for an iframe-driven order:
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger for the backend handoff, not as authorization to collect payment yet. For partners that sent `piece_counts` on `set_list`, this event also carries `recipient_selection.piece_count`; for A/B Split, each `orders[].pieces` is the size of that variant's slice. See [IFRAME_KIT.md](IFRAME_KIT.md#recipient-selection-contract-piece-count--dedup) for the full input/output contract.
 7. Partner backend selects the orders due in the current payment event, waits until each selected `ballpointOrderId` is non-null, uploads the matching recipient slice with [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload), and verifies every selected response has `ready === true` and `piece_count > 0`. For A/B Split, the slices must be address-disjoint.
 8. Partner backend calls [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with that selected order-id set. Read `campaign_partner_debit_cents` as the exact successful-confirmation ledger amount; the `partner_cost_*_tcents` fields remain the raw wholesale math for reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`; do not confirm rows excluded from the quoted total. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step.
-9. Partner shows the payment popup; end-user pays via the partner's payment provider.
-10. Partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
-11. On success, Ballpoint applies the account billing policy (stripe debits balance; manual records usage without moving balance; none records no charge/usage) and moves the order from `pending_payment` to `accepted`. Production proceeds.
+9. Partner shows the payment popup; end-user pays via the partner's payment provider. If the user ordinarily closes the popup without a final outcome, the parent sends no `payment_result`. The iframe leaves **Continue to Payment** enabled; a repeat click re-emits the exact cached `campaign_submitted` payload without another `POST /orders`. Treat that repeat idempotently and only reopen or resume the existing checkout.
+10. Once the popup has a known outcome, the parent sends the iframe [`payment_result`](IFRAME_KIT.md#payment_result--payment-popup-outcome-parent--iframe) for UX. `status: success` immediately renders **Payment Successful**. Its `campaignId` / order-id fields remain optional and, when present, are defensive mismatch checks only; any known foreign id rejects the message, including an active+foreign mixed array. No new parent field is required.
+11. Independently, the partner backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`). This server-to-server call — not the browser `payment_result` — is authoritative for Ballpoint billing and production state. Neither signal replaces the other or waits on the other.
+12. On backend confirmation success, Ballpoint applies the account billing policy (stripe debits balance; manual records usage without moving balance; none records no charge/usage) and moves the order from `pending_payment` to `accepted`. Production proceeds.
 
-After step 6, the iframe lifecycle and the payment lifecycle run in parallel: the iframe may emit `campaign_complete` / `done` once its own submission flow finishes, independent of the payment popup. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
+After step 6, the iframe UX lifecycle and the authoritative backend payment lifecycle run in parallel. `payment_result` selects the iframe result screen immediately; `/confirm-payment` commits Ballpoint payment/production state separately. The iframe may emit `campaign_complete` / `done` once its own submission flow finishes, independent of the payment popup. Production status continues through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
 
 For payment, reconciliation, or backend workflows, key off `campaign_submitted.orders[].ballpointOrderId` — not `campaign_created.orderIds` (those are pre-API local IDs).
 

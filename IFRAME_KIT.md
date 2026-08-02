@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.35** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.36** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -474,7 +474,7 @@ Explicit navigation command. Sends the iframe to its **My Campaigns / Direct Mai
 
 This message has **no payload fields** beyond the standard envelope (`source`, `version`, `type`). Send it once during bootstrap to land the iframe on the Dashboard.
 
-**Post-payment exception (v1.7.31).** While a checkout handoff is being reconciled, or while its success/failure result is awaiting user acknowledgement, this command is held and does not replace the result screen. The user-owned result-screen CTA is the navigation path after success. Bootstrap behavior outside an active checkout handoff is unchanged.
+**Checkout/result exception (v1.7.36).** After `campaign_submitted` hands checkout to the parent, this host command is held while the iframe awaits a result and remains held while a rendered success/failure result awaits user acknowledgement. This preserves the v1.7.31 protection against a host-navigation race without retaining its payment-state reconciliation. Iframe-owned exits remain available: **Previous** / the Order Summary's dashboard-back path still work, an ordinary payment-popup close leaves **Continue to Payment** enabled, and the result-screen CTA remains the explicit navigation path after a reported outcome. Bootstrap behavior outside an active checkout/result is unchanged.
 
 **This is the only way to land the iframe on the Dashboard.** Sibling messages do not navigate:
 
@@ -494,7 +494,7 @@ Recommended bootstrap order in dashboard-first mode:
    3. `open_direct_mail_dashboard`
    4. `set_sender` *(optional — pre-fills sender info)*
 
-   The iframe is **order-robust** and ends on the Dashboard regardless of the actual arrival order, except for the documented active post-payment hold above. The recommended order avoids a brief one-frame flash of the create page — sending `open_direct_mail_dashboard` **before** `set_sender` prevents the iframe from momentarily composing the post-`set_sender` create view before the Dashboard navigation lands.
+   The iframe is **order-robust** and ends on the Dashboard regardless of the actual arrival order, except during the active checkout/result hold documented above. The recommended order avoids a brief one-frame flash of the create page — sending `open_direct_mail_dashboard` **before** `set_sender` prevents the iframe from momentarily composing the post-`set_sender` create view before the Dashboard navigation lands.
 
 2. The iframe shows the Dashboard.
 
@@ -538,9 +538,9 @@ unchanged; no new parent → iframe command or partner-side listener is required
 
 ### `payment_result` — Payment popup outcome (parent → iframe)
 
-> **Current staging contract — pending PropStream wiring.** This is the iframe-side contract for the in-iframe Payment Successful / Payment Failed result screens. The payment popup and the charge itself remain partner-owned (see [Partner Payment Gate Flow](#partner-payment-gate-flow-send-now-walkthrough)); after the partner's popup resolves, the partner should send `payment_result` to the iframe so the iframe can render the matching result screen. PropStream's listener / sender is not yet wired — this section documents what the iframe expects today on staging.
+> **UX result signal (v1.7.36; corrects v1.7.31).** This postMessage controls only the in-iframe result screen. A valid `status: "success"` renders **Payment Successful** immediately; the iframe does not wait for, poll, or reconcile backend order state before rendering it. The separate server-to-server [`POST /v1/billing/orders/{order_id}/confirm-payment`](API_KIT.md#6k-confirm-payment-partner-payment-gate) call remains authoritative for Ballpoint payment and production state. Neither signal replaces the other.
 
-The iframe does **not** observe the payment popup directly. The parent app owns the popup lifecycle and is responsible for telling the iframe whether the charge succeeded, failed, or was cancelled.
+The iframe does **not** observe the partner-owned payment popup directly. After the popup reaches a known outcome, the parent app sends `payment_result` so the iframe can render the matching UX state. On an ordinary popup close with no final outcome, the parent sends nothing; the iframe leaves **Continue to Payment** enabled so the user can reopen checkout.
 
 ```json
 {
@@ -548,14 +548,11 @@ The iframe does **not** observe the payment popup directly. The parent app owns 
   "version": 1,
   "type": "payment_result",
   "tenantKey": "ps_acc_42",
-  "status": "success",
-  "campaignId": "camp_abc123",
-  "ballpointCampaignId": "cmp_abc",
-  "orderIds": ["ord_local_001"],
-  "ballpointOrderIds": ["ord_abc123"],
-  "reason": null
+  "status": "success"
 }
 ```
+
+`campaignId`, `ballpointCampaignId`, `orderIds`, `ballpointOrderIds`, and `reason` remain optional. No new field is required from the parent in v1.7.36.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -563,11 +560,11 @@ The iframe does **not** observe the payment popup directly. The parent app owns 
 | `version` | number | Yes | Must be `1`. The iframe supports the version set `[1]`; other values are ignored. |
 | `type` | string | Yes | Always `"payment_result"`. |
 | `tenantKey` | string | Yes | Must match the active tenant the iframe was scoped to. Mismatched or missing `tenantKey` causes the entire message to be **rejected and ignored** — no result screen is rendered and **no tenant state is mutated** by this message. The check is read-only (this event cannot be used to establish or change tenant scope). |
-| `status` | string | Yes | One of `"success"`, `"failed"`, `"failure"`, `"cancelled"`. The iframe normalizes `"failure"` → `"failed"`. `"success"` prompts authenticated order-history reconciliation and renders **Payment Successful** only after all matching orders report `payment_confirmed=true`; it is not itself proof of payment. `"failed"`/`"failure"` → **Payment Failed**; `"cancelled"` → **Payment Not Completed**. Any other value is ignored. |
-| `campaignId` | string | Optional | Iframe-local campaign handle (the same `campaignId` previously emitted on `campaign_created` / `campaign_submitted`). Echoed back on `payment_retry_requested` if present. |
-| `ballpointCampaignId` | string | Optional | Server-side campaign id. Send only if the parent has it from its own API / order-history reconciliation state — note that `campaign_submitted` does **not** expose `ballpointCampaignId` (only `campaignId` and `orders[].ballpointOrderId`). Echoed back on `payment_retry_requested` if present. |
-| `orderIds` | array of strings | Optional | Iframe-local order ids (e.g. those returned in `campaign_created.orderIds`). Echoed back on `payment_retry_requested` if present. |
-| `ballpointOrderIds` | array of strings | Optional | Server-side `ballpointOrderId` values (from `campaign_submitted.orders[].ballpointOrderId`). Echoed back on `payment_retry_requested` if present. |
+| `status` | string | Yes | One of `"success"`, `"failed"`, `"failure"`, `"cancelled"`. The iframe normalizes `"failure"` → `"failed"`. `"success"` immediately renders **Payment Successful**; `"failed"`/`"failure"` → **Payment Failed**; `"cancelled"` → **Payment Not Completed**. This field controls iframe UX only and does not confirm or mutate backend payment state. Any other value is ignored. |
+| `campaignId` | string | Optional | Iframe-local campaign handle (the same `campaignId` previously emitted on `campaign_created` / `campaign_submitted`). Defensive correlation hint only: if present and it positively mismatches the active checkout, the message is ignored. Echoed back on `payment_retry_requested` if accepted. |
+| `ballpointCampaignId` | string | Optional | Server-side campaign context, when the parent already has it. The iframe does not receive or fetch a comparable server campaign id during `campaign_submitted`, so this field is retained only as accepted retry context and is echoed back on `payment_retry_requested`; it is not used to match the active checkout. |
+| `orderIds` | array of strings | Optional | Iframe-local order ids (e.g. those returned in `campaign_created.orderIds`). Defensive correlation hint only: any supplied id known to belong to another checkout — including one foreign id mixed with active ids — rejects the message. Omission never delays the result UX. Echoed back on `payment_retry_requested` if accepted. |
+| `ballpointOrderIds` | array of strings | Optional | Server-side `ballpointOrderId` values (from `campaign_submitted.orders[].ballpointOrderId`). Defensive correlation hint only: any supplied id known to belong to another checkout — including one foreign id mixed with active ids — rejects the message. Omission never delays the result UX. Echoed back on `payment_retry_requested` if accepted. |
 | `reason` | string | Optional | Decline context for an actual **failure** (e.g. card-decline reason), surfaced inline on the **Payment Failed** screen (plain text, ~300-char cap). Ignored on `status: "success"` **and on `"cancelled"`** (a cancellation has no failure reason). |
 
 #### Status normalization and ignore behavior
@@ -575,16 +572,16 @@ The iframe does **not** observe the payment popup directly. The parent app owns 
 - `"failure"` is normalized to `"failed"` internally — partners may send either; the iframe treats them identically.
 - Any `status` value outside `{success, failed, failure, cancelled}` is ignored: the iframe does not change screens and does not emit a follow-up event. This is intentional, so an unknown future-status string (or a partner typo) cannot put the user on the wrong screen.
 - Missing `tenantKey`, or `tenantKey` that does not match the active scope, also causes the entire message to be ignored before any other field is read.
-- The message must identify the active checkout by a matching iframe-local `campaignId`, the complete expected local `orderIds`, or the complete expected server-side `ballpointOrderIds`. `ballpointCampaignId` remains retry context but is not sufficient by itself because the iframe does not receive that server-side campaign identifier in `campaign_submitted`. A stale callback from another checkout in the same tenant is ignored.
+- `campaignId`, `orderIds`, and `ballpointOrderIds` are optional defensive correlation hints. If any supplied known identifier positively belongs to another checkout — including a mixed array containing both active and foreign ids — the iframe ignores the message as stale. `ballpointCampaignId` is accepted only as retry context because the iframe has no comparable active server campaign id. Omitted or partial identifiers are never inferred, never trigger a server read, and never delay a valid tenant-scoped result.
 
 #### Iframe behavior on receipt
 
-- **`status: "success"`** — iframe immediately reconciles the active order IDs through authenticated `GET /v1/billing/orders` state. It shows **Payment Successful** only when every expected order is present and `payment_confirmed=true`. Missing, pending, inconclusive, or failed reads never render success.
+- **`status: "success"`** — iframe immediately shows **Payment Successful**. This acknowledges the partner-reported UX outcome only; it does not assert `payment_confirmed`, move an order into production, or replace the partner backend's `/confirm-payment` call.
 - **`status: "failed"` / `"failure"`** — iframe shows the in-iframe **Payment Failed** screen (an actual payment failure, e.g. card declined). The optional `reason` is surfaced inline. Offers a **Try Again** action that emits [`payment_retry_requested`](#payment_retry_requested--user-clicked-try-again-on-the-failure-screen) back to the parent.
-- **`status: "cancelled"`** — iframe shows a distinct **Payment Not Completed** screen (same visual shell as Payment Failed, different copy: *"Your payment was not completed. You can try again when you're ready."*). This represents the user **closing / not completing** the payment flow — it is **not** a card/payment failure, and no `reason` is shown. Also offers **Try Again** → emits [`payment_retry_requested`](#payment_retry_requested--user-clicked-try-again-on-the-failure-screen). Reserve `cancelled` for a genuinely abandoned outcome; an ordinary popup close with an uncertain charge result should send nothing and allow read-only reconciliation to resolve first.
+- **`status: "cancelled"`** — iframe shows a distinct **Payment Not Completed** screen (same visual shell as Payment Failed, different copy: *"Your payment was not completed. You can try again when you're ready."*). This represents a final, explicitly reported abandonment outcome — it is **not** a card/payment failure, and no `reason` is shown. Also offers **Try Again** → emits [`payment_retry_requested`](#payment_retry_requested--user-clicked-try-again-on-the-failure-screen). On an ordinary popup close, send nothing; **Continue to Payment** remains enabled and its next click resumes checkout through the cached `campaign_submitted` replay.
 - The iframe does **not** retry the payment itself, does **not** call `POST /orders` again, and does **not** call `/confirm-payment`. The parent owns the charge — this contract is UI handoff only.
 
-> **Backend distinction (important).** `status: "cancelled"` is a **UI signal to the iframe only** — the user closed or did not complete the payment flow. It does **not** imply a card/payment failure. Reserve the backend `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: "failed"` for an **actual** failed payment outcome (e.g. a declined charge), not for a user cancellation — unless that is your deliberate billing policy. A cancellation usually means no charge was attempted, so the order can remain `pending_payment` (the user retries later) or be cancelled via the canonical partner endpoint `POST /orders/{order_id}/cancel`.
+> **Backend distinction (important).** Every `payment_result` status is a **UI signal to the iframe only**. Separately, the partner backend must call `POST /v1/billing/orders/{order_id}/confirm-payment` for each order whose payment outcome should be committed; that server-to-server call is authoritative for Ballpoint billing and production state. A browser `status: "success"` does not confirm payment, and a backend confirmation does not by itself render the iframe result screen. Reserve backend `status: "failed"` for an actual failed payment attempt (for example, a declined charge), not an ordinary popup close.
 
 ### Recipient selection contract (piece count + dedup)
 
@@ -744,7 +741,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.35"
+    "partner": "1.7.36"
   }
 }
 ```
@@ -1433,13 +1430,13 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 
 > **Terminal in a partner embed (v1.6.6).** After this event is emitted, the iframe shows a neutral hand-off ("Opening secure checkout…") and defers final completion to the partner's billing flow — there is no internal "Campaign Submitted!" confirmation page in a partner embed. The campaign is not "submitted/complete" until billing succeeds on the partner side. Event semantics are unchanged: `campaign_submitted` remains the authoritative billing trigger, and partners should continue to key off `orders[].ballpointOrderId` as the server-assigned order id.
 
-> **No billing-trigger replay after handoff (v1.7.31; supersedes v1.7.8).** `campaign_submitted` fires once for the checkout handoff. The CTA remains locked while the iframe reconciles authenticated order state. If the bounded reconciliation window is inconclusive, **Check Payment Status** starts another read-only reconciliation window; it does not re-emit `campaign_submitted`, create orders, or ask the parent to charge again. A true failed/cancelled result may still offer **Try Again** through `payment_retry_requested`.
+> **Reopenable checkout handoff (v1.7.36; restores v1.7.8 and supersedes the v1.7.31 checkout lock).** In a partner embed, `campaign_submitted` MAY be emitted more than once during the same checkout. The first emit follows the successful `POST /orders` call. After that handoff, **Continue to Payment** remains enabled; if the user closes the partner payment popup without a final outcome and clicks the CTA again, the iframe re-emits the **exact cached first payload** — including the same `campaignId`, top-level `orderIds`, totals, and `orders[]` entries with their `ballpointOrderId` values. A replay does **not** call `POST /orders`, create another order, or alter the cached payload. The cache is cleared when the user leaves that campaign flow, preventing cross-campaign replay.
 >
-> Partners should continue to treat `campaign_submitted` idempotently for compatibility with older iframe builds. v1.7.31 no longer intentionally replays it within the active checkout.
+> **Partner MUST treat repeats idempotently.** The first event begins the normal backend handoff. A repeat for the same checkout is a resume signal only: reopen or resume the existing payment flow. Do not re-upload recipients, duplicate database writes or analytics, create duplicate checkout/charge records, or charge again merely because the cached event was replayed. Reconcile on the existing `orders[].ballpointOrderId` / `campaignId` values.
 >
-> **Do not send [`payment_result: cancelled`](#payment_result--payment-popup-outcome-parent--iframe) for an uncertain ordinary popup close.** Reserve `cancelled` / `failed` for genuinely abandoned or failed payment outcomes. If charge state is uncertain, send nothing; the iframe remains fail-closed and reconciles committed order state. `cancelled` remains a valid status value.
+> **Ordinary popup close: send nothing.** Do not send [`payment_result: cancelled`](#payment_result--payment-popup-outcome-parent--iframe) merely because the user closes the payment popup without a final outcome. The iframe keeps **Continue to Payment** enabled, and the next click follows the cached replay path above. Reserve `cancelled` / `failed` for final abandoned or failed outcomes; both remain valid status values.
 >
-> **Refetch authoritative amounts before charging.** The emitted `total_tcents` / `total_dollars` values are UX/display only. The partner backend must refetch authoritative billing amounts through [`POST /v1/billing/campaigns/preview`](API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) before charging. `GET /v1/billing/partner/orders` is a dashboard/read model, not the current-price billing source.
+> **Refetch authoritative amounts before charging — including after a replay.** The emitted `total_tcents` / `total_dollars` values are UX/display only. The partner backend must refetch authoritative billing amounts through [`POST /v1/billing/campaigns/preview`](API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) before collecting payment. `GET /v1/billing/partner/orders` is a dashboard/read model, not the current-price billing source.
 
 ```json
 {
@@ -1576,7 +1573,7 @@ Notes:
 
 #### `payment_retry_requested` — User clicked "Try Again" on the failure screen
 
-> **Current staging contract — pending PropStream wiring.** Companion to the parent → iframe [`payment_result`](#payment_result--payment-popup-outcome-parent--iframe) message. The iframe expects the parent (PropStream) to listen for this event and **reopen its payment popup** for the same campaign / order. PropStream's handler is not yet wired — this section documents what the iframe emits today on staging.
+> **Companion UX event.** Companion to the parent → iframe [`payment_result`](#payment_result--payment-popup-outcome-parent--iframe) message. The parent listens for this event and **reopens or resumes its existing payment flow** for the same checkout.
 
 Emitted when the user clicks **Try Again** on the iframe's in-iframe **Payment Failed** screen in partner-embedded mode. The iframe is asking the parent to reopen the payment popup so the user can retry the charge.
 
@@ -1696,9 +1693,10 @@ End-to-end timeline:
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX). This triggers the backend handoff; it is not authorization to collect payment yet.
 7. Parent backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then uploads the matching recipients to every order with `POST /v1/billing/orders/{order_id}/recipients`. For A/B Split, upload a different address-disjoint slice to each variant. Verify every upload reports `ready === true` and `piece_count > 0`.
 8. Parent backend calls [`POST /v1/billing/campaigns/preview`](https://github.com/Ballpoint-Marketing/ballpoint-api-docs/blob/main/API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) **once** with the `ballpointOrderId`s it intends to charge in this payment event (the endpoint prices exactly the caller-selected set; it does not compute billing windows). Read `campaign_partner_debit_cents` as the exact whole-cent ledger amount recorded on successful confirmation, with the raw tcents fields available for reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`; do not confirm rows excluded from the quoted total. Re-preview after any order/recipient edit before collecting or confirming payment. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.
-9. Parent shows the payment popup; end-user pays via the parent's payment provider.
-10. Parent backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`).
-11. On success, Ballpoint applies the account billing policy (stripe debits balance; manual records usage; none records no charge/usage) and moves the order to `accepted`. Production proceeds.
+9. Parent shows the payment popup; end-user pays via the parent's payment provider. On an ordinary popup close without a final outcome, the parent sends no `payment_result`; the iframe's enabled **Continue to Payment** replays the exact cached `campaign_submitted` payload on the next click so the parent can reopen or resume checkout idempotently.
+10. Once the popup has a known outcome, the parent sends [`payment_result`](#payment_result--payment-popup-outcome-parent--iframe) for iframe UX. `status: success` immediately renders **Payment Successful**; the optional campaign/order identifiers may only reject a positive mismatch and are not required. Any supplied known foreign id rejects the message, including an active+foreign mixed array.
+11. Independently, the parent backend calls `POST /v1/billing/orders/{order_id}/confirm-payment` with `status: success` (or `failed`). This server-to-server call — not `payment_result` — is authoritative for Ballpoint billing and production state. Neither signal replaces or waits on the other.
+12. On backend confirmation success, Ballpoint applies the account billing policy (stripe debits balance; manual records usage; none records no charge/usage) and moves the order to `accepted`. Production proceeds.
 
 **Postage label mapping:** Hybrid Letter and Greeting Letter display
 **Standard Class** to the end user but submit `postage_type: "presort"` to the
@@ -1710,7 +1708,7 @@ one-sided, and tri-folded to fit the #10 envelope. The iframe does not expose a
 black-and-white selector; the end user chooses only between Standard Class and
 First Class postage.
 
-**Important distinction.** After `campaign_submitted`, the iframe lifecycle and payment lifecycle are separate. The iframe may emit `campaign_complete` / `done` once the iframe submission flow finishes, independent of the payment popup. That does not mean production is complete and does not replace `/confirm-payment`. Production status continues separately through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
+**Important distinction.** After `campaign_submitted`, the iframe UX lifecycle and authoritative backend payment lifecycle are separate. `payment_result` selects the iframe result screen immediately; `/confirm-payment` commits Ballpoint billing and production state separately. The iframe may emit `campaign_complete` / `done` once the iframe submission flow finishes, independent of the payment popup. That does not mean production is complete and does not replace `/confirm-payment`. Production status continues through `order.status_changed` webhooks (`accepted` → `prep` → ... → `complete`).
 
 For payment, reconciliation, or backend workflows, key off `campaign_submitted.orders[].ballpointOrderId` — not `campaign_created.orderIds` (those are pre-API local IDs). Equivalently: **don't poll `GET /v1/billing/orders` mid-flow** to discover per-drop ids for Multi Send or A/B Split; orders only exist server-side after Continue to Payment fires `campaign_submitted`. See the [`campaign_created`](#campaign_created--campaign-created-before-submission) and [`order_added`](#order_added--new-order-added-multi-month-campaigns) timing notes for details.
 
