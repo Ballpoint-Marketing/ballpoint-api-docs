@@ -107,7 +107,8 @@ If the user performs an action before `set_api_config` arrives, the iframe queue
 const iframe = document.getElementById('ballpoint-mailer');
 
 window.addEventListener('message', function(event) {
-  // Only accept messages from the Ballpoint iframe origin
+  // Only accept messages from this exact Ballpoint iframe window and origin
+  if (event.source !== iframe.contentWindow) return;
   if (event.origin !== 'https://mailer.ballpointmarketing.com') return;
 
   const msg = event.data;
@@ -850,7 +851,7 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
 - All orders have `paymentConfirmed` not null (defense: campaigns with any null are skipped — typically non-gated accounts)
 - At least one order is "affected" (see classification below)
 
-**Eligibility (v1.6.0).** Edit Leads is available **only** for payment-gated campaigns/orders that are still `scheduled` or `pending_payment` and unbilled (`paymentConfirmed === false`) — i.e. pre-production and not yet paid. Once an order is paid, `accepted`, in production, mailed, delivered, or terminal, it is **locked** and its Edit Leads button is hidden (the underlying `PATCH .../recipients` returns `409 RECIPIENTS_LOCKED` / `PAID_LOCKED`). **Non-gated accounts do not expose Edit Leads** because the payment gate is not active. Full per-order classification is in "Affected allowlist" below; see also `API_KIT.md §6n/§6o`. Tightened in CHANGELOG v1.6.0.
+**Eligibility (v1.6.0).** Edit Leads is available **only** for payment-gated campaigns/orders that are still `scheduled` or `pending_payment` and unbilled (`paymentConfirmed === false`) — i.e. pre-production and not yet paid. Once an order is paid, `accepted`, in production, mailed, delivered, or terminal, it is **locked** and its Edit Leads button is hidden (the underlying `PATCH .../recipients` returns `409 RECIPIENTS_LOCKED` / `PAID_LOCKED`). **Non-gated accounts do not expose Edit Leads** because the payment gate is not active. Full per-order classification is in "Affected allowlist" below; see also `API_KIT.md §6o/§6p`. Tightened in CHANGELOG v1.6.0.
 
 **Post-creation payload:**
 
@@ -908,10 +909,10 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
   "version": 1,
   "type": "edit_leads_requested",
   "scope": "single_send",
-  "campaignId": "api_campaign_cmp_single_1",
-  "ballpointCampaignId": "cmp_single_1",
+  "campaignId": "api_campaign_camp_propstream_single_321",
+  "ballpointCampaignId": "camp_mrxonsok_single_1",
   "campaignType": "single",
-  "campaignDeltaEndpoint": "/v1/billing/campaigns/cmp_single_1/recipients",
+  "campaignDeltaEndpoint": "/v1/billing/campaigns/camp_propstream_single_321/recipients",
   "campaignDeltaMethod": "PATCH",
   "listId": "ps_list_321",
   "listName": "Absentee Owners",
@@ -944,10 +945,10 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
   "version": 1,
   "type": "edit_leads_requested",
   "scope": "ab_split",
-  "campaignId": "api_campaign_cmp_split_1",
-  "ballpointCampaignId": "cmp_split_1",
+  "campaignId": "api_campaign_camp_propstream_split_654",
+  "ballpointCampaignId": "camp_mrxonsok_split_1",
   "campaignType": "split",
-  "campaignDeltaEndpoint": "/v1/billing/campaigns/cmp_split_1/recipients",
+  "campaignDeltaEndpoint": "/v1/billing/campaigns/camp_propstream_split_654/recipients",
   "campaignDeltaMethod": "PATCH",
   "listId": "ps_list_654",
   "listName": "Probate Leads",
@@ -991,7 +992,7 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
 | `campaignId` | Iframe-local group key (e.g. `api_campaign_<id>` for API-loaded campaigns; `cmp_<local>` for in-builder). Use `ballpointCampaignId` for cross-system reference. |
 | `ballpointCampaignId` | The persisted cross-system campaign id shared by the campaign's orders (`orders.external_campaign_id`, i.e. the original `campaign_created.campaignId`) — **not** the Ballpoint-internal API `campaign_id`. `null` when the orders do not share a single persisted `external_campaign_id`. |
 | `campaignType` | `"single"` \| `"multi"` \| `"split"`. Mirrors `campaign.type` in the iframe. |
-| `campaignDeltaEndpoint` | Campaign-level PATCH endpoint for delta add/remove (`/v1/billing/campaigns/{campaign_id}/recipients`, where `{campaign_id}` is the Ballpoint-internal API campaign id — **not** `ballpointCampaignId`). Preferred for multi-month campaigns. `null` if campaign not yet persisted server-side. See `API_KIT.md §6o`. |
+| `campaignDeltaEndpoint` | The authoritative campaign-level PATCH endpoint for delta add/remove (`/v1/billing/campaigns/{campaign_id}/recipients`, where `{campaign_id}` is the Ballpoint-internal API campaign id — **not** `ballpointCampaignId`). Preferred for multi-month campaigns. Consumers must use the emitted path exactly rather than derive it from another field. Before use, require the exact relative-path shape `/v1/billing/campaigns/{campaign_id}/recipients` (no origin, query, or fragment) and resolve it only against the fixed Ballpoint `apiBaseUrl` for the current environment. `null` if campaign not yet persisted server-side. See `API_KIT.md §6p`. |
 | `campaignDeltaMethod` | Always `"PATCH"`. |
 | `recipientCount` | Raw list recipient count at the time of click (not the affected/locked breakdown sum). |
 | `affectedOrders[]` | Orders eligible for edit. Each has `editRecipientsEndpoint` + `editRecipientsMethod: "PATCH"`. PropStream's Edit Leads modal should PATCH each one with the new recipient list after the user saves. |
@@ -1028,8 +1029,8 @@ For `scope: "creation_flow"`, PropStream should open its Edit Leads modal and, o
 1. Listen for `edit_leads_requested`.
 2. Open the Edit Leads modal (PropStream-hosted, on top of the iframe).
 3. **Creation flow (`scope: "creation_flow"`):** after modal save, send a same-list [`set_list` refresh](#set_list-refresh-post-modal-sync). Do not PATCH recipients and do not send `recipients_updated`.
-4. **Post-creation Option A (campaign-level, preferred for multi-month):** PATCH `campaignDeltaEndpoint` with delta `{added, removed, remove_all}`. One call distributes to all editable drops. See `API_KIT.md §6o`.
-5. **Post-creation Option B (per-order, required for A/B split variant allocation):** PATCH each `affectedOrders[].editRecipientsEndpoint` with the full replacement list. See `API_KIT.md §6n`.
+4. **Post-creation Option A (campaign-level, preferred for multi-month):** PATCH the emitted `campaignDeltaEndpoint` exactly with delta `{added, removed, remove_all}`. Do not derive this URL from `ballpointCampaignId`. One call distributes to all editable drops. See `API_KIT.md §6p`.
+5. **Post-creation Option B (per-order, required for A/B split variant allocation):** PATCH each `affectedOrders[].editRecipientsEndpoint` with the full replacement list. See `API_KIT.md §6o`.
     - **A/B split:** the variant-specific slice goes to each variant's endpoint, not the full list. Use the `variant` field on each `affectedOrders[]` item to identify A vs B. PropStream's split allocation logic determines what slice goes to each.
 6. After all post-creation PATCHes succeed, emit [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) back to the iframe so it can refresh the campaign card.
 7. On modal close without changes, no postMessage required.
@@ -1766,7 +1767,7 @@ Content-Type: application/json
 | `contact_id` | No | Stable partner-side contact/lead identifier (e.g. PropStream contact id), max 64 chars. Stored verbatim, never interpreted by Ballpoint, round-tripped on the corresponding `GET .../recipients` response, and echoed verbatim on per-piece RTS push-back events so you can map returned pieces directly to the CRM contact. **For partners using the per-piece RTS push-back, `contact_id` must be populated on every recipient** — the V1 RTS payload carries `contact_id` only (no name/address fields). |
 | `address_type` | No | `PROPERTY` or `MAILING`. Optional for order-level upload; pair with `contact_id` when you need to distinguish a contact's property vs mailing address records. On the campaign-level Edit Leads / delta endpoint it is **required** and, together with `contact_id`, forms the upsert/remove key. |
 
-> For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6o`](API_KIT.md#6o-campaign-delta-recipients--addremove-across-editable-drops).
+> For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6p`](API_KIT.md#6p-campaign-delta-recipients--addremove-across-editable-drops).
 
 ### Batching Large Lists
 
@@ -1858,7 +1859,7 @@ Once the initial POST has reduced an order to zero, a positive retry on that sam
 
 Four distinct identifiers. Confusing any two of them is a docs/code bug. Doc copy must reflect this map exactly:
 
-- **backend `campaign_id`** — existing DB column. List-level grouping, deterministically derived as `f"camp_{account_id}_{list_id}"` (billing_router.py:3767). Stable across all submissions touching the same list_id within an account. **NOT exposed in postMessage payloads as-is.**
+- **backend `campaign_id`** — existing DB column. List-level grouping, deterministically derived as `f"camp_{account_id}_{list_id}"` (billing_router.py:3767). Stable across all submissions touching the same list_id within an account. It is **not emitted as a standalone postMessage field**; when Edit Leads is available, it is embedded in the trusted relative path carried by `campaignDeltaEndpoint`.
 - **postMessage `campaignId`** (camelCase) — iframe-local id, `generateId('camp')` from campaign-store.js. Emitted in `campaign_created` / `campaign_submitted` / `order_added`. Has **no relationship** to backend `campaign_id`. Doc must never describe `campaign_submitted.campaignId` as "the backend campaign". Treat it as an opaque iframe handle.
 - **`campaign_instance_id`** (snake_case) — **NEW** DB/API field on `orders`. Optional submit/split instance key. NULL = bypass cross-order dedup; shared value across siblings = enable dedup.
 - **`campaignInstanceId`** (camelCase) — same value as the new DB field, surfaced into iframe→partner `campaign_submitted.orders[].campaignInstanceId`. Opaque string for partners.
