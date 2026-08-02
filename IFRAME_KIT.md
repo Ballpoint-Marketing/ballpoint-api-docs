@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.36** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.37** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -741,7 +741,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.36"
+    "partner": "1.7.37"
   }
 }
 ```
@@ -1691,7 +1691,7 @@ End-to-end timeline:
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /orders` on the API base URL with the selected `postage_type`. Ballpoint persists that exact class and records a creation-time price **estimate** for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at `/confirm-payment`; refetch `POST /v1/billing/campaigns/preview` before charging); only legacy requests that omit the field default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated). No charge occurs yet.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX). This triggers the backend handoff; it is not authorization to collect payment yet.
-7. Parent backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then uploads the matching recipients to every order with `POST /v1/billing/orders/{order_id}/recipients`. For A/B Split, upload a different address-disjoint slice to each variant. Verify every upload reports `ready === true` and `piece_count > 0`.
+7. Parent backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then uploads the matching recipients to every order with `POST /v1/billing/orders/{order_id}/recipients`. For A/B Split, upload a different recipient-disjoint slice to each variant. Verify every upload reports `ready === true` and `piece_count > 0`.
 8. Parent backend calls [`POST /v1/billing/campaigns/preview`](https://github.com/Ballpoint-Marketing/ballpoint-api-docs/blob/main/API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) **once** with the `ballpointOrderId`s it intends to charge in this payment event (the endpoint prices exactly the caller-selected set; it does not compute billing windows). Read `campaign_partner_debit_cents` as the exact whole-cent ledger amount recorded on successful confirmation, with the raw tcents fields available for reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`; do not confirm rows excluded from the quoted total. Re-preview after any order/recipient edit before collecting or confirming payment. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.
 9. Parent shows the payment popup; end-user pays via the parent's payment provider. On an ordinary popup close without a final outcome, the parent sends no `payment_result`; the iframe's enabled **Continue to Payment** replays the exact cached `campaign_submitted` payload on the next click so the parent can reopen or resume checkout idempotently.
 10. Once the popup has a known outcome, the parent sends [`payment_result`](#payment_result--payment-popup-outcome-parent--iframe) for iframe UX. `status: success` immediately renders **Payment Successful**; the optional campaign/order identifiers may only reject a positive mismatch and are not required. Any supplied known foreign id rejects the message, including an active+foreign mixed array.
@@ -1797,7 +1797,7 @@ POST .../recipients   { "recipients": [next 10k],  "append": true  }
 | Field | Type | Description |
 |-------|------|-------------|
 | `accepted` | number | Recipients accepted in this request |
-| `rejected` | number | Recipients rejected (invalid name, duplicate address, etc.) |
+| `rejected` | number | Recipients rejected (invalid name, duplicate recipient, etc.) |
 | `rejected_details` | array | Per-recipient rejection reasons (see below) |
 | `total_recipients` | number | Total recipients on the order so far |
 | `piece_count` | number | Current piece count (may be auto-reduced — see Dedup below) |
@@ -1808,7 +1808,7 @@ POST .../recipients   { "recipients": [next 10k],  "append": true  }
 | Reason | Description |
 |--------|-------------|
 | `At least first_name or last_name is required` | Recipient is missing both name fields |
-| `duplicate_in_campaign` | Address already exists in a previous order within the same campaign |
+| `duplicate_in_campaign` | This recipient (full name + mailing address) already exists in a previous order within the same campaign |
 
 ### Campaign Dedup (automatic)
 
@@ -1816,13 +1816,27 @@ POST .../recipients   { "recipients": [next 10k],  "append": true  }
 
 - **`single` campaigns** — `campaignInstanceId` is `null`. No cross-order dedup.
 - **`multi` (sequence) campaigns** — `campaignInstanceId` is `null` on every drop. Each drop's recipient set is the partner's full selection for that drop — Ballpoint does **not** dedupe across drops, matching the product intent that a sequence repeatedly reaches the same individuals. List reuse across separate submissions is also not deduped.
-- **`split` (A/B) campaigns** — `campaignInstanceId` is the same opaque string on every sibling order in the same `campaign_submitted` payload. Cross-order dedup runs against the sibling orders only; partners must upload disjoint recipient slices per variant, and any overlap that slips through is rejected with `duplicate_in_campaign` on the second-uploaded variant. This is a guard-rail so no recipient receives both variants.
+- **`split` (A/B) campaigns** — `campaignInstanceId` is the same opaque string on every sibling order in the same `campaign_submitted` payload. Cross-order dedup runs against the sibling orders only; partners must upload recipient-disjoint slices per variant, and any overlap that slips through is rejected with `duplicate_in_campaign` on the second-uploaded variant. This is a guard-rail so no single recipient receives both variants.
 
 When `campaignInstanceId` is `null` on every order in a campaign, the "If an order belongs to a campaign..." behavior below does **not** fire, regardless of whether the orders share a backend `campaign_id`.
 
-If an order belongs to a campaign that already has recipients from previous drops, we check for duplicate addresses automatically. Matches get rejected with `duplicate_in_campaign` and the order's `piece_count` is adjusted down so it can still reach `ready: true`.
+If an order belongs to a campaign that already has recipients from previous drops, we check for duplicate recipients automatically. Matches get rejected with `duplicate_in_campaign` and the order's `piece_count` is adjusted down so it can still reach `ready: true`.
 
-Dedup matches on `(address, city, state, zip)`, trimmed and case-insensitive. We only check against other orders in the same campaign **with the same non-null `campaign_instance_id`** — cancelled/deleted orders are ignored.
+#### Dedup key — recipient, not household (v1.7.37)
+
+Dedup matches on the **canonical recipient full name plus the delivery address you uploaded**: `(first_name + " " + last_name, address, city, state, zip)`, each component trimmed and case-insensitive, with the two name parts joined by a single space (a row with only one of the two name fields uses just that part). Ballpoint keys on the `address` / `city` / `state` / `zip` it was given — the address it will actually mail — and does not interpret `address_type`, so which physical address that is follows the user's **Deliver To** selection. We only check against other orders in the same campaign **with the same non-null `campaign_instance_id`** — cancelled/deleted orders are ignored.
+
+What that means in practice:
+
+- **Two different people at the same delivery address both receive a piece.** A household with two owners is not collapsed by this guard-rail.
+- **The same person at the same delivery address receives exactly one piece.** With `Deliver To = mailing` — the case this guard-rail exists for — that means one owner with several properties gets a single piece, because every one of those leads resolves to the same mailing address and the owned property is not in the uploaded row at all.
+- **With `Deliver To = property` (or the property leg of `both`), each distinct property address is a distinct recipient**, even for the same owner. That is the point of selecting property delivery: `address` *is* the property, so the same owner across two properties is two keys and two pieces.
+- **Different delivery addresses stay distinct**, even for the same person.
+- **Name matching is exact.** There is no fuzzy matching, middle-name removal, nickname expansion, or punctuation cleanup, so `Ryan C Dossey` and `Ryan Dossey` are **distinct** recipients and both pass. County title records are inconsistent about middle initials; if you need those collapsed, do it before upload.
+- **`contact_id` is not used for dedup.** It stays an opaque partner identifier that Ballpoint stores and round-trips; two rows with different `contact_id` values but the same name + delivery address are still the same recipient.
+- **`address2` is not part of the key**, matching the pre-v1.7.37 behavior. `zip` is compared verbatim, so `12345` and `12345-6789` are different keys — send the same ZIP format across sibling variants.
+
+Before v1.7.37 the key was the address alone, so a second, different person at an address already used by the sibling variant was rejected and that variant's `piece_count` was reduced.
 
 **Example:** Say a campaign already has 500 recipients from drop 1. You upload 847 for drop 2, and 47 of those match. You'd get back:
 ```json
@@ -1841,9 +1855,9 @@ Dedup matches on `(address, city, state, zip)`, trimmed and case-insensitive. We
 
 The `piece_count` went from 847 → 800. Order enters production with 800 unique pieces.
 
-Cross-order dedup is a server-side safety net, not a substitute for constructing the A/B split. The partner must upload address-disjoint slices and inspect `accepted`, `rejected`, `rejected_details`, `ready`, and `piece_count` on every response. Do not proceed to preview or payment unless every variant reports `ready === true` and `piece_count > 0`. If every submitted address for a variant overlaps a sibling, the API rejects those rows as `duplicate_in_campaign`, the variant may end at `piece_count: 0`, and billing endpoints return `409 INVALID_PIECE_COUNT` until the recipient slice is corrected. For same-order (intra-payload) duplicates, see below.
+Cross-order dedup is a server-side safety net, not a substitute for constructing the A/B split. The partner must upload recipient-disjoint slices and inspect `accepted`, `rejected`, `rejected_details`, `ready`, and `piece_count` on every response. Do not proceed to preview or payment unless every variant reports `ready === true` and `piece_count > 0`. If every submitted recipient for a variant overlaps a sibling, the API rejects those rows as `duplicate_in_campaign`, the variant may end at `piece_count: 0`, and billing endpoints return `409 INVALID_PIECE_COUNT` until the recipient slice is corrected. For same-order (intra-payload) duplicates, see below.
 
-Once the initial POST has reduced an order to zero, a positive retry on that same endpoint exceeds the order's current piece count. Recover an eligible gated, unconfirmed order with the Edit Leads `PATCH /v1/billing/orders/{order_id}/recipients` using a verified address-disjoint replacement slice, or cancel and recreate the order. The PATCH does not perform cross-order A/B dedup, so slice correctness remains the partner's responsibility. If you recover by cancelling, drop the cancelled order's id from every later `POST /v1/billing/campaigns/preview` call — a cancelled order that is still at `piece_count: 0` keeps returning `409 INVALID_PIECE_COUNT` for the whole preview; pass only the ids of the orders you intend to charge (the recreated submission's `campaign_submitted.orders[]`).
+Once the initial POST has reduced an order to zero, a positive retry on that same endpoint exceeds the order's current piece count. Recover an eligible gated, unconfirmed order with the Edit Leads `PATCH /v1/billing/orders/{order_id}/recipients` using a verified recipient-disjoint replacement slice, or cancel and recreate the order. The PATCH does not perform cross-order A/B dedup, so slice correctness remains the partner's responsibility. If you recover by cancelling, drop the cancelled order's id from every later `POST /v1/billing/campaigns/preview` call — a cancelled order that is still at `piece_count: 0` keeps returning `409 INVALID_PIECE_COUNT` for the whole preview; pass only the ids of the orders you intend to charge (the recreated submission's `campaign_submitted.orders[]`).
 
 #### What this does NOT do
 
