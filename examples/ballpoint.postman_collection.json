@@ -835,7 +835,7 @@
                     }
                   ]
                 },
-                "description": "Safe recipient/address search used automatically by the embedded iframe. Searches accepted/uploaded order recipients immediately and indexed piece tracking when available. Query tokens may appear in any order. list_id restricts results to the same campaign-list scope as the dashboard; omit it for authorized account-wide search. Results contain recipient PII according to the key's PII access level; do not log or persist response bodies."
+                "description": "Safe recipient/address search used automatically by the embedded iframe. Searches accepted/uploaded order recipients immediately and indexed piece tracking when available. Query tokens may appear in any order. list_id restricts results to the same campaign-list scope as the dashboard; omit it for authorized account-wide search. Each campaigns[] appearance carries variant as \"a\", \"b\", or null so the iframe can identify which A/B creative the recipient received; ambiguous, single-send, and multi-send appearances return null. Results contain recipient PII according to the key's PII access level; do not log or persist response bodies."
               },
               "event": [
                 {
@@ -851,6 +851,15 @@
                       "  pm.expect(b.limit).to.eql(20);",
                       "  pm.expect(b.offset).to.eql(0);",
                       "  pm.expect(b.query).to.be.a('string');",
+                      "});",
+                      "pm.test('campaign appearances expose valid A/B attribution', function () {",
+                      "  var b = pm.response.json();",
+                      "  (b.results || []).forEach(function (recipient) {",
+                      "    (recipient.campaigns || []).forEach(function (campaign) {",
+                      "      pm.expect(campaign).to.have.property('variant');",
+                      "      pm.expect([null, 'a', 'b']).to.include(campaign.variant);",
+                      "    });",
+                      "  });",
                       "});"
                     ]
                   }
