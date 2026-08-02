@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.33 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.34 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -564,7 +564,7 @@
                     }
                   ]
                 },
-                "description": "Aggregate counts for a dashboard top panel: totals, status breakdown, SLA buckets, RTS summary. Optional external_user_id and list_id narrow the scope."
+                "description": "Aggregate counts for a dashboard top panel: raw order totals, canonical scheduled_drops, status breakdown, SLA buckets, and RTS summary. scheduled_drops is a non-negative logical-drop count (A/B pair = 1, each Multi-Send drop = 1, accepted included); do not derive it by summing orders_by_status. Optional external_user_id and repeatable list_id narrow the scope."
               },
               "event": [
                 {
@@ -576,9 +576,17 @@
                       "pm.test('body has expected fields', function () {",
                       "  var b = pm.response.json();",
                       "  pm.expect(b).to.have.property('total_orders');",
+                      "  pm.expect(b).to.have.property('total_pieces');",
+                      "  pm.expect(b).to.have.property('scheduled_drops');",
                       "  pm.expect(b).to.have.property('orders_by_status');",
                       "  pm.expect(b).to.have.property('sla_summary');",
                       "  pm.expect(b).to.have.property('rts_summary');",
+                      "  pm.expect(b).to.have.property('date_range');",
+                      "});",
+                      "pm.test('scheduled_drops is a non-negative integer', function () {",
+                      "  var value = pm.response.json().scheduled_drops;",
+                      "  pm.expect(Number.isInteger(value)).to.eql(true);",
+                      "  pm.expect(value).to.be.at.least(0);",
                       "});"
                     ]
                   }
@@ -867,7 +875,7 @@
               ]
             },
             {
-              "name": "Account mail-tracking summary (shape not modeled in docs)",
+              "name": "Account mail-tracking summary",
               "request": {
                 "method": "GET",
                 "header": [
@@ -877,7 +885,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/v1/mail-tracking/account-summary?days={{days}}",
+                  "raw": "{{base_url}}/v1/mail-tracking/account-summary",
                   "host": [
                     "{{base_url}}"
                   ],
@@ -885,15 +893,9 @@
                     "v1",
                     "mail-tracking",
                     "account-summary"
-                  ],
-                  "query": [
-                    {
-                      "key": "days",
-                      "value": "{{days}}"
-                    }
                   ]
                 },
-                "description": "Account-level mail-tracking insights. Documented in the partner API kit as a partner read that accepts a repeatable list_id filter. Response shape is NOT modeled in the API kit or OpenAPI spec - static/source reviewed; test asserts status only."
+                "description": "Account-level Direct Mail insights, requested All Time in this collection. The endpoint accepts inclusive from/to dates (not days) plus repeatable list_id. scheduled_drops is the same canonical non-negative logical-drop KPI exposed by /v1/billing/partner/stats; legacy Pieces/Active/Completed/RTS fields keep their campaign Creation Date scope."
               },
               "event": [
                 {
@@ -901,7 +903,26 @@
                   "script": {
                     "type": "text/javascript",
                     "exec": [
-                      "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                      "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('body has account-summary shape', function () {",
+                      "  var b = pm.response.json();",
+                      "  ['total_pieces_mailed', 'scheduled_drops', 'active_campaigns', 'completed_campaigns', 'total_rts', 'date_from', 'date_to'].forEach(function (field) {",
+                      "    pm.expect(b).to.have.property(field);",
+                      "  });",
+                      "});",
+                      "pm.test('account-summary counts are non-negative integers', function () {",
+                      "  var b = pm.response.json();",
+                      "  ['total_pieces_mailed', 'scheduled_drops', 'active_campaigns', 'completed_campaigns', 'total_rts'].forEach(function (field) {",
+                      "    pm.expect(Number.isInteger(b[field]), field + ' must be an integer').to.eql(true);",
+                      "    pm.expect(b[field], field + ' must be non-negative').to.be.at.least(0);",
+                      "  });",
+                      "});",
+                      "pm.test('date echoes are null or YYYY-MM-DD strings', function () {",
+                      "  var b = pm.response.json();",
+                      "  [b.date_from, b.date_to].forEach(function (value) {",
+                      "    pm.expect(value === null || /^\\d{4}-\\d{2}-\\d{2}$/.test(value)).to.eql(true);",
+                      "  });",
+                      "});"
                     ]
                   }
                 }

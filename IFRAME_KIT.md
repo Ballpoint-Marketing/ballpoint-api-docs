@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.33** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.34** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -455,6 +455,10 @@ Use this when your app wants the user to see, in My Campaigns, only the direct-m
 
 Backed by the repeated `list_id` query parameter on the dashboard read endpoints — see [`GET /v1/billing/orders` in API_KIT.md](API_KIT.md).
 
+**Insights KPI contract (v1.7.34).** The Scheduled tile reads the API's top-level `scheduled_drops` from `GET /v1/mail-tracking/account-summary`; it does not sum raw order statuses. An A/B sibling pair counts as one logical drop, every Multi-Send drop counts once, and accepted drops remain included. Ordinary unconfirmed/abandoned orders are excluded. After a canonical Multi-Send is purchased (complete `1..N` drop sequence under the same external campaign, with the first drop confirmed), all committed drops count even while future drops still have `payment_confirmed=false`.
+
+The Pieces Mailed tile follows the matching purchased-Multi exception: all committed drops are included, and cancelled/failed orders remain included; Active, Completed, RTS, and status-tab behavior are unchanged. For `account-summary`, Scheduled applies the inclusive UTC `from`/`to` bounds to order Creation Date, while those legacy KPIs retain their campaign Creation Date filter. This is an API/iframe display alignment only—there is no new or changed `postMessage`.
+
 ### `open_direct_mail_dashboard` — Open the Direct Mail dashboard (parent → iframe)
 
 Explicit navigation command. Sends the iframe to its **My Campaigns / Direct Mail Dashboard** view and enters **dashboard-first mode**.
@@ -736,7 +740,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.33"
+    "partner": "1.7.34"
   }
 }
 ```
