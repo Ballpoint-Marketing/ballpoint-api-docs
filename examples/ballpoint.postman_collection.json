@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.34 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.35 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -843,7 +843,7 @@
                     }
                   ]
                 },
-                "description": "Safe recipient/address search used automatically by the embedded iframe. Searches accepted/uploaded order recipients immediately and indexed piece tracking when available. Query tokens may appear in any order. list_id restricts results to the same campaign-list scope as the dashboard; omit it for authorized account-wide search. Each campaigns[] appearance carries variant as \"a\", \"b\", or null so the iframe can identify which A/B creative the recipient received; ambiguous, single-send, and multi-send appearances return null. Results contain recipient PII according to the key's PII access level; do not log or persist response bodies."
+                "description": "Safe recipient/address search used automatically by the embedded iframe. Searches available order recipients on non-deleted orders/campaigns immediately and indexed piece tracking when available. Query tokens may appear in any order. list_id restricts results to the same campaign-list scope as the dashboard; omit it for authorized account-wide search. Each campaigns[] appearance carries variant as \"a\", \"b\", or null so the iframe can identify which A/B creative the recipient received; ambiguous, single-send, and multi-send appearances return null. Results contain recipient PII according to the key's PII access level; do not log or persist response bodies."
               },
               "event": [
                 {
@@ -1936,6 +1936,140 @@
                   "pm.test('status is one of [200, 404, 409, 422]', function () {",
                   "  pm.expect([200, 404, 409, 422]).to.include(pm.response.code);",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[STATE-CHANGE] Opt out recipient by address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/mail-tracking/recipients/opt-out",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "mail-tracking",
+                "recipients",
+                "opt-out"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient_address\": \"{{recipient_address}}\",\n  \"recipient_city\": \"{{recipient_city}}\",\n  \"recipient_state\": \"{{recipient_state}}\",\n  \"recipient_zip\": \"{{recipient_zip}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "STATE-CHANGE. Persists tenant-wide normalized-address suppression, including before tracking exists. The public key remains recipient_address + recipient_city + recipient_state + ZIP5; there is no separate address2 input in v1.7.35. Set the four recipient address variables from a test search result before sending; they are intentionally blank in every environment. rows_affected counts only legacy piece_tracking flags and may be 0 on success. An unknown address returns 404 RECIPIENT_NOT_FOUND without mutation. Does not filter future partner recipient uploads. Manual only - excluded from smoke runs."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 401, 403, 404, 422, 429]', function () {",
+                  "  pm.expect([200, 401, 403, 404, 422, 429]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('authoritative opt-out state is true', function () {",
+                  "    pm.expect(body.opted_out).to.eql(true);",
+                  "    pm.expect(body.rows_affected).to.be.a('number');",
+                  "    pm.expect(body.recipients).to.be.an('array');",
+                  "  });",
+                  "}",
+                  "if (pm.response.code === 404) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('unknown address fails closed', function () {",
+                  "    pm.expect(body).to.have.nested.property('detail.error.type', 'not_found');",
+                  "    pm.expect(body).to.have.nested.property('detail.error.code', 'RECIPIENT_NOT_FOUND');",
+                  "    pm.expect(body).to.have.nested.property('detail.error.message', 'No recipient matching this address was found for the authenticated tenant');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[STATE-CHANGE] Undo recipient opt-out",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/mail-tracking/recipients/opt-out",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "mail-tracking",
+                "recipients",
+                "opt-out"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient_address\": \"{{recipient_address}}\",\n  \"recipient_city\": \"{{recipient_city}}\",\n  \"recipient_state\": \"{{recipient_state}}\",\n  \"recipient_zip\": \"{{recipient_zip}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "STATE-CHANGE. Clears the same tenant-wide normalized-address suppression. The public key remains recipient_address + recipient_city + recipient_state + ZIP5; there is no separate address2 input in v1.7.35. Set the four recipient address variables to the exact test address used for Opt Out. rows_affected counts only legacy piece_tracking flags and may be 0 on success. An unknown address returns 404 RECIPIENT_NOT_FOUND without mutation. Future partner recipient selection remains partner-owned. Manual only - excluded from smoke runs."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is one of [200, 401, 403, 404, 422, 429]', function () {",
+                  "  pm.expect([200, 401, 403, 404, 422, 429]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('authoritative opt-out state is false', function () {",
+                  "    pm.expect(body.opted_out).to.eql(false);",
+                  "    pm.expect(body.rows_affected).to.be.a('number');",
+                  "    pm.expect(body.recipients).to.be.an('array');",
+                  "  });",
+                  "}",
+                  "if (pm.response.code === 404) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('unknown address fails closed', function () {",
+                  "    pm.expect(body).to.have.nested.property('detail.error.type', 'not_found');",
+                  "    pm.expect(body).to.have.nested.property('detail.error.code', 'RECIPIENT_NOT_FOUND');",
+                  "    pm.expect(body).to.have.nested.property('detail.error.message', 'No recipient matching this address was found for the authenticated tenant');",
+                  "  });",
+                  "}"
                 ]
               }
             }
