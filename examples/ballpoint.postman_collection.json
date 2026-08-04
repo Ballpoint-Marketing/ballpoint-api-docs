@@ -897,19 +897,19 @@
                   "query": [
                     {
                       "key": "from",
-                      "value": "2026-08-04",
-                      "description": "Inclusive local start date (YYYY-MM-DD). Enable with to and time_zone to test a bounded local-day range.",
+                      "value": "{{account_summary_from}}",
+                      "description": "Inclusive local start date (YYYY-MM-DD). Enable with to and time_zone to test the environment's bounded local-day example.",
                       "disabled": true
                     },
                     {
                       "key": "to",
-                      "value": "2026-08-04",
+                      "value": "{{account_summary_to}}",
                       "description": "Inclusive local end date (YYYY-MM-DD). The API converts the following local midnight to the exclusive UTC upper bound.",
                       "disabled": true
                     },
                     {
                       "key": "time_zone",
-                      "value": "America/New_York",
+                      "value": "{{account_summary_time_zone}}",
                       "description": "Non-blank IANA time zone (maximum 64 characters) used to interpret from/to. Omit for backward-compatible UTC bounds.",
                       "disabled": true
                     }
