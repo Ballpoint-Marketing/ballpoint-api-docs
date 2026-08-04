@@ -11,6 +11,12 @@
 - **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, and iframe/API partner-contract version metadata report `1.7.37`.
 - **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
 
+## Unreleased — Auto-suppress next-drop note documented (PROPS-3273)
+
+- **Documented the display-only next-drop note in the RTS suppression panel.** While **Auto-suppress on next drop** is ON, the iframe may render `Next drop: N leads (adjusted from M)` beside the checkbox, projected from the campaign data and RTS list the iframe already loads. It appears only when every input is provable and is absent otherwise; there is no alternative copy.
+- **Retracts two sentences previously published alongside v1.7.37.** The kit stated that the iframe never selects the "next drop" and that no optimistic count update is defined. Both described display behavior only, and both are superseded for this control. The iframe still never calls a recipient-update endpoint, never mutates an order, and never recalculates a price in response to the click.
+- **No payload, event, route, or contract-version change.** PropStream remains the only side that persists the preference, chooses the applicable drop, applies the recipient update and then sends `recipients_updated`. Nothing is required from the partner for this note.
+
 ## Unreleased — Edit Leads campaign identifier guidance correction
 
 - **Corrected the Edit Leads identifier guidance and examples.** `campaign_id` is Ballpoint's internal list-derived grouping id and is the value embedded in `campaignDeltaEndpoint`; `ballpointCampaignId` is the persisted cross-system Direct Mail id from `orders.external_campaign_id`. Consumers must PATCH the emitted `campaignDeltaEndpoint` exactly and must not derive that path from `ballpointCampaignId`.
