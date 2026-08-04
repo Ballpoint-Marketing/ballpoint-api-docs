@@ -52,7 +52,7 @@ def postman_tests(item: dict[str, Any]) -> str:
 
 class PostHogAnalyticsContractTests(unittest.TestCase):
     def test_version_and_public_examples_are_in_lockstep(self) -> None:
-        expected = "1.7.38"
+        expected = "1.7.39"
         self.assertTrue(CHANGELOG.startswith(f"# Changelog\n\n## v{expected}"))
         self.assertIn(f"Partner contract version: **v{expected}**", IFRAME_KIT)
         self.assertIn(f"> **v{expected} · August 2026**", API_KIT)

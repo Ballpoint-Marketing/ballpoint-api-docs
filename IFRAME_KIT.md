@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.38** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.39** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -475,7 +475,11 @@ Backed by the repeated `list_id` query parameter on the dashboard read endpoints
 
 **Insights KPI contract (v1.7.34).** The Scheduled tile reads the API's top-level `scheduled_drops` from `GET /v1/mail-tracking/account-summary`; it does not sum raw order statuses. An A/B sibling pair counts as one logical drop, every Multi-Send drop counts once, and accepted drops remain included. Ordinary unconfirmed/abandoned orders are excluded. After a canonical Multi-Send is purchased (complete `1..N` drop sequence under the same external campaign, with the first drop confirmed), all committed drops count even while future drops still have `payment_confirmed=false`.
 
-The Pieces Mailed tile follows the matching purchased-Multi exception: all committed drops are included, and cancelled/failed orders remain included; Active, Completed, RTS, and status-tab behavior are unchanged. For `account-summary`, Scheduled applies the inclusive UTC `from`/`to` bounds to order Creation Date, while those legacy KPIs retain their campaign Creation Date filter. This is an API/iframe display alignment only—there is no new or changed `postMessage`.
+The Pieces Mailed tile follows the matching purchased-Multi exception: all committed drops are included, and cancelled/failed orders remain included; Active, Completed, RTS, and status-tab behavior are unchanged. For `account-summary`, Scheduled retains its logical-drop order Creation Date basis, while Pieces/Active/Completed/RTS retain their campaign Creation Date basis.
+
+**Local date bounds (v1.7.38).** Every bounded insights preset resolves the browser's IANA time zone and passes it through the JavaScript API client as camelCase `timeZone`; the client serializes it on the wire as `time_zone`. The `from` / `to` strings are inclusive local calendar dates in that zone. The API converts them to a half-open UTC interval from local midnight at `from` through local midnight on the day after `to`, so the **Today** preset follows the user's local day across UTC rollover and DST. At local day `2026-08-04` in `America/New_York`, the exact UTC interval is `[2026-08-04T04:00:00Z, 2026-08-05T04:00:00Z)`; spring-forward and fall-back local days produce 23-hour and 25-hour windows.
+
+**All Time remains unchanged:** it sends no `from`, `to`, or `timeZone` and therefore stays unbounded. If browser IANA-zone resolution throws or returns no usable identifier, bounded presets send `UTC`. These request details do not add or change a `postMessage`, metric date basis, cohort/list ownership rule, or account-summary response field.
 
 ### `open_direct_mail_dashboard` — Open the Direct Mail dashboard (parent → iframe)
 
@@ -758,7 +762,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.38"
+    "partner": "1.7.39"
   }
 }
 ```
@@ -777,7 +781,7 @@ Both blocks are additive (v1.6.7+) and carry the same shape returned by `GET /v1
 
 These fields are diagnostic and non-sensitive. Partners may ignore them — they do not affect handshake, ordering, billing, or any contract behavior. Existing `iframeVersion`, `maxVersion`, and `buildStamp` are unchanged.
 
-The example above shows the values from a **staging** deploy (`environment: "staging"`, `releaseTag: ""`), which is the currently deployed environment. On a production deploy, `environment` reads `"production"` and `releaseTag` carries the release git tag — the field shapes are identical.
+The payload above is an **illustrative staging example** (`environment: "staging"`, `releaseTag: ""`); it does not assert the version or build currently deployed to staging. On a production deploy, `environment` reads `"production"` and `releaseTag` carries the release git tag — the field shapes are identical.
 
 #### `resize` — Iframe content height changed
 
