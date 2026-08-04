@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.37** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.38** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -208,6 +208,23 @@ the browser check is not the security boundary. The flag introduces **no new
 button, checkbox, copy, or layout**. PropStream continues to own visibility of
 its Send Mail entry point; Ballpoint owns the submit decision after the user
 enters the iframe. Non-PropStream embeds are unchanged.
+
+The same coalesced request carries Ballpoint's closed PostHog configuration.
+Analytics stays off until a complete enabled snapshot is received. Missing,
+malformed, disabled, or failed refreshes close capture; an API credential,
+tenant, account, or list-context change closes it synchronously before the
+refresh completes. Changed key/host/account/source snapshots replace the local
+instance, while unchanged snapshots are no-ops. Events missed while closed are
+never queued or backfilled. There is no build-time key fallback and the SDK is
+loaded only from the iframe's committed local bundle.
+
+When enabled, the iframe uses memory-only persistence, no person profiles,
+autocapture, replay, page lifecycle capture, remote SDK assets, feature-flag
+requests, URL/referrer/campaign capture, or PII. It sends only the ten approved
+events and properties with account/partner group context. This remains
+Ballpoint-owned best-effort telemetry: partners take no action, and failures
+cannot block the product flow or the existing `/v1/partner/funnel-events`
+transport.
 
 ### Automatic funnel analytics traffic (no partner action)
 
@@ -741,7 +758,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.37"
+    "partner": "1.7.38"
   }
 }
 ```
@@ -1046,7 +1063,8 @@ Emitted by the parent app (e.g. PropStream) after successfully PATCHing each `af
   "tenantKey": "ps_acc_42",
   "campaignId": "api_campaign_camp_propstream_4192",
   "ballpointCampaignId": "camp_mrx17n8ccqe52ve",
-  "updatedBallpointOrderIds": ["ord_abc123", "ord_def456"]
+  "updatedBallpointOrderIds": ["ord_abc123", "ord_def456"],
+  "recipientCount": 24
 }
 ```
 
@@ -1056,13 +1074,15 @@ Emitted by the parent app (e.g. PropStream) after successfully PATCHing each `af
 | `campaignId` | Iframe-local group key, echoed from the original `edit_leads_requested` event. |
 | `ballpointCampaignId` | Echo of the persisted cross-system campaign id from the original `edit_leads_requested` event (`orders.external_campaign_id`) — **not** the internal Ballpoint API `campaign_id`. |
 | `updatedBallpointOrderIds` | Array of `ballpointOrderId` strings that were PATCHed. Maximum 1000 IDs, each up to 256 chars. The iframe treats this as advisory (full refresh happens regardless). |
+| `recipientCount` | Optional integer from 1 through 1,000,000 containing the authoritative saved recipient count. Missing or invalid values suppress only Ballpoint's `edit_leads_saved` analytics event; the iframe must still refresh and reconcile the validated campaign update. |
 
 **Iframe behavior on receipt:**
 
 1. Validate `tenantKey` against the active scope (read-only check; mismatch → rejected, no state mutation).
 2. Validate `updatedBallpointOrderIds` array shape + per-element string + length caps.
-3. Re-fetch campaign history (full refresh).
-4. Re-render My Campaigns page so the user sees the new `piece_count` and price for the edited drops.
+3. Validate optional `recipientCount` only for `edit_leads_saved`; a missing or invalid value still refreshes campaign history and suppresses only that analytics event.
+4. Re-fetch campaign history (full refresh).
+5. Re-render My Campaigns page so the user sees the new `piece_count` and price for the edited drops.
 
 **Defense in depth:** the iframe does NOT trust `updatedBallpointOrderIds` for access control. The list is advisory; refresh is unconditional once tenant + shape validation pass. This prevents a malicious or buggy parent from selectively invalidating per-order state.
 

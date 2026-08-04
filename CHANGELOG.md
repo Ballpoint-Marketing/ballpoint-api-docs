@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.38 — 2026-08-04 — Explicit, fail-closed PostHog analytics contract
+
+- **Closed runtime configuration:** authenticated `GET /v1/config` always returns `analytics: { enabled: false }` or a complete enabled branch containing the bounded `phc_…` project key, pinned US ingestion host, authenticated `account_id`, and normalized `partner_source`. The audited `posthog_analytics_enabled` flag is not exposed raw in `flags`, and failures never return partial analytics fields.
+- **Privacy posture:** browser capture is disabled-first and memory-only, with no build-time key fallback, remote SDK loading, autocapture, replay, person profiles, URL/referrer/campaign capture, feature-flag requests, external dependencies, or PII. Only the ten explicitly approved events/properties and account/partner group context are eligible; telemetry remains best-effort and cannot block the product or the unchanged `/v1/partner/funnel-events` behavior.
+- **Additive order identities:** fresh partner-format `POST /orders` responses and cached idempotent replays now include `campaign_id` (Ballpoint's internal grouping key) and nullable `external_campaign_id` (the echoed cross-system identifier). In-progress idempotency conflicts remain errors.
+- **Optional Edit Leads count:** `recipients_updated` accepts optional integer `recipientCount` from 1 through 1,000,000. Missing or invalid values suppress only `edit_leads_saved`; the existing validated campaign refresh and reconciliation still run.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, and downstream API/iframe partner metadata advance to `1.7.38`. The postMessage envelope stays `1` and API version stays `3.1`.
+- **Availability:** prepared for disabled-first staging validation only. This entry is not a production deployment or analytics-enablement claim.
+
 ## v1.7.37 — 2026-08-02 — A/B cross-variant dedup is recipient-level, not household-level
 
 - **`duplicate_in_campaign` now matches on the recipient, not the mailbox.** The cross-order A/B-split key is the canonical recipient full name (`first_name` + `last_name`) **plus** the existing normalized delivery address (`address`, `city`, `state`, `zip`). Previously the key was the address alone, so a second, different person at an address already used by the sibling variant was rejected and that variant's `piece_count` was reduced.

@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.37 · August 2026** · _prepared for staging validation; not yet deployed to production_
+> **v1.7.38 · August 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -669,6 +669,28 @@ The partner/iframe request shape may include an optional `sender` object. Empty 
 | `phone` | 10 digits, or 11 digits beginning with `1`; `+`, parentheses, spaces, periods, and hyphens are accepted formatting. Letters and extensions are rejected; maximum 20 characters. |
 
 Valid formatted values are persisted as supplied by the API client. The embedded iframe may normalize a valid phone to `AAA-BBB-CCCC` before sending it.
+
+Successful partner-format `POST /orders` responses contain both campaign
+identities in addition to the server order id:
+
+```json
+{
+  "id": "ord_7f3a2b",
+  "campaign_id": "camp_propstream_11115",
+  "external_campaign_id": "camp_mrxonsokyk0ljnk",
+  "status": "accepted",
+  "tracking_id": null,
+  "estimated_delivery": null
+}
+```
+
+`campaign_id` is Ballpoint's internal grouping key derived from the
+authenticated account and `list_id`. `external_campaign_id` is the echoed
+cross-system identifier supplied in the request, or `null` when the request
+omitted it. Fresh responses and cached idempotent replays have the same shape;
+older cached bodies are enriched with these deterministic identifiers when
+replayed. An in-progress idempotency `409` remains an error and is not a cached
+success.
 
 **Example — postcard:**
 
@@ -1840,6 +1862,7 @@ curl https://api.ballpointmarketing.com/v1/config \
 ```json
 {
   "flags": { "propstream_send_mail_enabled": false },
+  "analytics": { "enabled": false },
   "evaluated_at": "2026-07-14T16:00:00Z",
   "evaluation_context": {
     "principal_type": "partner",
@@ -1849,6 +1872,36 @@ curl https://api.ballpointmarketing.com/v1/config \
   "cache_ttl_seconds": 60
 }
 ```
+
+The `analytics` member is always present and is exactly one of two closed
+branches. Disabled responses contain no partial key, host, account, source, or
+reason fields:
+
+```json
+{ "analytics": { "enabled": false } }
+```
+
+The enabled branch is returned only when the effective audited
+`posthog_analytics_enabled` account flag is true, the deployment switch is the
+exact string `true`, the trimmed project key is a bounded `phc_…` key, and the
+authenticated account plus normalized partner source are both non-empty:
+
+```json
+{
+  "analytics": {
+    "enabled": true,
+    "posthog_key": "phc_exampleProjectKey",
+    "posthog_host": "https://us.i.posthog.com",
+    "account_id": "acct_partner_propstream",
+    "partner_source": "propstream"
+  }
+}
+```
+
+The audited analytics flag is intentionally not exposed raw in `flags`; only
+this effective closed union is public. The iframe consumes it automatically
+and fail-closed. There is no build-time key fallback and partners do not need
+to initialize an SDK or handle an analytics response.
 
 The response contains boolean flags only and never returns raw or hashed user
 or account identifiers. Cache it in memory for 60 seconds (`Cache-Control:
