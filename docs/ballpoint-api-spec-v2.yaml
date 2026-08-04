@@ -2,8 +2,8 @@ openapi: 3.1.0
 info:
   title: Ballpoint Marketing API (v1, staging)
   version: 3.1.0
-  x-partner-contract-version: 1.7.38
-  description: "This spec documents the v1 API contract prepared for staging validation. Production and v2 are out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Sandbox only, no real mail |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nAll errors return a consistent envelope with trace ID for debugging:\n\n```json\n{\n  \"error\": {\n    \"type\": \"validation_error\",\n    \"code\": \"INVALID_ADDRESS\",\n    \"message\": \"Address could not be verified\",\n    \"details\": { \"field\": \"to_address_line1\" },\n    \"trace_id\": \"tr_abc123\"\n  }\n}\n```\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.38`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on all responses:\n    - `X-RateLimit-Remaining`: requests remaining in window\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
+  x-partner-contract-version: 1.7.39
+  description: "This spec documents the v1 API contract prepared for staging validation. Production and v2 are out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Sandbox only, no real mail |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nAll errors return a consistent envelope with trace ID for debugging:\n\n```json\n{\n  \"error\": {\n    \"type\": \"validation_error\",\n    \"code\": \"INVALID_ADDRESS\",\n    \"message\": \"Address could not be verified\",\n    \"details\": { \"field\": \"to_address_line1\" },\n    \"trace_id\": \"tr_abc123\"\n  }\n}\n```\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.39`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on all responses:\n    - `X-RateLimit-Remaining`: requests remaining in window\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
   contact:
     name: Ballpoint API Support
     email: api-support@ballpointmarketing.com
@@ -193,6 +193,32 @@ components:
                 trace_id:
                   type: string
                   description: Request trace ID for support; omitted when unavailable.
+    AnalyticsConfigDisabled:
+      type: object
+      additionalProperties: false
+      required: [enabled]
+      properties:
+        enabled: { const: false }
+    AnalyticsConfigEnabled:
+      type: object
+      additionalProperties: false
+      required: [enabled, posthog_key, posthog_host, account_id, partner_source]
+      properties:
+        enabled: { const: true }
+        posthog_key:
+          type: string
+          minLength: 8
+          maxLength: 256
+          pattern: '^phc_[A-Za-z0-9_-]+$'
+        posthog_host:
+          type: string
+          const: https://us.i.posthog.com
+        account_id: { type: string, minLength: 1 }
+        partner_source: { type: string, minLength: 1 }
+    AnalyticsConfig:
+      oneOf:
+      - $ref: '#/components/schemas/AnalyticsConfigDisabled'
+      - $ref: '#/components/schemas/AnalyticsConfigEnabled'
     InvalidTimeZoneError:
       type: object
       description: Standard FastAPI detail-wrapped validation error returned for a blank or unknown account-summary time_zone value.
@@ -230,6 +256,7 @@ components:
       type: object
       required:
       - flags
+      - analytics
       - evaluated_at
       - evaluation_context
       - cache_ttl_seconds
@@ -241,6 +268,8 @@ components:
             type: boolean
           example:
             propstream_send_mail_enabled: false
+        analytics:
+          $ref: '#/components/schemas/AnalyticsConfig'
         evaluated_at:
           type: string
           format: date-time
@@ -919,6 +948,42 @@ components:
               type: string
             trace_id:
               type: string
+    PartnerOrderCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [id, campaign_id, external_campaign_id]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        campaign_id:
+          type: string
+          minLength: 1
+        external_campaign_id:
+          type:
+          - string
+          - 'null'
+        external_id:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+        tracking_id:
+          type:
+          - string
+          - 'null'
+        estimated_delivery:
+          type:
+          - string
+          - 'null'
+        scheduled_production_date:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
     PartnerOrderCreateRequest:
       properties:
         external_id:
@@ -2380,8 +2445,9 @@ paths:
       summary: Resolve partner feature flags
       operationId: get_partner_config
       description: |
-        Returns boolean-only partner feature flags for the current source/user
-        context. The iframe caches this response in memory for 60 seconds.
+        Returns boolean-only partner feature flags plus a closed analytics
+        configuration for the current source/user context. The iframe caches
+        this response in memory for 60 seconds.
         For PropStream, `propstream_send_mail_enabled` also gates both order
         creation routes authoritatively; disabled requests return
         `403 FEATURE_DISABLED` before any mutation.
@@ -2576,8 +2642,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                description: Order acceptance payload (shape not strictly modeled in OpenAPI source).
+                $ref: '#/components/schemas/PartnerOrderCreateResponse'
         '403':
           description: Account suspended or PropStream Send Mail feature disabled
           content:

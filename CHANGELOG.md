@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.39 — 2026-08-04 — Explicit, fail-closed PostHog analytics contract
+
+- **Closed runtime configuration:** authenticated `GET /v1/config` always returns `analytics: { enabled: false }` or a complete enabled branch containing the bounded `phc_…` project key, pinned US ingestion host, authenticated `account_id`, and normalized `partner_source`. The audited `posthog_analytics_enabled` flag is not exposed raw in `flags`, and failures never return partial analytics fields.
+- **Privacy posture:** browser capture is disabled-first and memory-only, with no build-time key fallback, remote SDK loading, autocapture, replay, person profiles, URL/referrer/campaign capture, feature-flag requests, external dependencies, or PII. Only the ten explicitly approved events/properties and account/partner group context are eligible; telemetry remains best-effort and cannot block the product or the unchanged `/v1/partner/funnel-events` behavior.
+- **Additive order identities:** fresh partner-format `POST /orders` responses and cached idempotent replays now include `campaign_id` (Ballpoint's internal grouping key) and nullable `external_campaign_id` (the echoed cross-system identifier). In-progress idempotency conflicts remain errors.
+- **Optional Edit Leads count:** `recipients_updated` accepts optional integer `recipientCount` from 1 through 1,000,000. Missing or invalid values suppress only `edit_leads_saved`; the existing validated campaign refresh and reconciliation still run.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, and downstream API/iframe partner metadata advance to `1.7.39`. The postMessage envelope stays `1` and API version stays `3.1`.
+- **Availability:** prepared for disabled-first staging validation only. This entry is not a production deployment or analytics-enablement claim.
+
 ## v1.7.38 — 2026-08-04 — Timezone-aware account-summary date bounds
 
 - **`GET /v1/mail-tracking/account-summary` now accepts an optional `time_zone` query parameter.** Supply a non-blank IANA time-zone identifier of at most 64 characters (for example, `America/New_York`) to interpret each supplied `from` / `to` value as a local calendar date. The inclusive local dates become a half-open UTC interval: local midnight at `from` is inclusive, and local midnight on the day after `to` is exclusive. For example, `from=2026-08-04&to=2026-08-04&time_zone=America/New_York` resolves to exactly `[2026-08-04T04:00:00Z, 2026-08-05T04:00:00Z)`.
