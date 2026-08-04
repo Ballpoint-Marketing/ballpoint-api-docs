@@ -1330,7 +1330,9 @@ Sent when the user checks or unchecks **Auto-suppress on next drop** in the RTS 
 | `enabled` | boolean | `true` when checked; `false` when unchecked. |
 | `ballpointCampaignId` | string | Non-empty server-side Ballpoint campaign id for the suppression-list view. Never a PropStream list id and never `null` on this event. |
 
-The event contains no recipients, contact identifiers, recipient PII, counts, prices, order ids, request id, or acknowledgement fields. The iframe does not choose which future order is the "next drop," call a recipient-update endpoint, or update any displayed count/price in response to the click.
+The event contains no recipients, contact identifiers, recipient PII, counts, prices, order ids, request id, or acknowledgement fields. The iframe does not call a recipient-update endpoint, mutate any order, or change pricing in response to the click.
+
+**Display-only next-drop note.** While the checkbox is ON, the iframe may show an inline projection beside it — `Next drop: 26,436 leads (adjusted from 26,454)` — computed entirely from data the iframe already holds. It is a preview of what the user just asked for, never a confirmation, and it changes nothing on either side: PropStream remains the only side that decides which drop is applicable and applies the recipient change. Nothing is displayed unless every input is provable, so the note is absent for a Single Send or A/B campaign, when no future drop remains whose recipients PropStream could still change, when the suppression list page is truncated, and when the next drop no longer measures the pre-suppression size shared by the campaign's already-locked drops — which is how the iframe recognises a removal PropStream has already applied and avoids counting it twice. There is no alternative copy: when the projection is not provable, the row shows only the checkbox.
 
 **Visibility and state**
 
@@ -1338,7 +1340,7 @@ The event contains no recipients, contact identifiers, recipient PII, counts, pr
 - The checkbox is rendered only when the iframe can resolve a non-empty `ballpointCampaignId` from the active campaign detail.
 - The iframe remembers a successfully emitted choice only for the lifetime of the current iframe document so ordinary detail re-renders do not visually undo the click. Reloading the iframe resets that visual state in v1.7.11; there is no hydration message in this contract.
 - The event is delivered only to the origin-locked parent. It is queued until that lock exists and is never added to the pre-lock broadcast allowlist.
-- Fire-and-forget: no parent acknowledgement, retry, replay, or optimistic count/pricing update is defined.
+- Fire-and-forget: no parent acknowledgement, retry, or replay is defined, and no price is ever recalculated. The display-only next-drop note described above is the sole optimistic element, and it is confined to the iframe's own suppression panel.
 
 **Expected PropStream behavior**
 
