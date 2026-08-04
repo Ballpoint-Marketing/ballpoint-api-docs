@@ -193,6 +193,39 @@ components:
                 trace_id:
                   type: string
                   description: Request trace ID for support; omitted when unavailable.
+    InvalidTimeZoneError:
+      type: object
+      description: Standard FastAPI detail-wrapped validation error returned for a blank or unknown account-summary time_zone value.
+      required:
+      - detail
+      properties:
+        detail:
+          type: object
+          required:
+          - error
+          properties:
+            error:
+              type: object
+              required:
+              - type
+              - code
+              - message
+              properties:
+                type:
+                  type: string
+                  const: validation_error
+                code:
+                  type: string
+                  const: INVALID_TIME_ZONE
+                message:
+                  type: string
+                  const: time_zone must be a valid IANA time zone.
+                details:
+                  type: object
+                  description: Additional validation context; omitted when unavailable.
+                trace_id:
+                  type: string
+                  description: Request trace ID for support; omitted when unavailable.
     PartnerConfigResponse:
       type: object
       required:
@@ -1805,7 +1838,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                oneOf:
+                - $ref: '#/components/schemas/InvalidTimeZoneError'
+                - $ref: '#/components/schemas/HTTPValidationError'
+              examples:
+                invalidTimeZone:
+                  summary: Blank or unknown IANA time zone
+                  value:
+                    detail:
+                      error:
+                        type: validation_error
+                        code: INVALID_TIME_ZONE
+                        message: time_zone must be a valid IANA time zone.
         '429':
           description: Rate limit exceeded.
           content:
