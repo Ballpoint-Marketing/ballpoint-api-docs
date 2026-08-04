@@ -764,7 +764,7 @@ Both blocks are additive (v1.6.7+) and carry the same shape returned by `GET /v1
 
 These fields are diagnostic and non-sensitive. Partners may ignore them — they do not affect handshake, ordering, billing, or any contract behavior. Existing `iframeVersion`, `maxVersion`, and `buildStamp` are unchanged.
 
-The example above shows the values from a **staging** deploy (`environment: "staging"`, `releaseTag: ""`), which is the currently deployed environment. On a production deploy, `environment` reads `"production"` and `releaseTag` carries the release git tag — the field shapes are identical.
+The payload above is an **illustrative staging example** (`environment: "staging"`, `releaseTag: ""`); it does not assert the version or build currently deployed to staging. On a production deploy, `environment` reads `"production"` and `releaseTag` carries the release git tag — the field shapes are identical.
 
 #### `resize` — Iframe content height changed
 

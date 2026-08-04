@@ -1450,7 +1450,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
 - `last_error` — `null` when there is no recent failure within your scope; otherwise `{code, action, at}` summarizing the most recent error logged for the account.
 - `rate_limit` — current per-minute and per-day limits plus today's usage. `rpm_used` is intentionally omitted (process-local; not reliably aggregable across instances).
 - `daily_piece_cap` — pieces accepted today vs. the configured daily cap.
-- `build` and `contractVersions` (v1.6.7+) — same shape as the iframe `ready` event. See [IFRAME_KIT.md → `ready`](IFRAME_KIT.md#ready--iframe-is-loaded-and-ready-for-configuration) for field-level notes. Diagnostic and non-sensitive — partners may ignore them. The `build` values above are from a **staging** deploy (`environment: "staging"`, `releaseTag: ""`), the currently deployed environment; on production, `environment` is `"production"` and `releaseTag` carries the release tag (field shapes identical).
+- `build` and `contractVersions` (v1.6.7+) — same shape as the iframe `ready` event. See [IFRAME_KIT.md → `ready`](IFRAME_KIT.md#ready--iframe-is-loaded-and-ready-for-configuration) for field-level notes. Diagnostic and non-sensitive — partners may ignore them. The payload above is an **illustrative staging example** (`environment: "staging"`, `releaseTag: ""`); it does not assert the version or build currently deployed to staging. On production, `environment` is `"production"` and `releaseTag` carries the release tag (field shapes identical).
 
 ---
 
