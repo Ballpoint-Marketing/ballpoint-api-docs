@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.37 · August 2026** · _prepared for staging validation; not yet deployed to production_
+> **v1.7.38 · August 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1302,14 +1302,15 @@ Account-level insights used by the iframe's Direct Mail dashboard header. The re
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `from` | date (`YYYY-MM-DD`) | — | Inclusive start date. `scheduled_drops` interprets it as a UTC order Creation Date bound; legacy KPIs continue to apply their existing campaign Creation Date semantics |
-| `to` | date (`YYYY-MM-DD`) | — | Inclusive end date, with the same per-field date-source rule as `from` |
+| `from` | date (`YYYY-MM-DD`) | — | Inclusive local start date. Midnight at the start of this date in `time_zone` becomes the inclusive UTC lower bound |
+| `to` | date (`YYYY-MM-DD`) | — | Inclusive local end date. Midnight on the following date in `time_zone` becomes the exclusive UTC upper bound |
+| `time_zone` | string (IANA, max 64) | `UTC` | Time zone used to interpret each supplied date bound, for example `America/New_York`. Must be a non-blank valid IANA identifier |
 | `list_id` | string (repeatable) | — | Narrow to one or more campaign lists. Repeat for multiple lists; max 100. Omit for account-wide totals. Present-but-empty returns zero results |
 
 **Example:**
 
 ```bash
-curl -s "https://api.ballpointmarketing.com/v1/mail-tracking/account-summary?from=2026-04-01&to=2026-04-30&list_id=marketing_q1_2026" \
+curl -s "https://api.ballpointmarketing.com/v1/mail-tracking/account-summary?from=2026-04-01&to=2026-04-30&time_zone=America%2FNew_York&list_id=marketing_q1_2026" \
   -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 
@@ -1327,7 +1328,25 @@ curl -s "https://api.ballpointmarketing.com/v1/mail-tracking/account-summary?fro
 }
 ```
 
-`scheduled_drops` follows the exact same logical-drop, payment-visibility, and canonical purchased Multi-Send rule as `/v1/billing/partner/stats`. Its `from`/`to` filter is inclusive in UTC and uses the logical drop's order Creation Date (`orders.created_at`; an A/B pair uses its earliest sibling Creation Date). The pre-existing fields `total_pieces_mailed`, `active_campaigns`, `completed_campaigns`, and `total_rts` retain their legacy campaign Creation Date filter (`campaigns.created_at`). Omitting a bound returns `null` for the corresponding `date_from` or `date_to` echo.
+`from` and `to` are inclusive **local calendar dates** in `time_zone`. The server converts local midnight at each supplied `from` to an inclusive UTC instant and local midnight on the day after each supplied `to` to an exclusive UTC instant: `[local from midnight, local day-after-to midnight)`, converted to UTC. Each midnight is resolved independently, so DST transitions have their real duration. For example, `2026-08-04` in `America/New_York` is exactly `[2026-08-04T04:00:00Z, 2026-08-05T04:00:00Z)`; the New York spring-forward and fall-back days are respectively 23-hour and 25-hour UTC windows. Omitting `time_zone` is backward compatible and uses `UTC`.
+
+`scheduled_drops` follows the exact same logical-drop, payment-visibility, and canonical purchased Multi-Send rule as `/v1/billing/partner/stats`. The converted half-open instant bounds apply to the logical drop's order Creation Date (`orders.created_at`; an A/B pair uses its earliest sibling Creation Date). The pre-existing fields `total_pieces_mailed`, `active_campaigns`, `completed_campaigns`, and `total_rts` retain their legacy campaign Creation Date ownership (`campaigns.created_at`) while using the same converted bounds. The time-zone option changes only how date boundaries become instants; it does not move a metric between order and campaign cohorts.
+
+`time_zone` is validated whenever it is supplied, even when both date bounds are omitted. Blank or unknown identifiers return the standard detail-wrapped validation error:
+
+```json
+{
+  "detail": {
+    "error": {
+      "type": "validation_error",
+      "code": "INVALID_TIME_ZONE",
+      "message": "time_zone must be a valid IANA time zone."
+    }
+  }
+}
+```
+
+The response shape is unchanged: `time_zone` is not echoed. Omitting a bound still returns `null` for the corresponding `date_from` or `date_to`; a supplied bound is echoed as its original `YYYY-MM-DD` local date.
 
 Pieces Mailed includes every committed drop of a canonical purchased Multi-Send even when future drops remain unconfirmed; ordinary unconfirmed orders stay excluded, cancelled/failed orders stay included, and Active/Completed/RTS behavior is unchanged. These are aggregate semantics only—no status taxonomy, status tab, order lifecycle, or webhook changed.
 
@@ -1422,7 +1441,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.6.7"
+    "partner": "1.7.38"
   }
 }
 ```
@@ -1431,7 +1450,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
 - `last_error` — `null` when there is no recent failure within your scope; otherwise `{code, action, at}` summarizing the most recent error logged for the account.
 - `rate_limit` — current per-minute and per-day limits plus today's usage. `rpm_used` is intentionally omitted (process-local; not reliably aggregable across instances).
 - `daily_piece_cap` — pieces accepted today vs. the configured daily cap.
-- `build` and `contractVersions` (v1.6.7+) — same shape as the iframe `ready` event. See [IFRAME_KIT.md → `ready`](IFRAME_KIT.md#ready--iframe-is-loaded-and-ready-for-configuration) for field-level notes. Diagnostic and non-sensitive — partners may ignore them. The `build` values above are from a **staging** deploy (`environment: "staging"`, `releaseTag: ""`), the currently deployed environment; on production, `environment` is `"production"` and `releaseTag` carries the release tag (field shapes identical).
+- `build` and `contractVersions` (v1.6.7+) — same shape as the iframe `ready` event. See [IFRAME_KIT.md → `ready`](IFRAME_KIT.md#ready--iframe-is-loaded-and-ready-for-configuration) for field-level notes. Diagnostic and non-sensitive — partners may ignore them. The payload above is an **illustrative staging example** (`environment: "staging"`, `releaseTag: ""`); it does not assert the version or build currently deployed to staging. On production, `environment` is `"production"` and `releaseTag` carries the release tag (field shapes identical).
 
 ---
 
@@ -2865,7 +2884,7 @@ Before switching to your live key:
 | Cancel order | `POST` | `/orders/{id}/cancel` | `X-Partner-Key` |
 | Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` (server-to-server only) |
 | Partner dashboard stats | `GET` | `/v1/billing/partner/stats?days=30&list_id=...&external_user_id=...` | `X-Partner-Key` |
-| Account insights summary (iframe automatic) | `GET` | `/v1/mail-tracking/account-summary?from=...&to=...&list_id=...` | `X-Partner-Key` |
+| Account insights summary (iframe automatic) | `GET` | `/v1/mail-tracking/account-summary?from=...&to=...&time_zone=...&list_id=...` | `X-Partner-Key` |
 | Partner dashboard orders | `GET` | `/v1/billing/partner/orders?days=30&list_id=...&status=...` | `X-Partner-Key` |
 | Recipient/direct-mail search (iframe automatic) | `GET` | `/v1/mail-tracking/recipients/search?q=...&limit=20&offset=0&list_id=...` | `X-Partner-Key`, optional `X-External-User-ID` |
 | Opt out recipient address (iframe automatic; manual API use is state-changing) | `POST` | `/v1/mail-tracking/recipients/opt-out` | `X-Partner-Key` |

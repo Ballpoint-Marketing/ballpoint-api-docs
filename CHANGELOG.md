@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.38 — 2026-08-04 — Timezone-aware account-summary date bounds
+
+- **`GET /v1/mail-tracking/account-summary` now accepts an optional `time_zone` query parameter.** Supply a non-blank IANA time-zone identifier of at most 64 characters (for example, `America/New_York`) to interpret each supplied `from` / `to` value as a local calendar date. The inclusive local dates become a half-open UTC interval: local midnight at `from` is inclusive, and local midnight on the day after `to` is exclusive. For example, `from=2026-08-04&to=2026-08-04&time_zone=America/New_York` resolves to exactly `[2026-08-04T04:00:00Z, 2026-08-05T04:00:00Z)`.
+- **Daylight-saving boundaries use the zone's real local midnights.** In `America/New_York`, local day `2026-03-08` maps to a 23-hour UTC window (`[2026-03-08T05:00:00Z, 2026-03-09T04:00:00Z)`), while `2026-11-01` maps to a 25-hour window (`[2026-11-01T04:00:00Z, 2026-11-02T05:00:00Z)`).
+- **The iframe sends its browser time zone for every bounded insights preset.** It passes camelCase `timeZone` through its JavaScript client, which serializes the HTTP query key as `time_zone`. **All Time** remains unbounded and omits the field; if browser time-zone resolution is unavailable, bounded presets send `UTC`.
+- **Existing callers remain UTC-compatible.** Omitting `time_zone` preserves the prior UTC interpretation. A blank or unknown zone returns the standard detail-wrapped `422 INVALID_TIME_ZONE`; values longer than 64 characters fail query validation.
+- **Metric ownership and the response shape are unchanged.** The converted instant bounds apply to `scheduled_drops` over logical-drop order Creation Date and to the legacy Pieces/Active/Completed/RTS cohorts over campaign Creation Date. A/B and Multi-Send grouping, payment visibility, tenant/list ownership, response field names, and `date_from` / `date_to` echoes are unchanged; no time-zone field is added to the response and no `postMessage` contract changes.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, and iframe/API partner-contract version metadata report `1.7.38`; the REST API version remains `3.1`.
+- **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
+
 ## v1.7.37 — 2026-08-02 — A/B cross-variant dedup is recipient-level, not household-level
 
 - **`duplicate_in_campaign` now matches on the recipient, not the mailbox.** The cross-order A/B-split key is the canonical recipient full name (`first_name` + `last_name`) **plus** the existing normalized delivery address (`address`, `city`, `state`, `zip`). Previously the key was the address alone, so a second, different person at an address already used by the sibling variant was rejected and that variant's `piece_count` was reduced.

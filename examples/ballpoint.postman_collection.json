@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.37 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.38 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -893,9 +893,29 @@
                     "v1",
                     "mail-tracking",
                     "account-summary"
+                  ],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "{{account_summary_from}}",
+                      "description": "Inclusive local start date (YYYY-MM-DD). Enable with to and time_zone to test the environment's bounded local-day example.",
+                      "disabled": true
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{account_summary_to}}",
+                      "description": "Inclusive local end date (YYYY-MM-DD). The API converts the following local midnight to the exclusive UTC upper bound.",
+                      "disabled": true
+                    },
+                    {
+                      "key": "time_zone",
+                      "value": "{{account_summary_time_zone}}",
+                      "description": "Non-blank IANA time zone (maximum 64 characters) used to interpret from/to. Omit for backward-compatible UTC bounds.",
+                      "disabled": true
+                    }
                   ]
                 },
-                "description": "Account-level Direct Mail insights, requested All Time in this collection. The endpoint accepts inclusive from/to dates (not days) plus repeatable list_id. scheduled_drops is the same canonical non-negative logical-drop KPI exposed by /v1/billing/partner/stats; legacy Pieces/Active/Completed/RTS fields keep their campaign Creation Date scope."
+                "description": "Account-level Direct Mail insights, requested All Time in this collection because the example from/to/time_zone query fields are disabled. When enabled, from/to are inclusive local dates in the supplied IANA time_zone and become a half-open UTC interval; omitted time_zone defaults to UTC, while blank or unknown identifiers return 422 INVALID_TIME_ZONE. scheduled_drops keeps its logical-drop order Creation Date basis; legacy Pieces/Active/Completed/RTS keep their campaign Creation Date basis. The response shape is unchanged."
               },
               "event": [
                 {
