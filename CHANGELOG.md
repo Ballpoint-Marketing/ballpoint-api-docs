@@ -14,10 +14,6 @@
 - **Artifact sync:** API Kit, OpenAPI, and the API partner-contract version metadata report `1.7.40`.
 - **Availability:** prepared for staging validation only. This entry is not a production deployment or availability claim.
 
-## v1.7.39 — 2026-08-04 — Internal analytics version advance (no partner-facing change)
-
-- **No partner-facing change.** This version number was advanced alongside internal server-side analytics and static-hosting configuration work. No endpoint, request field, response field, webhook payload, postMessage type, or documented behavior was added, removed, renamed, or altered. The entry exists so the published contract history has no gap between `1.7.38` and `1.7.40`.
-
 ## v1.7.38 — 2026-08-04 — Timezone-aware account-summary date bounds
 
 - **`GET /v1/mail-tracking/account-summary` now accepts an optional `time_zone` query parameter.** Supply a non-blank IANA time-zone identifier of at most 64 characters (for example, `America/New_York`) to interpret each supplied `from` / `to` value as a local calendar date. The inclusive local dates become a half-open UTC interval: local midnight at `from` is inclusive, and local midnight on the day after `to` is exclusive. For example, `from=2026-08-04&to=2026-08-04&time_zone=America/New_York` resolves to exactly `[2026-08-04T04:00:00Z, 2026-08-05T04:00:00Z)`.
