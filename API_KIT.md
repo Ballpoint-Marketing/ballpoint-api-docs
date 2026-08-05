@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.38 · August 2026** · _prepared for staging validation; not yet deployed to production_
+> **v1.7.40 · August 2026** · _prepared for staging validation; not yet deployed to production_
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1441,7 +1441,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.38"
+    "partner": "1.7.40"
   }
 }
 ```
@@ -1462,7 +1462,13 @@ Update an order's scheduled mail date without creating a replacement order. V1 c
 POST /v1/billing/orders/{order_id}/reschedule
 ```
 
-**Allowed when:** `production_status = 'scheduled'` — **paid or unpaid** (contract v1.7.32 / PROPS-3322). The lock is the fulfillment lock (the order entering production at `accepted`), not payment: PropStream charges the end user at checkout, so a paid `scheduled` order stays reschedulable until its production date. Any other state returns `409` with a reason code (see the table below).
+**Allowed when `production_status` is `scheduled`, or `accepted` with its `scheduled_production_date` still ahead of it** — **paid or unpaid** (contract v1.7.32 / PROPS-3322, widened in v1.7.40). The lock is the fulfillment lock, not payment: PropStream charges the end user at checkout, so a paid order stays reschedulable until production starts. Any other state returns `409` with a reason code (see the table below).
+
+**`accepted` is no longer refused outright (v1.7.40).** The window used to be keyed on `production_status = 'scheduled'` alone, which quietly excluded short-notice orders: an order whose production date falls today, tomorrow, or already in the past opens directly in `accepted`, so it was refused from the moment it was created and was never reschedulable at all. Such an order is now reschedulable for as long as its production date is still ahead of it.
+
+**For an `accepted` order the window closes at the START of the production day, not at a clock time.** `scheduled_production_date` is a UTC-midnight date; the order is locked for the whole of that day. An `accepted` order whose `scheduled_production_date` is `null` — rows created before v1.7.40, or created without a usable `mail_date` — cannot prove its window is open and is refused.
+
+> A `scheduled` order is accepted by this endpoint whatever its `scheduled_production_date`. The `scheduled → accepted` transition is owned by a Ballpoint cron, so a `scheduled` order whose production date has passed means that cron is lagging, not that the order entered production. v1.7.40 does not narrow that case.
 
 **Paid orders are date-only.** Rescheduling an order with `payment_confirmed = TRUE` changes the mail date and `scheduled_production_date` only — **no re-billing, no repricing, no balance movement**. Pricing was frozen at `/confirm-payment` and is not recomputed (it only changes if the fulfillment/product type changes, which this endpoint does not allow).
 
@@ -1505,14 +1511,14 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/res
 | 400 | `MAIL_DATE_TOO_SOON` | `mail_date − SLA_business_days(product_type)` is ≤ today + 1 day (same threshold as `create_order`'s scheduling branch). SLA is in **business days** (Mon–Fri); see §6q for the full table. |
 | 400 | `MAIL_DATE_TOO_FAR` | `mail_date` is more than 365 days in the future |
 | 409 | `SEND_NOW_PROCESSING` | Send-now order in `pending_payment` awaiting `/confirm-payment` |
-| 409 | `IN_PRODUCTION` | Status is `accepted`, `prep`, `printing`, `writing`, `inserting`, `stamping`, or `shipping` |
+| 409 | `IN_PRODUCTION` | Status is `prep`, `printing`, `writing`, `inserting`, `stamping`, or `shipping`; **or** status is `accepted` and the order's `scheduled_production_date` has arrived (or is `null`). Before v1.7.40 `accepted` was refused unconditionally. |
 | 409 | `TERMINAL` | Status is `complete`, `cancelled`, `failed`, or `payment_failed` |
 | 409 | `STATE_CHANGED` | Concurrent state transition between read and write — retry once |
 | 404 | `ORDER_NOT_FOUND` | Order does not exist OR belongs to a different tenant (404, never 403, to prevent existence probing) |
 
 > **Retired in v1.7.32:** `PAID_LOCKED` is no longer returned by this endpoint. Clients that branched on it should treat it as impossible going forward (it remains in use by Edit Leads — `§6o` — which still locks on payment).
 
-**Distinct from `payment_failed → new order`.** The existing terminal-failed-payment flow (`§6k Confirm Payment`) applies only **after** a terminal payment failure: the failed order is left in `payment_failed`, and partners create a fresh order to retry. Same-order reschedule (this endpoint) applies to any `scheduled` order, paid or unpaid, up to the fulfillment lock (entering production).
+**Distinct from `payment_failed → new order`.** The existing terminal-failed-payment flow (`§6k Confirm Payment`) applies only **after** a terminal payment failure: the failed order is left in `payment_failed`, and partners create a fresh order to retry. Same-order reschedule (this endpoint) applies to any order, paid or unpaid, whose production date has not yet arrived.
 
 **On success.** Ballpoint emits the `order.rescheduled` webhook (see §7 Payload Format) and — when initiated from the embedded iframe — an `order_rescheduled` postMessage to the parent (see `IFRAME_KIT.md §6`). Webhook endpoints are selected by the exact partner identity tuple `account_id + source + external_account_id`, then by the endpoint's optional `event_types[]` allowlist. Cross-tenant endpoints are not eligible (see [§7 Delivery Scope](#delivery-scope-shipping-behavior)).
 
@@ -1841,6 +1847,8 @@ Ballpoint computes `scheduled_production_date` by subtracting the product's SLA 
 Unknown product types are rejected by validation (`INVALID_PRODUCT_CONFIG`). If an unrecognized type reaches the scheduler through a legacy path, the conservative default is 6 business days.
 
 The 3/4/6 policy applies when Ballpoint computes a schedule for a new order or a rescheduled order. Existing orders keep their persisted `scheduled_production_date`; this release does not backfill them automatically.
+
+**`scheduled_production_date` is now populated whenever a usable `mail_date` is supplied (v1.7.40).** It is a derived fact of `mail_date` + `product_type`, so it is recorded whatever status the order opens in. Before v1.7.40 it was stored only when the order opened in `scheduled`, which left every short-notice order — anything whose production date falls today, tomorrow, or in the past — with `null`. It is still `null` when the order carries no `mail_date` at all, or one that cannot be parsed as `YYYY-MM-DD`; and orders created before v1.7.40 may carry `null` for any reason. Treat `null` as "unknown", not as "no production date" — §6m refuses to reschedule an `accepted` order on that basis. The field does **not** imply `production_status = 'scheduled'`, and populating it does not change which orders the scheduling cron advances (that remains gated on the status).
 
 The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date ≤ today + 1 day`.
 
