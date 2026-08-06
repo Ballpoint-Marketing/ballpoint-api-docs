@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.7.41 — 2026-08-06 — PROPS-3029 new-user Direct Mail Dashboard empty state (Figma parity)
+
+- **A dashboard with zero direct mails now renders only the illustrated empty state.** The status tab row and the search + "+ Create Direct Mail" header are hidden whenever the (possibly list-filtered) campaign list is empty and loaded successfully — including under an active `set_dashboard_filter` and for its `[]` zero-results value. The empty-state card carries the Create CTA. The header stays visible on the load-error and missing-user-context states, which have no CTA of their own.
+- **The Dashboard Sender Information card now keys on profile COMPLETENESS, not presence.** A partial profile (PropStream always seeds the marketing-profile name into `set_sender`) keeps the illustrated **Set Up Your Sender Information** card with **Set Up Now** instead of rendering a summary full of `Not set`, matching the Figma empty-state frame. Only a complete profile (`fullName`, `address`, `city`, `state`, valid `zip` + `phone`) renders the summary and **Edit**. Saved partial values are unchanged and still prefill the parent's Marketing Profile modal; the `sender_setup_requested` flow, the Sender Information step, and every `externalUserIsAccountOwner` non-owner rule are unaffected.
+- **No message schema, route, or payload change.** Parent → iframe and iframe → parent envelopes are identical; this is a documented rendering-behavior change on the PropStream-facing dashboard surface (iframe PROPS-3029, Figma "Direct Mail Revamp" node 422-71699).
+
 ## v1.7.40 — 2026-08-05 — Reschedule window keyed on the production date
 
 - **`POST /v1/billing/orders/{order_id}/reschedule` now also accepts an `accepted` order whose `scheduled_production_date` is still ahead of it.** The window used to be keyed on `production_status = 'scheduled'` alone. That silently excluded every short-notice order: an order whose production date falls today, tomorrow, or already in the past opens directly in `accepted`, so it was refused from the moment it was created and was never reschedulable at all. `409 IN_PRODUCTION` is still returned for `prep`, `printing`, `writing`, `inserting`, `stamping`, `shipping`, and for `accepted` once its production date has arrived.
