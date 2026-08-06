@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.40** (prepared for staging validation; not yet deployed to production)
+Partner contract version: **v1.7.41** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -345,7 +345,7 @@ Optional boolean on singular `set_list` and on `set_sender`. It controls the emb
 
 | Effective value | Iframe behavior |
 |-----------------|-----------------|
-| `true` | An incomplete profile shows **Set up now** or **Complete in Marketing Profile**. A profile with any sender data shows **Edit** on the Dashboard. Clicking any of these actions may emit `sender_setup_requested`. |
+| `true` | An incomplete profile shows **Set up now** or **Complete in Marketing Profile**. On the Dashboard, only a **complete** profile shows the sender summary and **Edit**; an incomplete profile (empty or partial) keeps the illustrated **Set Up Your Sender Information** card with **Set Up Now**. Clicking any of these actions may emit `sender_setup_requested`. |
 | `false`, missing, or any non-`true` value | Setup/edit actions are hidden. On the Sender Information step, an incomplete profile shows the blocked-state message ("Please contact your account owner to set up sender info"). On the Direct Mail Dashboard, the Sender Information card is hidden entirely whether the sender profile is empty, partial, or complete. `sender_setup_requested` is suppressed. |
 
 Rules:
@@ -447,8 +447,8 @@ Use this when your app wants the user to see, in My Campaigns, only the direct-m
 
 | Value | Meaning |
 |-------|---------|
-| `["a", "b", …]` (1–100 ids) | Scope the dashboard to those lists. The campaign list, insights header, **and** tab counts all narrow together. Ids are sanitized + de-duplicated. |
-| `[]` (empty array) | **Zero-results** — the dashboard renders empty (empty list, zeroed insights, all tab counts `0`). This is **not** "show all"; use it when the selected group has no lists. |
+| `["a", "b", …]` (1–100 ids) | Scope the dashboard to those lists. The campaign list, insights header, **and** tab counts all narrow together. Ids are sanitized + de-duplicated. When the scoped result has zero campaigns, the dashboard renders the illustrated empty state and the tab row + search/Create header are hidden (the empty-state card carries the Create CTA). |
+| `[]` (empty array) | **Zero-results** — the dashboard renders the illustrated empty state with zeroed insights; the tab row and the search/Create header are hidden (the empty-state card carries the Create CTA). This is **not** "show all"; use it when the selected group has no lists. |
 | `null` or field omitted | **Clear** the filter — the dashboard returns to the full account-wide view. |
 | more than 100 ids | **Rejected** with no truncation — the whole message is ignored (a warning is logged). Send ≤ 100. |
 
@@ -694,7 +694,7 @@ A sender profile is complete only when `fullName`, `address`, `city`, and `state
 | Profile received | Sender Information step | Direct Mail Dashboard |
 |------------------|-------------------------|-----------------------|
 | Complete | The iframe may advance to Direct Mail Type. If another parent modal is open, the parent still owns when that modal closes. | An account owner sees the sender summary and **Edit**. A non-owner sees no Sender Information card. |
-| Partial | The step remains open. Supplied fields are prefilled read-only, missing fields remain empty, and an account owner sees **Complete in Marketing Profile**. | An account owner sees available values, `Not set` for missing values, and **Edit**. A non-owner sees no Sender Information card. |
+| Partial | The step remains open. Supplied fields are prefilled read-only, missing fields remain empty, and an account owner sees **Complete in Marketing Profile**. | An account owner sees the illustrated **Set Up Your Sender Information** card with **Set Up Now** (the saved partial values are kept and prefill the Marketing Profile modal). A non-owner sees no Sender Information card. |
 | Empty + account owner | Shows **Set up now**. | Shows **Set up now**. |
 | Empty + non-owner | Shows the account-owner blocked state and emits no setup request. | The Sender Information card is hidden entirely and no setup request is emitted. |
 
@@ -1102,7 +1102,7 @@ No sender PII (`fullName`, `firstName`, `lastName`, `businessName`, `address`, `
 
 - **Gated by the effective `externalUserIsAccountOwner === true`.** The value may be bootstrapped by `set_sender` before list context exists; an accepted singular `set_list` is authoritative afterward. When the effective value is `false`, missing, or non-`true`, setup/edit actions are hidden and `sender_setup_requested` is not emitted. See [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner).
 - On the Sender Information step, an empty profile renders **Set up now** and a partial profile renders its available fields plus **Complete in Marketing Profile**. A complete profile may advance the active create flow.
-- On the Direct Mail Dashboard, an account owner sees **Set up now** for an empty profile and the available sender summary plus **Edit** for a partial or complete profile. A non-owner sees no Sender Information card in any sender state. Dashboard clicks use `page: "campaigns"`.
+- On the Direct Mail Dashboard, an account owner sees **Set Up Now** for an empty or partial profile (the illustrated Set Up card) and the sender summary plus **Edit** only for a complete profile. A non-owner sees no Sender Information card in any sender state. Dashboard clicks use `page: "campaigns"`.
 - In standalone (non-embed) mode the iframe falls back to its built-in inline sender form. The CTA is suppressed.
 - **Pre-lock behavior:** queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Not broadcast to all allowlisted origins. Identical treatment to `edit_leads_requested`.
 - **Parent owns its modal lifecycle.** The iframe does not emit a modal-close or modal-cancel event. Receiving `set_sender` may update or advance the iframe underneath, but it does not instruct PropStream to close its Marketing Profile modal. Keep that modal open until the parent completes its own explicit save or close action.
