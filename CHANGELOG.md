@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Correctness restorations within the v1.7.41 contract
+
+**Availability:** live in production.
+
+Each item below corrects behavior that had drifted from what this contract defines. None introduces new behavior, and none requires a change on the partner side.
+
+- **Classic flows keep the selected product identity across an editor Cancel.** Cancelling out of the editor on a Classic template no longer replaces the piece with a generic one, so the **Customize** control stays available on the piece screen and the selection survives in Multi-Send and A/B campaigns, including the size chosen before opening the editor. This also restores `productIds` on `campaign_created` and `campaign_submitted`: the array again carries the selected product ids, as `IFRAME_KIT.md` describes, instead of arriving empty while a Classic was open in the editor.
+- **The Classic Back preview shows the actual back artwork.** The Back tab previously repeated the front image. It now renders the real back. This was a preview-only defect: the design submitted with the order already contained the correct back, so nothing about the mailed piece changed.
+- **Campaign mail-tracking `total_pieces` is published from the campaign's indexed pieces.** The value is no longer taken from the rows of whichever manifest was ingested most recently, so a partial or corrective re-ingest no longer replaces a campaign's total with the size of that file, and the published total stays consistent with the indexed rows when a large manifest fails partway through ingestion. The field's definition, scope and inclusion rules are unchanged. Because `scan_coverage`, `delivered_rate`, `rts_rate` and `mail_status` are derived from this total, affected campaigns will show corrected values; reconciliations keyed on the previous numbers should be re-run.
+- **Cancelling an eligible order stops outstanding render work.** Cancellation now reaches render work that was already in flight, so a cancelled order does not continue producing and publishing artifacts afterwards. `display_status` remains the single partner-facing state field and reads `cancelled`; `render_status` is internal bookkeeping and may still read `rendering` for an order whose work has stopped. One observable consequence, accepted deliberately: when a cancel arrives while a piece is mid-publication, the request now waits for that work to yield instead of skipping it, so `POST /v1/billing/orders/{order_id}/cancel` can take longer to respond than before. If a client times out, re-read the order rather than treating the timeout as a failed cancel.
+- **No schema or contract change.** No route, request or response field, field type, webhook schema, `postMessage` schema or status taxonomy changed, and the partner contract version remains **v1.7.41**. Corrected values are delivered through existing fields. No PropStream implementation, configuration or migration is required.
+
 ## v1.7.41 — 2026-08-06 — PROPS-3029 new-user Direct Mail Dashboard empty state (Figma parity)
 
 - **A dashboard with zero direct mails now renders only the illustrated empty state.** The status tab row and the search + "+ Create Direct Mail" header are hidden whenever the (possibly list-filtered) campaign list is empty and loaded successfully — including under an active `set_dashboard_filter` and for its `[]` zero-results value. The empty-state card carries the Create CTA. The header stays visible on the load-error and missing-user-context states, which have no CTA of their own.
