@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.42 — 2026-08-11 — Handwritten message merge tags render per recipient
+
+- **The four merge chips exposed in the handwritten-message editor now resolve in canvas-backed print output.** `{first_name}` reads the structured recipient first name; `{property_address}` reads `placeHolders.PropertyStreet`; `{city}` reads `placeHolders.PropertyCity`; and `{property_value}` reads the new optional `placeHolders.PropertyValue` input.
+- **Normal canvas rendering and production batching share the same implementation.** The mapping is applied before rasterization and PDF assembly in both paths, so batching does not change personalization semantics for renderable artwork.
+- **Mailing data never substitutes for missing property data.** Missing `PropertyStreet`, `PropertyCity`, or `PropertyValue` renders blank. Unknown single-brace tokens remain literal, and token-shaped text inside a supplied value is not recursively expanded.
+- **The locked 11-field V1 canvas contract is unchanged.** `PropertyValue` is message-only and does not become a 12th canonical `#Token#` field. The recipient upload schema already accepts scalar `placeHolders` keys; partners that use `{property_value}` must begin supplying `PropertyValue` per recipient.
+- **Known boundary:** the standalone order `message` field is metadata, not Fabric artwork. This release does not synthesize missing `canvas_json` for legacy local-catalog postcards; those designs remain on their existing fulfillment path until print-ready canvas assets are available.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.42`.
+- **Availability:** prepared and verified locally only. This entry is not a staging or production deployment claim.
+
 ## Unreleased — Correctness restorations within the v1.7.41 contract
 
 **Availability:** live in production.
