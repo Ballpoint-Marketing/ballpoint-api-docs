@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.41 · August 2026** · live in production
+> **v1.7.42 · August 2026** · prepared for staging validation
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1441,7 +1441,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.40"
+    "partner": "1.7.42"
   }
 }
 ```
@@ -1548,7 +1548,12 @@ The PropStream flow is create the order first (with `piece_count`, via `POST /or
       "zip": "94103",
       "contact_id": "ps_contact_42",
       "address_type": "MAILING",
-      "placeHolders": { "OwnerFirstName": "Jane" }
+      "placeHolders": {
+        "OwnerFullName": "Jane Doe",
+        "PropertyStreet": "42 Market Street",
+        "PropertyCity": "Oakland",
+        "PropertyValue": "$425,000"
+      }
     }
   ],
   "append": false
@@ -1558,8 +1563,20 @@ The PropStream flow is create the order first (with `piece_count`, via `POST /or
 - `recipients[]` — max 10,000 per request. For larger orders, chunk with multiple calls using `append=true`.
 - Required per recipient: `address`, `city`, `state` (2-letter), `zip` (5 or 5+4).
 - At least one of `first_name` / `last_name` (enforced per-row — see partial acceptance below).
-- Optional: `company`, `address2`, `contact_id` (<=64; partner-side recipient id, stored verbatim and round-tripped, never interpreted by Ballpoint), `address_type` (`PROPERTY` | `MAILING`; optional for order-level upload), `placeHolders` (camelCase; PropStream V1 merge-tag values; used for render personalization only, never as the delivery address).
+- Optional: `company`, `address2`, `contact_id` (<=64; partner-side recipient id, stored verbatim and round-tripped, never interpreted by Ballpoint), `address_type` (`PROPERTY` | `MAILING`; optional for order-level upload), `placeHolders` (camelCase; PropStream V1 Owner/Property merge values plus optional message-only `PropertyValue`; used for render personalization only, never as the delivery address).
+
 - `append` (default `false`): `false` REPLACES all existing recipients on the order (idempotent re-upload); `true` APPENDS to existing recipients (for chunked uploads of large orders).
+
+The handwritten-message chips use this exact mapping at render time:
+
+| Message tag | Recipient source | Missing value |
+|---|---|---|
+| `{first_name}` | structured `first_name` | blank |
+| `{property_address}` | `placeHolders.PropertyStreet` | blank; never falls back to mailing `address` |
+| `{city}` | `placeHolders.PropertyCity` | blank; never falls back to mailing `city` |
+| `{property_value}` | `placeHolders.PropertyValue` | blank |
+
+For canvas-backed designs, the same mapping runs for ordinary per-order rendering and production batching before the card is rasterized or assembled into a PDF. `PropertyValue` is message-only and does not add a 12th canonical Color Letter `#Token#` field. The standalone `message` metadata field is not printable artwork and does not synthesize a missing `canvas_json` for legacy catalog products.
 
 **Response (`200`):**
 

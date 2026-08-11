@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.41** (live in production)
+Partner contract version: **v1.7.42** (prepared for staging validation)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -745,7 +745,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.40"
+    "partner": "1.7.42"
   }
 }
 ```
@@ -1749,7 +1749,12 @@ Content-Type: application/json
       "state": "AZ",
       "zip": "85001",
       "contact_id": "ps_contact_8123",
-      "address_type": "PROPERTY"
+      "address_type": "PROPERTY",
+      "placeHolders": {
+        "PropertyStreet": "123 Main St",
+        "PropertyCity": "Phoenix",
+        "PropertyValue": "$425,000"
+      }
     }
   ],
   "append": false
@@ -1770,6 +1775,9 @@ Content-Type: application/json
 | `zip` | Yes | ZIP code — 5-digit (`85001`) or ZIP+4 (`85001-1234`) |
 | `contact_id` | No | Stable partner-side contact/lead identifier (e.g. PropStream contact id), max 64 chars. Stored verbatim, never interpreted by Ballpoint, round-tripped on the corresponding `GET .../recipients` response, and echoed verbatim on per-piece RTS push-back events so you can map returned pieces directly to the CRM contact. **For partners using the per-piece RTS push-back, `contact_id` must be populated on every recipient** — the V1 RTS payload carries `contact_id` only (no name/address fields). |
 | `address_type` | No | `PROPERTY` or `MAILING`. Optional for order-level upload; pair with `contact_id` when you need to distinguish a contact's property vs mailing address records. On the campaign-level Edit Leads / delta endpoint it is **required** and, together with `contact_id`, forms the upsert/remove key. |
+| `placeHolders` | No | Per-recipient render values. For handwritten-message chips, send `PropertyStreet` for `{property_address}`, `PropertyCity` for `{city}`, and optional `PropertyValue` for `{property_value}`. `{first_name}` uses the structured `first_name` field. Missing property values print blank and never fall back to the mailing address. |
+
+The iframe submits the four message tags literally in the order message. When a canvas-backed design carries that text in its printable artwork, Ballpoint resolves the tags per recipient before both ordinary and batched raster/PDF generation. `PropertyValue` is message-only; the existing 11 canonical Color Letter `#Token#` fields are unchanged. The message field alone does not synthesize a missing canvas for legacy catalog products.
 
 > For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6p`](API_KIT.md#6p-campaign-delta-recipients--addremove-across-editable-drops).
 
