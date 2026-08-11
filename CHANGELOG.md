@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.43 — 2026-08-11 — PROPS-3029 incomplete-owner New Activity routing
+
+- **`open_create_direct_mail` now keeps an account owner with incomplete sender information on the Direct Mail Dashboard.** The dashboard's illustrated **Set Up Your Sender Information / Set Up Now** state is the single prerequisite surface for this case; the command no longer opens the legacy standalone Sender Information page.
+- **Completed owners and team members keep their existing behavior.** A completed owner still enters the create flow immediately. A team member with incomplete sender information still receives the existing non-owner blocked prerequisite and cannot emit `sender_setup_requested`. Returning to the Dashboard does not initialize or reset campaign state.
+- **No message schema, payload, API route, webhook, or merge-tag change.** This is a navigation correction within the existing V1 `open_create_direct_mail` command and PROPS-3029 new-user experience. Existing campaigns remain available on the Dashboard, and the sender setup action continues to be owned by the PropStream Marketing Profile.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.43`.
+- **Availability:** prepared and verified locally; staging validation is pending.
+
 ## v1.7.42 — 2026-08-11 — Handwritten message merge tags render per recipient
 
 - **The four merge chips exposed in the handwritten-message editor now resolve in canvas-backed print output.** `{first_name}` reads the structured recipient first name; `{property_address}` reads `placeHolders.PropertyStreet`; `{city}` reads `placeHolders.PropertyCity`; and `{property_value}` reads the new optional `placeHolders.PropertyValue` input.
