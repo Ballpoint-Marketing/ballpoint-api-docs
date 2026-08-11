@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.42** (prepared for staging validation)
+Partner contract version: **v1.7.43** (prepared for staging validation)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -411,7 +411,9 @@ Use this when your parent app needs to programmatically open the same flow the i
 }
 ```
 
-This message has no required payload fields. On success, the iframe reuses its internal `startNewCampaign()` path and emits the normal `page_changed` event for the page it opens (`type` when sender info is already saved, otherwise `setup`).
+This message has no required payload fields. On success, users with complete sender information reuse the internal `startNewCampaign()` path and emit the normal `page_changed` event for `type`.
+
+**Incomplete account-owner sender profile (PROPS-3029):** when the active user is the account owner and the accepted sender snapshot is incomplete, the iframe emits `page_changed: { page: "campaigns" }` and stays on the Direct Mail Dashboard. The dashboard's illustrated **Set Up Your Sender Information / Set Up Now** card is the sole setup surface for this state; no create-flow state is initialized. A later `set_sender` completion keeps the user on the Dashboard so navigation remains user-owned. Team members keep the existing non-owner blocked prerequisite on `setup` and cannot emit `sender_setup_requested`.
 
 **Idempotent while a create flow is active:** after the first valid command starts a create flow, replayed `open_create_direct_mail` messages are ignored until that flow explicitly ends (the user returns to the Direct Mail Dashboard, cancels/abandons the flow, or completes it). An ignored replay does not navigate, reset selections or form state, call `startNewCampaign()` again, or emit another `page_changed`. After the flow ends, a later valid command may start a new campaign in the same iframe load, including for the same list. Parent apps should still avoid sending duplicate commands; this iframe behavior is a defense against effect/retry replays.
 
@@ -480,11 +482,11 @@ This message has **no payload fields** beyond the standard envelope (`source`, `
 
 **Checkout/result exception (v1.7.36).** After `campaign_submitted` hands checkout to the parent, this host command is held while the iframe awaits a result and remains held while a rendered success/failure result awaits user acknowledgement. This preserves the v1.7.31 protection against a host-navigation race without retaining its payment-state reconciliation. Iframe-owned exits remain available: **Previous** / the Order Summary's dashboard-back path still work, an ordinary payment-popup close leaves **Continue to Payment** enabled, and the result-screen CTA remains the explicit navigation path after a reported outcome. Bootstrap behavior outside an active checkout/result is unchanged.
 
-**This is the only way to land the iframe on the Dashboard.** Sibling messages do not navigate:
+**This is the explicit general-purpose Dashboard navigation command.** Sibling context messages do not navigate:
 
 - [`set_dashboard_filter`](#set_dashboard_filter--scope-the-my-campaigns-dashboard-to-a-marketing-group-parent--iframe) is **view-only** — it scopes what is displayed on the Dashboard (campaign list, insights header, tab counts) but never changes the active page.
 - [`set_list`](#set_list--recipient-list-info-required) (and [`set_lists`](#set_lists--multiple-lists-for-user-selection-alternative-to-set_list)) set context only — they never navigate by themselves.
-- [`open_create_direct_mail`](#open_create_direct_mail--open-the-create-direct-mail-flow-optional) opens the **Create Direct Mail** flow (and is gated on an active list context). It does not open the Dashboard.
+- [`open_create_direct_mail`](#open_create_direct_mail--open-the-create-direct-mail-flow-optional) normally opens the **Create Direct Mail** flow (and is gated on an active list context). The narrow PROPS-3029 exception is an account owner whose sender profile is incomplete: the iframe keeps that user on the Dashboard's illustrated **Set Up Now** prerequisite instead of opening the standalone sender page.
 
 **Session-sticky — no "exit dashboard-first" command in V1.** Once `open_direct_mail_dashboard` lands, dashboard-first mode persists for the iframe's lifetime. There is intentionally no inverse message. To return the iframe to the legacy `set_list`-first behavior (list context is supplied up front, and create navigation remains driven by the existing CTA/flow), remount the iframe element (or reload its `src`) and re-bootstrap without `open_direct_mail_dashboard`.
 
@@ -512,11 +514,11 @@ Recommended bootstrap order in dashboard-first mode:
 
    Order matters: `open_create_direct_mail` is gated on an active list context (see its [required list context note](#open_create_direct_mail--open-the-create-direct-mail-flow-optional)). If `open_create_direct_mail` arrives before `set_list`, the iframe emits [`open_create_direct_mail_failed`](#open_create_direct_mail_failed--create-direct-mail-command-rejected) and does not navigate.
 
-6. The iframe opens the **Create Direct Mail** page with the new list context.
+6. The iframe opens the **Create Direct Mail** page with the new list context when the account owner's sender profile is complete. If the account owner still has incomplete sender information, the iframe remains on the Dashboard's illustrated **Set Up Now** prerequisite; after Marketing Profile completion, the user starts creation from the Dashboard CTA.
 
 7. On parent-side failure, the parent sends nothing. The iframe stays on the Dashboard with **no iframe-side toast, error banner, or status message** — error UX is entirely the parent's responsibility.
 
-> **Compatibility with the existing `set_list`-first flow.** Partners that do **not** send `open_direct_mail_dashboard` see the legacy bootstrap behavior unchanged: partners provide concrete list context up front via `set_list` or `set_lists`; when the iframe-owned Create Direct Mail CTA runs, [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail) includes `listId` / `listName` / `recipientCount` and the iframe opens the create flow locally, as before.
+> **Compatibility with the existing `set_list`-first flow.** Partners that do **not** send `open_direct_mail_dashboard` still provide concrete list context up front via `set_list` or `set_lists`; when the iframe-owned Create Direct Mail CTA runs, [`create_direct_mail_requested`](#create_direct_mail_requested--user-clicked-create-direct-mail) includes `listId` / `listName` / `recipientCount` and the iframe opens the create flow locally. The incomplete-owner prerequisite described above applies specifically when the parent sends `open_create_direct_mail`.
 
 #### Dashboard direct-mail, recipient, and address search
 
@@ -745,7 +747,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.42"
+    "partner": "1.7.43"
   }
 }
 ```
