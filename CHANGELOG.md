@@ -6,7 +6,7 @@
 - **Completed owners and team members keep their existing behavior.** A completed owner still enters the create flow immediately. A team member with incomplete sender information still receives the existing non-owner blocked prerequisite and cannot emit `sender_setup_requested`. Returning to the Dashboard does not initialize or reset campaign state.
 - **No message schema, payload, API route, webhook, or merge-tag change.** This is a navigation correction within the existing V1 `open_create_direct_mail` command and PROPS-3029 new-user experience. Existing campaigns remain available on the Dashboard, and the sender setup action continues to be owned by the PropStream Marketing Profile.
 - **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, API metadata, iframe metadata/deploy literals, and the PropStream one-pager report `1.7.43`.
-- **Availability:** prepared and verified locally; staging validation is pending.
+- **Availability:** deployed to staging and verified on build `3adb3b3` with partner contract `1.7.43`; the real PropStream UAT owner and team-member flows were also exercised without production actions.
 
 ## v1.7.42 — 2026-08-11 — Handwritten message merge tags render per recipient
 
