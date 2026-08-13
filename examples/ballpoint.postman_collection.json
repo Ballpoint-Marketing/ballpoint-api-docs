@@ -379,6 +379,7 @@
                       "  pm.expect(b).to.have.property('total');",
                       "  pm.expect(b).to.have.property('limit');",
                       "  pm.expect(b).to.have.property('offset');",
+                      "  if (b.orders.length > 0) { pm.expect(b.orders[0]).to.have.property('cancelled_at'); }",
                       "});"
                     ]
                   }
@@ -1005,6 +1006,7 @@
                       "    pm.expect(b).to.have.property('id');",
                       "    pm.expect(b).to.have.property('display_status');",
                       "    pm.expect(b).to.have.property('production_status');",
+                      "    pm.expect(b).to.have.property('cancelled_at');",
                       "  });",
                       "}"
                     ]
