@@ -484,6 +484,11 @@ components:
         created_at:
           type: string
           format: date-time
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 time the order was cancelled; null when the order is not cancelled.
     MailTrackingSummary:
       type: object
       description: Campaign-level mail tracking summary. Safe for all principal types — no PII.

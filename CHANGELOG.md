@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — PropStream mailing evidence and cancellation reads
+
+**Availability:** live in production in Ballpoint API v3.23.0. No partner-side change is required.
+
+- **PropStream Presort completion now waits for finalized mailing evidence.** A 4x6 Standard/Presort order remains at its current production status until Ballpoint can link the finalized AccuZIP output to that specific order. Once linked, completion and billing facts use the distinct pieces proved mailed; First Class orders continue to use their frozen order count.
+- **Combined AccuZIP files are scoped to their canonical orders.** Rows from one combined output are no longer indexed into unrelated jobs or tenants. Replays are idempotent, and ambiguous or conflicting identity signals fail closed instead of creating mail-tracking or billing evidence.
+- **Order reads now include `cancelled_at`.** `GET /v1/billing/orders/{order_id}` and each item returned by `GET /v1/billing/orders` carry the ISO-8601 cancellation time, or `null` for an order that is not cancelled. This is an additive nullable response field; existing clients that ignore unknown fields remain compatible.
+- **Contract boundary.** No request field, endpoint, webhook shape, `postMessage` shape, pricing rule, or partner-supplied integration step changed. Ballpoint continues to bill only pieces supported by authoritative mailing evidence, and the partner contract version remains **v1.7.43**.
+
 ## v1.7.43 — 2026-08-11 — PROPS-3029 incomplete-owner New Activity routing
 
 - **`open_create_direct_mail` now keeps an account owner with incomplete sender information on the Direct Mail Dashboard.** The dashboard's illustrated **Set Up Your Sender Information / Set Up Now** state is the single prerequisite surface for this case; the command no longer opens the legacy standalone Sender Information page.

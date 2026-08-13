@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.43 · August 2026** · prepared for staging validation
+> **v1.7.43 · August 2026** · API v3.23.0 live in production; iframe v1.7.43 changes remain prepared for staging validation
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -779,15 +779,20 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
   "priority": "normal",
   "render_status": "complete",
   "status_changed_at": "2026-03-02T09:00:00Z",
-  "created_at": "2026-03-01T14:00:00Z"
+  "created_at": "2026-03-01T14:00:00Z",
+  "cancelled_at": null
 }
 ```
 
 `display_status` is the single field to show your users. `usps_status` is `null` until USPS scans arrive (1–2 days after production completes).
 
+For PropStream 4x6 Standard/Presort orders, Ballpoint keeps the order at its current production status until finalized AccuZIP evidence can be linked to that order. First Class orders continue to use the frozen order count. This changes neither the request shape nor the status vocabulary.
+
 Tenant scoping: partners only see their own orders. Both cross-tenant and unknown `order_id` return `404` (never `403`) so existence cannot be probed across tenants.
 
 `customer_info` is `null` unless populated (object with `name`, `website`, `rma`, `phone`, `shipping_address` — only present keys returned). `envelope_style`, `print_font`, `shipping_option`, `proof_approval_status` are `null` for products that do not use them. `metadata` is returned as a JSON-encoded string; call `JSON.parse(body.metadata)` if you need nested fields. Response shape matches each element of `GET /v1/billing/orders` (§6d).
+
+**`cancelled_at`** (ISO-8601 string or null): The time the order was cancelled, using the same timestamp format as `created_at`; `null` when the order is not cancelled. The field is additive and is present on both Get Order and List Orders responses.
 
 **`campaign_instance_id`** (string or null): Surfaced verbatim from the stored column (previously persisted but not exposed; now round-tripped on GET). Set only on A/B split sibling orders so the iframe can reconstruct split groupings after a reload; `null` on single-send, multi-send, and edit-leads orders.
 
@@ -850,7 +855,8 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
       "payment_confirmed": true,
       "external_user_id": "user_789",
       "status_changed_at": "2026-03-05T10:00:00Z",
-      "created_at": "2026-03-01T14:00:00Z"
+      "created_at": "2026-03-01T14:00:00Z",
+      "cancelled_at": null
     }
   ],
   "total": 1,
@@ -864,7 +870,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
 - `display_status` is the single field to show users. It equals `usps_status` when USPS tracking is available, otherwise `production_status`.
 - Use `total` for pagination: if `total > limit + offset`, there are more pages.
 
-Each element has the same shape as §6c, including the `payment_confirmed` field.
+Each element has the same shape as §6c, including the `payment_confirmed` and `cancelled_at` fields.
 
 ---
 
