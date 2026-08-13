@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.43** (prepared for staging validation)
+Partner contract version: **v1.7.44** (prepared for staging validation; production remains on v1.7.43)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -747,7 +747,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.43"
+    "partner": "1.7.44"
   }
 }
 ```
@@ -1697,7 +1697,7 @@ End-to-end timeline:
 2. End-user creates the campaign locally inside the iframe (picks list, product, drop type).
 3. iframe emits `campaign_created` to the parent. `orderIds` in this event are local iframe IDs only — no Ballpoint order exists yet.
 4. End-user customizes the campaign and clicks Submit.
-5. iframe calls `POST /orders` on the API base URL with the selected `postage_type`. Ballpoint persists that exact class and records a creation-time price **estimate** for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at `/confirm-payment`; refetch `POST /v1/billing/campaigns/preview` before charging); only legacy requests that omit the field default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated). No charge occurs yet.
+5. iframe calls `POST /orders` on the API base URL with the selected `postage_type`. For PropStream `4x6_printed` and `6x9_printed` orders, the iframe also preserves the matching `postcard_size` and complete two-sided `canvas_json` across initial submission and retry. If either face is unavailable or the size does not match, the iframe stops on the existing design-load error and does not create an order; the API independently enforces the same rule before the idempotency claim, order creation, or billing. Correctly configured artwork follows the existing flow unchanged. Ballpoint persists the exact postage class and records a creation-time price **estimate** for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at `/confirm-payment`; refetch `POST /v1/billing/campaigns/preview` before charging); only legacy requests that omit the field default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated). No charge occurs yet.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX). This triggers the backend handoff; it is not authorization to collect payment yet.
 7. Parent backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then uploads the matching recipients to every order with `POST /v1/billing/orders/{order_id}/recipients`. For A/B Split, upload a different recipient-disjoint slice to each variant. Verify every upload reports `ready === true` and `piece_count > 0`.
 8. Parent backend calls [`POST /v1/billing/campaigns/preview`](https://github.com/Ballpoint-Marketing/ballpoint-api-docs/blob/main/API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) **once** with the `ballpointOrderId`s it intends to charge in this payment event (the endpoint prices exactly the caller-selected set; it does not compute billing windows). Read `campaign_partner_debit_cents` as the exact whole-cent ledger amount recorded on successful confirmation, with the raw tcents fields available for reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`; do not confirm rows excluded from the quoted total. Re-preview after any order/recipient edit before collecting or confirming payment. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.

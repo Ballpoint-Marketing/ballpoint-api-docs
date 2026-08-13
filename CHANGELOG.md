@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.44 — 2026-08-13 — PropStream printed-postcard artwork gate
+
+- **PropStream printed postcards now fail closed when they cannot render.** `POST /orders` requires a non-empty `canvas_json.front`, a non-empty `canvas_json.back`, and a `postcard_size` matching `product_type` for PropStream partner requests whose canonical type is `4x6_printed` or `6x9_printed`.
+- **Invalid artwork is rejected before durable work.** Ballpoint returns `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign or order, or reaching billing. The caller may correct the request and reuse the same idempotency key.
+- **The embedded iframe applies the same rule to every submission path.** Single Send, Multi Send, A/B Split, review-screen as-is submission, and background retry all preserve and validate the two-sided artwork. A deterministic validation error is not retried.
+- **No PropStream integration or UI redesign is required.** Correctly configured artwork follows the existing flow unchanged. If artwork is unavailable, the existing design-load error is shown and no order is created; products still awaiting final assets remain blocked rather than creating orders without PDFs.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, API metadata, and iframe metadata/deploy literals report `1.7.44`.
+- **Availability:** prepared and verified locally for staging deployment. This entry is not a production deployment claim.
+
 ## Unreleased — PropStream mailing evidence and cancellation reads
 
 **Availability:** live in production in Ballpoint API v3.23.0. No partner-side change is required.
@@ -7,7 +16,7 @@
 - **PropStream Presort completion now waits for finalized mailing evidence.** A 4x6 Standard/Presort order remains at its current production status until Ballpoint can link the finalized AccuZIP output to that specific order. Once linked, completion and billing facts use the distinct pieces proved mailed; First Class orders continue to use their frozen order count.
 - **Combined AccuZIP files are scoped to their canonical orders.** Rows from one combined output are no longer indexed into unrelated jobs or tenants. Replays are idempotent, and ambiguous or conflicting identity signals fail closed instead of creating mail-tracking or billing evidence.
 - **Order reads now include `cancelled_at`.** `GET /v1/billing/orders/{order_id}` and each item returned by `GET /v1/billing/orders` carry the ISO-8601 cancellation time, or `null` for an order that is not cancelled. This is an additive nullable response field; existing clients that ignore unknown fields remain compatible.
-- **Contract boundary.** No request field, endpoint, webhook shape, `postMessage` shape, pricing rule, or partner-supplied integration step changed. Ballpoint continues to bill only pieces supported by authoritative mailing evidence, and the partner contract version remains **v1.7.43**.
+- **Contract boundary for this earlier item.** No request field, endpoint, webhook shape, `postMessage` shape, pricing rule, or partner-supplied integration step changed. That item did not require a version bump; the current partner contract version is reported by the latest numbered entry above.
 
 ## v1.7.43 — 2026-08-11 — PROPS-3029 incomplete-owner New Activity routing
 

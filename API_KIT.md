@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.43 · August 2026** · API v3.23.0 live in production; iframe v1.7.43 changes remain prepared for staging validation
+> **v1.7.44 · August 2026** · prepared for staging validation; production remains on v1.7.43
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -660,6 +660,8 @@ POST /v1/billing/orders
 | `remove_duplicate_addresses` | boolean | No | Optional, additive. Whether the user enabled the "Remove duplicates" checkbox on the iframe's piece-selection page (paired with `deliver_to`). Persisted to `metadata.remove_duplicate_addresses` and round-tripped on GET responses **even when `false`**, so partners can read back the user's exact selection. `null`/absent when no recipient-selection UI was shown. Iframe-driven persistence — no partner-side action required. |
 
 **Partner iframe compatibility sender (`POST /orders`):**
+
+For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, or unsafe artwork with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. This conditional rule does not change other partners or non-printed-postcard products.
 
 The partner/iframe request shape may include an optional `sender` object. Empty or `null` contact fields remain optional for partial Marketing Profiles. Invalid non-empty contact values return `422` before idempotency or order creation.
 
@@ -1447,7 +1449,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.43"
+    "partner": "1.7.44"
   }
 }
 ```
