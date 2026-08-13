@@ -7,7 +7,7 @@
 - **The embedded iframe applies the same rule to every submission path.** Single Send, Multi Send, A/B Split, review-screen as-is submission, and background retry all preserve and validate the two-sided artwork. A deterministic validation error is not retried.
 - **No PropStream integration or UI redesign is required.** Correctly configured artwork follows the existing flow unchanged. If artwork is unavailable, the existing design-load error is shown and no order is created; products still awaiting final assets remain blocked rather than creating orders without PDFs.
 - **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, API metadata, and iframe metadata/deploy literals report `1.7.44`.
-- **Availability:** deployed to staging and verified in the real PropStream UAT on iframe build `c207117` with API build `764e8e1`. Single Send, Multi Send, and A/B Split produced complete front/back PDFs for approved artwork; the migrated catalog has immutable 4x6 and 6x9 print fronts for 33 products (66 integrity-pinned assets), and postcards without approved print assets are hidden from selection. This entry is not a production deployment claim.
+- **Availability:** deployed to staging and verified in the real PropStream UAT on iframe build `d7c02d8` with API build `764e8e1`. Single Send, Multi Send, and A/B Split produced complete front/back PDFs for approved artwork; the migrated catalog has immutable 4x6 and 6x9 print fronts for 33 products (66 integrity-pinned assets), and postcards without approved print assets are hidden from selection. This entry is not a production deployment claim.
 
 ## Unreleased — PropStream mailing evidence and cancellation reads
 
