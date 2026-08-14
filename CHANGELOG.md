@@ -1,12 +1,23 @@
 # Changelog
 
+## v1.7.45 — 2026-08-14 — Real-recipient handwritten proof preview
+
+- **PropStream can now supply one representative recipient for the browser proof.** After an accepted singular `set_list`, send the re-applicable `set_preview_recipient` message with the same `tenantKey` and `listId`, selecting the first valid lead in stable list order and formatting it with the same rules used for recipient upload. Send `recipient: null` when no valid lead exists.
+- **The iframe validates and scopes the snapshot before using it.** Pre-list messages, tenant/list mismatches, non-plain recipients, missing names, invalid structured mailing addresses, and malformed nested placeholder values are rejected. Copied strings are sanitized and bounded, unrelated fields are ignored, and each accepted value replaces the prior snapshot atomically.
+- **List edits fail closed.** Every accepted same-list `set_list` refresh clears the representative snapshot until PropStream sends the replacement or an explicit clear. The snapshot stays in memory only and is excluded from storage, analytics, logs, order metadata, and outbound messages.
+- **Approved printed postcards again expose the four handwritten aliases.** The standard editor shows `{first_name}`, `{property_address}`, `{city}`, and `{property_value}`, in that order, for the 37 approved canvas-backed postcard products across Single Send, Multi Send, and A/B Split. Classic, Build Your Own, Home Services, letters, and unsupported products remain unchanged.
+- **The proof uses real data without changing fulfillment input.** Supported aliases resolve once from `recipient.first_name`, `placeHolders.PropertyStreet`, `placeHolders.PropertyCity`, and `placeHolders.PropertyValue`; missing values render blank with no mailing-address fallback, and token-shaped values are not recursively expanded. The representative name and structured mailing address replace the old fictional postal sample. Until valid data arrives, the proof clears those fields and shows **Recipient preview unavailable**.
+- **Raw aliases remain authoritative for final personalization.** The textarea, character count, order `message`, and 4x6/6x9 Fabric canvas text retain the literal aliases. Ballpoint continues to resolve them independently for every recipient during ordinary and batched PDF rendering.
+- **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, API metadata, iframe metadata/deploy literals, and the PropStream one-pager advance to `1.7.45`. The REST API remains `3.1`, and the postMessage envelope remains `1`.
+- **Availability:** contract-first documentation and implementation are prepared for staging validation; this is not a production deployment claim. PropStream must gate `set_preview_recipient` emission on `ready.contractVersions.partner >= 1.7.45`, then validate a real representative lead in UAT and a two-recipient staging PDF without production billing.
+
 ## Unreleased — Safe SVG upload normalization
 
 **Availability:** live in production in Ballpoint iframe v1.12.1 (build `c61d258`). No partner-side change is required.
 
 - **SVG uploads in the custom-design editor are normalized to PNG before they enter the canvas or saved artwork.** Supported visual content, including gradients and clipping, is preserved as a raster image.
 - **Active and external SVG content is removed before rendering.** Scripts, event handlers, external resource references, embedded HTML, and document-level styles are not retained in the normalized artwork. If a file cannot be normalized safely, the existing upload validation rejects it instead of saving or submitting it.
-- **The integration contract is unchanged.** No API route, request or response field, webhook payload, `postMessage` event, pricing rule, or order-submission flow changed. The partner contract remains **v1.7.44**, and PropStream does not need to update its embed, payloads, or callbacks.
+- **That SVG-only release did not change the integration contract.** No API route, request or response field, webhook payload, `postMessage` event, pricing rule, or order-submission flow changed. It left the partner contract at **v1.7.44** at the time; the current version is reported by the latest numbered entry above, and the SVG normalization itself requires no PropStream change.
 - **Artifact review:** Iframe Kit availability is updated for v1.12.1. API Kit, OpenAPI, Postman, webhook documentation, and API production version v3.24.0 remain unchanged.
 
 ## v1.7.44 — 2026-08-13 — PropStream printed-postcard artwork gate

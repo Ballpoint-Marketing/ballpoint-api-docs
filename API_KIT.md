@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.44 · August 2026** · live in production in Ballpoint API v3.24.0
+> **v1.7.45 · August 2026** · prepared for staging validation; not yet deployed to production
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1449,7 +1449,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.44"
+    "partner": "1.7.45"
   }
 }
 ```
@@ -1575,7 +1575,7 @@ The PropStream flow is create the order first (with `piece_count`, via `POST /or
 
 - `append` (default `false`): `false` REPLACES all existing recipients on the order (idempotent re-upload); `true` APPENDS to existing recipients (for chunked uploads of large orders).
 
-The handwritten-message chips use this exact mapping at render time:
+The standard handwritten editor on the 37 approved canvas-backed printed postcard products uses this exact mapping at render time:
 
 | Message tag | Recipient source | Missing value |
 |---|---|---|
@@ -1584,7 +1584,7 @@ The handwritten-message chips use this exact mapping at render time:
 | `{city}` | `placeHolders.PropertyCity` | blank; never falls back to mailing `city` |
 | `{property_value}` | `placeHolders.PropertyValue` | blank |
 
-For canvas-backed designs, the same mapping runs for ordinary per-order rendering and production batching before the card is rasterized or assembled into a PDF. `PropertyValue` is message-only and does not add a 12th canonical Color Letter `#Token#` field. The standalone `message` metadata field is not printable artwork and does not synthesize a missing `canvas_json` for legacy catalog products.
+For those approved designs, the same mapping runs for ordinary per-order rendering and production batching before the card is rasterized or assembled into a PDF. `PropertyValue` is message-only and does not add a 12th canonical Color Letter `#Token#` field. Classic, Build Your Own, Home Services, letters, unsupported products, and the standalone `message` metadata field do not gain synthesized `canvas_json` artwork.
 
 **Response (`200`):**
 
