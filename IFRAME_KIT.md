@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.44** (live in production in Ballpoint iframe v1.12.1)
+Partner contract version: **v1.7.45** (prepared for staging validation; not yet deployed to production)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -39,7 +39,7 @@ This guide explains how to embed the Ballpoint direct mail campaign builder into
 - [ ] **postMessage handler** — listen for events from the iframe and send configuration on `ready` (see [Section 4](#4-bootstrap-flow))
 - [ ] **Recipient upload** — after a campaign is submitted, POST the mailing addresses to the Ballpoint API (see [Section 7](#7-recipient-upload-flow))
 
-> **Minimum viable integration:** embed the iframe, send `set_api_config` + `set_list` on ready, resolve sender info (either send `set_sender` directly, or include `externalUserIsAccountOwner: true` in `set_list` and handle the `sender_setup_requested` → `set_sender` flow), and handle recipient upload on `campaign_submitted`.
+> **Minimum viable integration:** embed the iframe, send `set_api_config` + `set_list` on ready, send `set_preview_recipient` after `set_list` when `ready.contractVersions.partner >= 1.7.45`, resolve sender info (either send `set_sender` directly, or include `externalUserIsAccountOwner: true` in `set_list` and handle the `sender_setup_requested` → `set_sender` flow), and handle recipient upload on `campaign_submitted`.
 
 ---
 
@@ -96,7 +96,8 @@ After the iframe loads, it sends a `ready` message. Your page then sends configu
 3. Parent → Iframe:  "set_api_config"  (API URL + auth token)
 4. Parent → Iframe:  "set_list"        (recipient count, list info)
    — OR —            "set_lists"       (multiple lists for user to choose from)
-5. Parent → Iframe:  "set_sender"      (optional — pre-fill sender info)
+5. Parent → Iframe:  "set_preview_recipient" (v1.7.45+, after set_list only)
+6. Parent → Iframe:  "set_sender"      (optional — pre-fill sender info)
 ```
 
 If the user performs an action before `set_api_config` arrives, the iframe queues it automatically and replays it once config is received. No action is lost.
@@ -147,9 +148,20 @@ function sendConfig() {
     count: 847,
     name: 'Pre-Foreclosure Leads',
     listId: 'your_list_id',
+    tenantKey: 'your_tenant_id',
     externalAccountId: 'your_account_id',
     externalUserId: 'your_user_id',
     externalUserIsAccountOwner: true  // Optional — gates sender-info setup CTA visibility
+  }, origin);
+
+  // Partner contract v1.7.45+: representative lead for proof display only.
+  iframe.contentWindow.postMessage({
+    source: 'propstream',
+    version: 1,
+    type: 'set_preview_recipient',
+    tenantKey: 'your_tenant_id',
+    listId: 'your_list_id',
+    recipient: selectFirstValidLeadInStableListOrder()
   }, origin);
 
   // Optional: Pre-fill sender information
@@ -192,7 +204,7 @@ All messages must include these base fields:
 | `apiToken` | string | Partner API key (`pk_...`) |
 | `tenantKey` | string | Optional. Tenant scope key for storage isolation |
 
-This is the only message that can be sent more than once (to refresh tokens). All other message types are accepted once per session.
+`set_api_config` can be sent more than once to refresh tokens. The separately documented `set_preview_recipient` message is also re-applicable because list edits can replace or remove the representative lead; other bootstrap context remains governed by its per-message rules.
 
 For a PropStream embed, the iframe uses this configuration plus the
 `externalUserId` from `set_list` to fetch `GET /v1/config`. The response is
@@ -318,6 +330,7 @@ After PropStream's Edit Leads modal saves changes to the recipient list, the par
   - `externalAccountId` / `externalUserId`: ignored (existing values preserved).
   - `tenantKey` mismatch: ENTIRE refresh message rejected, no state change applied.
 - **Backward compatibility:** partners that do not send `set_list` a second time are unaffected. First-receipt behavior is unchanged. Partners that previously relied on second-receipt rejection still get the same rejection for *different-listId* attempts.
+- **Representative proof reset:** every accepted same-list refresh clears the in-memory preview recipient immediately. Send the replacement `set_preview_recipient` after the refresh, or send `recipient: null` when no valid lead remains.
 
 Example refresh payload (after Edit Leads modal save):
 
@@ -338,6 +351,58 @@ Example refresh payload (after Edit Leads modal save):
 ```
 
 See also the [`edit_leads_requested` event](#edit_leads_requested--user-clicked-edit-leads-on-a-campaign-card) for the iframe → parent trigger that opens the modal.
+
+### `set_preview_recipient` — Representative recipient for handwritten proof (v1.7.45+)
+
+After an accepted singular `set_list`, send one real representative lead so eligible printed handwritten-postcard proofs can display the personalized message and postal address before order submission. Select the first valid lead in stable list order and format it with the same rules used for recipient upload.
+
+```json
+{
+  "source": "propstream",
+  "version": 1,
+  "type": "set_preview_recipient",
+  "tenantKey": "tenant-id",
+  "listId": "list-id",
+  "recipient": {
+    "first_name": "Ada",
+    "last_name": "Lovelace",
+    "address": "55 Mailing Way",
+    "address2": "",
+    "city": "Atlanta",
+    "state": "GA",
+    "zip": "30301",
+    "placeHolders": {
+      "PropertyStreet": "12 Analytical Engine Ave",
+      "PropertyCity": "Atlanta",
+      "PropertyValue": "$425,000"
+    }
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tenantKey` | string | Yes | Must equal the active tenant established by the accepted `set_list`. |
+| `listId` | string | Yes | Must equal the active singular `set_list.listId`. |
+| `recipient` | object \| null | Yes | A valid structured recipient snapshot, or `null` to clear the proof. |
+| `recipient.first_name` | string | Conditional | At least one of `first_name` or `last_name` must be non-empty. |
+| `recipient.last_name` | string | Conditional | At least one of `first_name` or `last_name` must be non-empty. |
+| `recipient.address` | string | Yes | Structured mailing street address used only for the postal sample. |
+| `recipient.address2` | string | No | Optional second mailing-address line. |
+| `recipient.city` | string | Yes | Structured mailing city. |
+| `recipient.state` | string | Yes | Two-letter US state code. |
+| `recipient.zip` | string | Yes | Five-digit ZIP or ZIP+4. |
+| `recipient.placeHolders` | object | No | Optional preview values. Only string `PropertyStreet`, `PropertyCity`, and `PropertyValue` fields are read. |
+
+Rules:
+
+- **Scope is strict.** The iframe rejects this message before a singular `set_list`, on tenant/list mismatch, when `recipient` is not a plain object or `null`, or when the recipient lacks a name or valid structured mailing address. Copied strings are sanitized and bounded; unrelated recipient fields are ignored.
+- **Replacement is atomic and memory-only.** Each accepted object replaces the prior snapshot as a whole. The iframe never persists it, includes it in order metadata or analytics, logs it, or emits it back to the parent.
+- **Clearing is explicit and refresh-safe.** Send `recipient: null` to clear the proof. An accepted same-list `set_list` refresh also clears the snapshot until the parent sends the replacement. After list edits, reselect the first valid lead in stable order and resend it, or clear when none remains.
+- **Only approved printed postcards use it.** The standard handwritten editor exposes `{first_name}`, `{property_address}`, `{city}`, and `{property_value}`, in that order, only for the 37 approved canvas-backed postcard products. Classic, Build Your Own, Home Services, letters, and unsupported products remain unchanged.
+- **Proof substitution is one-pass.** `{first_name}` reads `recipient.first_name`; `{property_address}` reads `placeHolders.PropertyStreet`; `{city}` reads `placeHolders.PropertyCity`; and `{property_value}` reads `placeHolders.PropertyValue`. Missing values render blank without falling back to the mailing address, and token-shaped recipient values are not recursively expanded.
+- **Fulfillment aliases stay raw.** The textarea, character count, order `message`, and submitted Fabric canvas text retain the literal aliases. Ballpoint remains responsible for final per-recipient substitution. If no valid snapshot exists, the eligible proof clears the postal sample and shows **Recipient preview unavailable**; it never shows fictional recipient data or a raw supported alias.
+- **Version gate the emission.** Send this message only when `ready.contractVersions.partner` is `1.7.45` or newer. The postMessage envelope remains version `1`, and the REST API remains `3.1`.
 
 #### Sender-info setup gate (`externalUserIsAccountOwner`)
 
@@ -747,7 +812,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.44"
+    "partner": "1.7.45"
   }
 }
 ```
@@ -1779,7 +1844,7 @@ Content-Type: application/json
 | `address_type` | No | `PROPERTY` or `MAILING`. Optional for order-level upload; pair with `contact_id` when you need to distinguish a contact's property vs mailing address records. On the campaign-level Edit Leads / delta endpoint it is **required** and, together with `contact_id`, forms the upsert/remove key. |
 | `placeHolders` | No | Per-recipient render values. For handwritten-message chips, send `PropertyStreet` for `{property_address}`, `PropertyCity` for `{city}`, and optional `PropertyValue` for `{property_value}`. `{first_name}` uses the structured `first_name` field. Missing property values print blank and never fall back to the mailing address. |
 
-The iframe submits the four message tags literally in the order message. When a canvas-backed design carries that text in its printable artwork, Ballpoint resolves the tags per recipient before both ordinary and batched raster/PDF generation. `PropertyValue` is message-only; the existing 11 canonical Color Letter `#Token#` fields are unchanged. The message field alone does not synthesize a missing canvas for legacy catalog products.
+For the 37 approved canvas-backed printed postcard products, the standard handwritten editor submits the four message tags literally in the order message and Fabric artwork. Ballpoint resolves those aliases per recipient before both ordinary and batched raster/PDF generation. `PropertyValue` is message-only; the existing 11 canonical Color Letter `#Token#` fields are unchanged. Classic, Build Your Own, Home Services, letters, unsupported products, and message-only designs do not gain this editor surface or synthesized artwork.
 
 > For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6p`](API_KIT.md#6p-campaign-delta-recipients--addremove-across-editable-drops).
 
