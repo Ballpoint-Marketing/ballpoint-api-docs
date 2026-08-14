@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Safe SVG upload normalization
+
+**Availability:** live in production in Ballpoint iframe v1.12.1 (build `c61d258`). No partner-side change is required.
+
+- **SVG uploads in the custom-design editor are normalized to PNG before they enter the canvas or saved artwork.** Supported visual content, including gradients and clipping, is preserved as a raster image.
+- **Active and external SVG content is removed before rendering.** Scripts, event handlers, external resource references, embedded HTML, and document-level styles are not retained in the normalized artwork. If a file cannot be normalized safely, the existing upload validation rejects it instead of saving or submitting it.
+- **The integration contract is unchanged.** No API route, request or response field, webhook payload, `postMessage` event, pricing rule, or order-submission flow changed. The partner contract remains **v1.7.44**, and PropStream does not need to update its embed, payloads, or callbacks.
+- **Artifact review:** Iframe Kit availability is updated for v1.12.1. API Kit, OpenAPI, Postman, webhook documentation, and API production version v3.24.0 remain unchanged.
+
 ## v1.7.44 — 2026-08-13 — PropStream printed-postcard artwork gate
 
 - **PropStream printed postcards now fail closed when they cannot render.** `POST /orders` requires a non-empty `canvas_json.front`, a non-empty `canvas_json.back`, and a `postcard_size` matching `product_type` for PropStream partner requests whose canonical type is `4x6_printed` or `6x9_printed`.
