@@ -11,6 +11,14 @@
 - **Artifact sync:** API Kit, Iframe Kit, OpenAPI, Postman, API metadata, iframe metadata/deploy literals, and the PropStream one-pager advance to `1.7.45`. The REST API remains `3.1`, and the postMessage envelope remains `1`.
 - **Availability:** contract-first documentation and implementation are prepared for staging validation; this is not a production deployment claim. PropStream must gate `set_preview_recipient` emission on `ready.contractVersions.partner >= 1.7.45`, then validate a real representative lead in UAT and a two-recipient staging PDF without production billing.
 
+## Unreleased — PropStream postal-address handwriting correction
+
+- **PropStream return and recipient addresses now match the approved handwriting treatment in final PDFs.** Both postal address blocks use Lexi and the exact royal blue `#3017FE`; the USPS postage indicia remains Arial and black.
+- **Normal and batched postcard rendering use the same source-scoped rule.** The correction applies to PropStream 4x6 and 6x9 printed postcards without changing the non-PropStream rendering path, the customer-authored canvas, or recipient data.
+- **Large rerenders tolerate transient renderer socket resets.** API v3.25.1 retries a recipient-level transport interruption once with a fresh connection while preserving the existing capacity backoff, attempt budget, generation fences, and chunk/merge workflow.
+- **The partner contract is unchanged.** No endpoint, field, webhook, `postMessage` event, pricing rule, or partner-side implementation changed, so the partner contract remains **v1.7.45**.
+- **Availability:** live and validated in staging and production in Ballpoint API v3.25.1 (build `c84eaec`). The bounded production rerender is complete: **22 orders, 9,141 pieces, and 27,423 recipient artifacts** passed generation/job, DB/S3, merged-PDF, postal-color, and first/last visual QA.
+
 ## Unreleased — Safe SVG upload normalization
 
 **Availability:** live in production in Ballpoint iframe v1.12.1 (build `c61d258`). No partner-side change is required.
