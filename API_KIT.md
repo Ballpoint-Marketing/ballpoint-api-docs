@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.45 · August 2026** · prepared for staging validation; not yet deployed to production
+> **v1.7.45 · August 2026** · live in Ballpoint production via iframe `v1.12.2` (build `0152500`); PropStream `set_preview_recipient` emission validation remains pending
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
