@@ -139,8 +139,7 @@ def filled(value: str, minimum: int) -> bool:
     return len(value.strip()) >= minimum and "required" not in lowered and not lowered.startswith(("_", "<"))
 
 
-def validate_classification(iframe: Path, docs_version: str, base: str, body: str) -> None:
-    changed = changed_files(iframe, base)
+def classification(body: str) -> str:
     public_checked = bool(PUBLIC_BOX.search(body))
     no_public_checked = bool(NO_PUBLIC_BOX.search(body))
 
@@ -151,7 +150,23 @@ def validate_classification(iframe: Path, docs_version: str, base: str, body: st
         justification = field(body, "No-public justification")
         if not filled(justification, 20):
             raise GateError("a contract-sensitive diff classified no-public needs a concrete justification")
+        return "no-public"
+
+    return "public"
+
+
+def version_key(value: str) -> tuple[int, int, int]:
+    if not re.fullmatch(VERSION, value):
+        raise GateError(f"invalid partner contract version: {value}")
+    return tuple(int(part) for part in value.split("."))
+
+
+def validate_classification(iframe: Path, docs_version: str, base: str, body: str) -> None:
+    impact = classification(body)
+    if impact == "no-public":
         return
+
+    changed = changed_files(iframe, base)
 
     iframe_values = iframe_versions(iframe)
     current = next(iter(iframe_values.values()))
@@ -186,6 +201,43 @@ def validate_classification(iframe: Path, docs_version: str, base: str, body: st
             raise GateError(f"PR body is missing required public-impact field: {required}")
 
 
+def validate_maintenance_release(iframe: Path, docs_version: str, base: str, body: str) -> str:
+    """Allow an unchanged older contract only for an explicitly no-public release.
+
+    Public docs remain canonical and may be ahead of a maintenance branch. The
+    candidate must keep every iframe version surface equal to its own base; a
+    contract bump or public-impact classification still fails closed.
+    """
+    if classification(body) != "no-public":
+        raise GateError("maintenance release mode requires No public contract change")
+
+    iframe_values = iframe_versions(iframe)
+    current = next(iter(iframe_values.values()))
+    old = version_at(
+        iframe,
+        base,
+        "js/build-info.js",
+        rf"partner:\s*'({VERSION})'",
+        "base iframe partner version",
+    )
+    if current != old:
+        raise GateError(
+            f"maintenance release changed the iframe partner version: base={old}, candidate={current}"
+        )
+    if version_key(current) > version_key(docs_version):
+        raise GateError(
+            f"maintenance iframe contract={current} is ahead of public docs={docs_version}"
+        )
+    return current
+
+
+def maintenance_release_required(docs_version: str, iframe_values: dict[str, str]) -> bool:
+    return bool(
+        iframe_values
+        and any(value != docs_version for value in iframe_values.values())
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--docs-root", type=Path, required=True)
@@ -195,6 +247,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pr-body-file", type=Path)
     parser.add_argument("--pr-body-env", default="PR_BODY")
     parser.add_argument("--require-classification", action="store_true")
+    parser.add_argument("--allow-maintenance-release", action="store_true")
     return parser.parse_args()
 
 
@@ -202,12 +255,23 @@ def main() -> int:
     args = parse_args()
     try:
         canonical = public_version(args.docs_root.resolve())
-        surfaces = {"public docs": canonical}
+        platform_surfaces = {"public docs": canonical}
         if args.api_root:
-            surfaces["API"] = api_version(args.api_root.resolve())
+            platform_surfaces["API"] = api_version(args.api_root.resolve())
+        require_equal(platform_surfaces)
+
+        iframe_surfaces = {}
         if args.iframe_root:
-            surfaces.update(iframe_versions(args.iframe_root.resolve()))
-        require_equal(surfaces)
+            iframe_surfaces = iframe_versions(args.iframe_root.resolve())
+
+        if args.allow_maintenance_release and not args.require_classification:
+            raise GateError("maintenance release mode requires --require-classification")
+
+        surfaces = {**platform_surfaces, **iframe_surfaces}
+        maintenance_active = bool(
+            args.allow_maintenance_release
+            and maintenance_release_required(canonical, iframe_surfaces)
+        )
 
         if args.require_classification:
             if not args.iframe_root or not args.base_ref:
@@ -217,9 +281,21 @@ def main() -> int:
                 if args.pr_body_file
                 else os.environ.get(args.pr_body_env, "")
             )
-            validate_classification(args.iframe_root.resolve(), canonical, args.base_ref, body)
+            if maintenance_active:
+                validate_maintenance_release(
+                    args.iframe_root.resolve(), canonical, args.base_ref, body
+                )
+            else:
+                validate_classification(args.iframe_root.resolve(), canonical, args.base_ref, body)
 
-        print("PASS partner contract gate: " + ", ".join(f"{key}={value}" for key, value in surfaces.items()))
+        if not maintenance_active:
+            require_equal(surfaces)
+
+        mode = " maintenance" if maintenance_active else ""
+        print(
+            f"PASS partner contract{mode} gate: "
+            + ", ".join(f"{key}={value}" for key, value in surfaces.items())
+        )
         return 0
     except (GateError, json.JSONDecodeError) as exc:
         print(f"FAIL partner contract gate: {exc}", file=sys.stderr)

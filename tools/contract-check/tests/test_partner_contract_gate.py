@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -89,6 +90,33 @@ Consumers: PropStream iframe parent
 Communication: staging validation draft prepared
 """
 
+    def no_public_body(self) -> str:
+        return """- [ ] Public contract change
+- [x] No public contract change
+No-public justification: Maintenance release changes no public partner behavior or version surface.
+"""
+
+    def run_gate_cli(
+        self,
+        body: str,
+        *extra: str,
+        require_classification: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        body_path = Path(self.tmp.name) / "pr-body.md"
+        write(body_path, body)
+        command = [
+            sys.executable,
+            str(MODULE_PATH),
+            "--docs-root", str(self.docs),
+            "--iframe-root", str(self.iframe),
+            "--base-ref", "HEAD",
+            "--pr-body-file", str(body_path),
+        ]
+        if require_classification:
+            command.append("--require-classification")
+        command.extend(extra)
+        return subprocess.run(command, check=False, capture_output=True, text=True)
+
     def test_complete_release_passes(self) -> None:
         self.bump_iframe("1.7.16")
         gate.require_equal({"docs": gate.public_version(self.docs), **gate.iframe_versions(self.iframe)})
@@ -128,6 +156,90 @@ Communication: staging validation draft prepared
                 "- [ ] Public contract change\n- [x] No public contract change\n"
                 "No-public justification: _Required when selecting no public change_\n",
             )
+
+    def test_maintenance_release_allows_unchanged_older_iframe_contract(self) -> None:
+        self.bump_docs("1.7.16")
+        self.assertTrue(gate.maintenance_release_required(
+            "1.7.16", gate.iframe_versions(self.iframe)
+        ))
+        current = gate.validate_maintenance_release(
+            self.iframe, "1.7.16", "HEAD", self.no_public_body()
+        )
+        self.assertEqual(current, "1.7.15")
+
+    def test_default_gate_still_rejects_docs_ahead_of_iframe(self) -> None:
+        self.bump_docs("1.7.16")
+        with self.assertRaises(gate.GateError):
+            gate.require_equal({
+                "docs": gate.public_version(self.docs),
+                **gate.iframe_versions(self.iframe),
+            })
+
+    def test_maintenance_release_rejects_public_classification(self) -> None:
+        self.bump_docs("1.7.16")
+        with self.assertRaises(gate.GateError):
+            gate.validate_maintenance_release(
+                self.iframe, "1.7.16", "HEAD", self.public_body("1.7.16")
+            )
+
+    def test_equal_contract_with_maintenance_capability_keeps_normal_public_path(self) -> None:
+        self.bump_iframe("1.7.16")
+        surfaces = gate.iframe_versions(self.iframe)
+        self.assertFalse(gate.maintenance_release_required("1.7.16", surfaces))
+        gate.validate_classification(
+            self.iframe, "1.7.16", "HEAD", self.public_body("1.7.16")
+        )
+
+    def test_maintenance_release_rejects_iframe_contract_bump(self) -> None:
+        self.bump_iframe("1.7.16")
+        with self.assertRaises(gate.GateError):
+            gate.validate_maintenance_release(
+                self.iframe, "1.7.16", "HEAD", self.no_public_body()
+            )
+
+    def test_maintenance_release_rejects_iframe_ahead_of_docs(self) -> None:
+        self.bump_iframe("1.7.16", docs=False)
+        run("git", "add", ".", cwd=self.iframe)
+        run("git", "commit", "-m", "newer baseline", cwd=self.iframe)
+        with self.assertRaises(gate.GateError):
+            gate.validate_maintenance_release(
+                self.iframe, "1.7.15", "HEAD", self.no_public_body()
+            )
+
+    def test_cli_default_rejects_docs_ahead_of_iframe(self) -> None:
+        self.bump_docs("1.7.16")
+        result = self.run_gate_cli(self.no_public_body())
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("partner contract version drift", result.stderr)
+
+    def test_cli_flag_accepts_unchanged_older_maintenance_release(self) -> None:
+        self.bump_docs("1.7.16")
+        result = self.run_gate_cli(
+            self.no_public_body(), "--allow-maintenance-release"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PASS partner contract maintenance gate", result.stdout)
+
+    def test_cli_equal_contract_with_flag_uses_normal_classification(self) -> None:
+        self.bump_iframe("1.7.16")
+        result = self.run_gate_cli(
+            self.public_body("1.7.16"), "--allow-maintenance-release"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PASS partner contract gate", result.stdout)
+        self.assertNotIn("maintenance gate", result.stdout)
+
+    def test_cli_flag_without_classification_fails_closed(self) -> None:
+        result = self.run_gate_cli(
+            self.no_public_body(),
+            "--allow-maintenance-release",
+            require_classification=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "maintenance release mode requires --require-classification",
+            result.stderr,
+        )
 
 
 if __name__ == "__main__":
