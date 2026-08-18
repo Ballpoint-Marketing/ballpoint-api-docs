@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — PropStream postcard postal layout v5
+
+- **PropStream 4x6 and 6x9 printed postcards now use the approved postal sizing and placement in final PDFs.** The postage indicia is 0.9in wide by 0.73in high, and the recipient block is enlarged and moved into the approved right-side mailing area for each postcard size.
+- **The handwritten treatment remains source-scoped and deterministic.** PropStream return and recipient addresses use Lexi in royal blue `#3017FE`; the USPS indicia remains Arial and black. Existing customer artwork is preserved, including legacy full-face artwork whose old baked-in indicia is cleared before the new server-owned block is drawn.
+- **The rollout cutoff is fulfillment-safe.** The layout applies to future PropStream postcards and to rerenderable orders still in **Incoming**. Orders already in Prep, Printing, Shipping, or a locked production batch at the rollout cutoff are not changed. Rerendering replaces print artifacts only; it does not rebill, change the production status, or add an order to a batch.
+- **Recipient text never shrinks or clips to force a fit.** The approved address size remains fixed at 12pt on 4x6 and 18pt on 6x9. For the bounded Incoming-order migration, every recipient was preflighted with the same Lexi metrics used by the renderer; when any address in an existing order could not fit the approved frame, that order retained its previously completed PDF instead of publishing a partial or unreadable rerender.
+- **The partner contract is unchanged.** No endpoint, request or response field, webhook, `postMessage` event, pricing rule, or partner-side integration step changed, so the partner contract remains **v1.7.45**.
+- **Availability:** live in Ballpoint production in API `v3.26.1` (build `cc4dd6b`) and iframe `v1.13.0` (build `c6857fa`). Staging validation covered all 29 pages of representative 4x6 and 6x9 orders, followed by clean production pilots for both sizes. The bounded Incoming-order migration published v5 PDFs for 61 orders (2,025 pieces). Another 35 orders (17,907 pieces) retained their prior PDFs because at least one recipient failed the fixed-frame migration preflight; one additional one-piece order retained its prior PDFs after staff advanced it to Prep before its merge completed.
+
 ## v1.7.45 — 2026-08-14 — Real-recipient handwritten proof preview
 
 - **PropStream can now supply one representative recipient for the browser proof.** After an accepted singular `set_list`, send the re-applicable `set_preview_recipient` message with the same `tenantKey` and `listId`, selecting the first valid lead in stable list order and formatting it with the same rules used for recipient upload. Send `recipient: null` when no valid lead exists.
