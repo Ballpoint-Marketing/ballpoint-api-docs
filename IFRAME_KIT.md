@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.45** (live in Ballpoint production via iframe `v1.12.2`, build `0152500`; PropStream `set_preview_recipient` emission validation remains pending)
+Partner contract version: **v1.7.46** (prepared for staging validation; the iframe message envelope remains version `1`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -812,7 +812,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.45"
+    "partner": "1.7.46"
   }
 }
 ```

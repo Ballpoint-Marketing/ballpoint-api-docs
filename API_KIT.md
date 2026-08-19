@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.45 · August 2026** · live in Ballpoint production via iframe `v1.12.2` (build `0152500`); PropStream `set_preview_recipient` emission validation remains pending
+> **v1.7.46 · August 2026** · prepared for staging validation; `order.presort_suppressed` remains disabled by default until the PropStream receiver is ready
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1449,7 +1449,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.45"
+    "partner": "1.7.46"
   }
 }
 ```
@@ -2113,7 +2113,7 @@ its own future-drop selection.
 
 > **Ballpoint delivers webhooks at least once. Your integration must handle duplicates, delays, and out-of-order delivery.**
 
-> Ballpoint emits two webhook event families: order lifecycle events (`order.drop_completed`, `order.drop_cancelled`, `order.status_changed`, `order.usps_update`, and `order.rescheduled`) and the per-piece RTS push-back (`campaign.mail_tracking.rts_update` — see [§7b](#7b-per-piece-rts-push-back-v1)).
+> Ballpoint emits order events (`order.drop_completed`, `order.drop_cancelled`, `order.status_changed`, `order.usps_update`, `order.rescheduled`, and `order.presort_suppressed`) plus the per-piece RTS push-back (`campaign.mail_tracking.rts_update` — see [§7b](#7b-per-piece-rts-push-back-v1)).
 
 The partner-facing source of truth is the [canonical webhook catalog](contracts/webhooks/catalog.json). Each emitted event has a Draft 2020-12 logical schema, wire schema, exact raw-body fixture, parsed fixture, and header fixture under [`contracts/webhooks/`](contracts/webhooks/). The fixture HMAC is independently recalculated in CI. If a prose example and a wire schema ever disagree, the wire schema and its raw-body fixture win.
 
@@ -2141,11 +2141,53 @@ The endpoint must also be active and, when it has an `event_types[]` allowlist, 
 
 There are **two envelope shapes** depending on the event type. Code against the shape of the event you subscribe to — the two do not converge.
 
-**Flat envelope — `order.*` events (`order.drop_completed`, `order.drop_cancelled`, `order.status_changed`, `order.usps_update`, `order.rescheduled`).** Only `event_id` / `event_type` / `timestamp` are added at the top level at delivery time. There is **no** `id` / `version` / `data` wrapper on the wire. All payload fields sit directly at the top of the JSON object alongside `event_id` / `event_type` / `timestamp`; the dedicated drop events also carry their logical `type` field.
+**Flat envelope — existing order lifecycle events (`order.drop_completed`, `order.drop_cancelled`, `order.status_changed`, `order.usps_update`, `order.rescheduled`).** Only `event_id` / `event_type` / `timestamp` are added at the top level at delivery time. There is **no** `id` / `version` / `data` wrapper on the wire. All payload fields sit directly at the top of the JSON object alongside `event_id` / `event_type` / `timestamp`; the dedicated drop events also carry their logical `type` field.
 
-**Wrapped envelope — `campaign.mail_tracking.rts_update`.** Uses `{ id, type, version, created_at, data }` with the actual payload nested inside `data`. In addition, `event_id` / `event_type` / `timestamp` are **also** added at the top level at delivery time (so the wire object has both forms). See the [`campaign.mail_tracking.rts_update` example](#campaign-level-mail-tracking-events) for the concrete shape.
+**Wrapped envelope — `order.presort_suppressed` and `campaign.mail_tracking.rts_update`.** Uses `{ id, type, version, created_at, data }` with the actual payload nested inside `data`. In addition, `event_id` / `event_type` / `timestamp` are **also** added at the top level at delivery time (so the wire object has both forms). See the examples below and under [campaign-level mail-tracking events](#campaign-level-mail-tracking-events).
 
 Match on the appropriate top-level key. `X-Ballpoint-Event` and `X-Ballpoint-Event-Id` headers are always present and are the recommended dispatch/dedup surfaces regardless of envelope shape.
+
+### AccuZIP presort suppression credit event (v1.7.46+)
+
+When an accepted AccuZIP generation irreversibly enters production, Ballpoint
+emits one `order.presort_suppressed` event for each order with at least one
+removed piece. A zero-suppression order emits no event. An order with all pieces
+removed still emits normally; no printable PDF is manufactured for that case.
+
+```json
+{
+  "id": "evt_order.presort_suppressed_ord_abc123_1",
+  "type": "order.presort_suppressed",
+  "version": "2026-08-19",
+  "created_at": "2026-08-19T17:00:00+00:00",
+  "data": {
+    "orderId": "ord_abc123",
+    "suppressedCount": 2,
+    "recipients": [
+      { "contactId": "12345", "addressType": "PROPERTY" },
+      { "contactId": "67890", "addressType": "MAILING" }
+    ]
+  },
+  "event_id": "77777777-7777-4777-8777-777777777777",
+  "event_type": "order.presort_suppressed",
+  "timestamp": "2026-08-19T17:00:00+00:00"
+}
+```
+
+- `suppressedCount` always equals `recipients.length`. Each array entry is one
+  removed physical piece; duplicate `contactId` + `addressType` pairs are
+  intentionally preserved.
+- `contactId` is the opaque string supplied with the order recipient.
+  `addressType` is always `PROPERTY` or `MAILING`. Missing identity blocks the
+  production transition instead of emitting an uncreditable partial event.
+- Ballpoint does not send `creditTotalTCents`. PropStream calculates prepaid
+  wallet credit as the order's saved `unitPriceTCents` from
+  `POST /v1/billing/campaigns/preview` multiplied by `suppressedCount`.
+- Delivery is at least once. Deduplicate the wallet credit on
+  `X-Ballpoint-Event-Id` / top-level `event_id`, not on the wrapped `id`.
+- Activation is coordinated receiver-first and applies from the enabled
+  cutover forward. Ballpoint does not backfill events for batches that already
+  entered production while the event was disabled.
 
 ### Payload Format
 

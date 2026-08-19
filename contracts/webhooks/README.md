@@ -20,8 +20,17 @@ The signature is HMAC-SHA256 over the UTF-8 bytes of
 `X-Ballpoint-Timestamp + exact raw body`. Tests recompute it independently
 with the synthetic fixture secret. `event_id` is the stable transport dedup
 key across retries and endpoints; `X-Ballpoint-Delivery` is unique per HTTP
-attempt. For the wrapped RTS event, legacy `id` remains a separate payload
-identifier and must not be used in place of `event_id` for transport dedup.
+attempt. For wrapped events (`order.presort_suppressed` and the legacy RTS
+event), `id` remains a separate payload identifier and must not be used in
+place of `event_id` for transport dedup.
+
+`order.presort_suppressed` is emitted once per affected order when the accepted
+AccuZIP generation irreversibly enters production. Its
+`data.suppressedCount` always equals `data.recipients.length`; each recipient
+array entry represents one removed physical piece, so duplicate
+`contactId`/`addressType` pairs are preserved. Ballpoint does not send a credit
+amount. The consumer calculates prepaid-wallet credit from its saved order unit
+price and deduplicates on `X-Ballpoint-Event-Id`.
 
 RTS rates are percentages on the inclusive 0–100 scale. The runtime emits at
 most 100 `new_rts_pieces` in one event; the golden fixture exercises all 100.

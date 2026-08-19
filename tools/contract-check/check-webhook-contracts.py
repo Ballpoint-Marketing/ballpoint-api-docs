@@ -19,6 +19,7 @@ FIXTURE_SECRET = "fixture-secret-not-production"
 EXPECTED_EMITTED = {
     "order.drop_completed",
     "order.drop_cancelled",
+    "order.presort_suppressed",
     "order.status_changed",
     "order.rescheduled",
     "order.usps_update",
@@ -103,7 +104,7 @@ def main() -> int:
                 headers["X-Ballpoint-Signature"], f"sha256={digest}"
             )
 
-    assert fixture_count == 9
+    assert fixture_count == 10
     unsigned = load_json(CONTRACTS / "headers" / "unsigned.fixture.json")
     validate(unsigned, header_schema)
     assert unsigned["X-Ballpoint-Insecure"] == "true"
@@ -116,6 +117,15 @@ def main() -> int:
     assert len(rts["data"]["new_rts_pieces"]) == 100
     for field in ("scan_coverage", "delivered_rate", "rts_rate"):
         assert 0 <= rts["data"][field] <= 100
+
+    suppressed = load_json(
+        CONTRACTS / "order.presort_suppressed" / "fixtures" / "wire.json"
+    )
+    assert suppressed["id"] != suppressed["event_id"]
+    assert suppressed["data"]["suppressedCount"] == len(
+        suppressed["data"]["recipients"]
+    )
+    assert "creditTotalTCents" not in suppressed["data"]
 
     print(f"OK: {len(entries)} catalog entries, {fixture_count} emitted fixtures")
     return 0
