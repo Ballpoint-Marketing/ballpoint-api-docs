@@ -19,6 +19,7 @@
       "enum": [
         "order.drop_completed",
         "order.drop_cancelled",
+        "order.presort_suppressed",
         "order.status_changed",
         "order.rescheduled",
         "order.usps_update",

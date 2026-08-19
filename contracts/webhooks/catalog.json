@@ -33,6 +33,19 @@
       }]
     },
     {
+      "type": "order.presort_suppressed",
+      "status": "emitted",
+      "logical_schema": "order.presort_suppressed/logical.schema.json",
+      "wire_schema": "order.presort_suppressed/wire.schema.json",
+      "logical_id_semantics": "Wrapped-payload identifier, distinct from event_id.",
+      "fixtures": [{
+        "logical": "order.presort_suppressed/fixtures/logical.json",
+        "wire": "order.presort_suppressed/fixtures/wire.json",
+        "raw_body": "order.presort_suppressed/fixtures/wire.body.json",
+        "headers": "order.presort_suppressed/fixtures/headers.json"
+      }]
+    },
+    {
       "type": "order.status_changed",
       "status": "emitted",
       "logical_schema": "order.status_changed/logical.schema.json",

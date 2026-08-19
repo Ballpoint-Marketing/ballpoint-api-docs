@@ -1,12 +1,21 @@
 # Changelog
 
+## v1.7.46 — 2026-08-19 — AccuZIP presort suppression credits
+
+- **Ballpoint now defines a dedicated wrapped webhook for pieces removed by AccuZIP.** When an accepted generation irreversibly enters production, each affected order emits one `order.presort_suppressed` event with `orderId`, `suppressedCount`, and one `{ contactId, addressType }` entry per removed physical piece. Orders with no removed pieces emit nothing; an order with every piece removed still emits without manufacturing an empty print PDF.
+- **Credit ownership stays with PropStream.** The payload intentionally excludes `creditTotalTCents`. PropStream calculates prepaid-wallet credit from the `unitPriceTCents` it saved from `POST /v1/billing/campaigns/preview` immediately before payment, multiplied by the webhook's `suppressedCount`.
+- **Count and identity fail closed.** `suppressedCount` always equals `recipients.length`; duplicate contact/address pairs are preserved because each entry represents one paid piece. `contactId` is a non-empty string and `addressType` is `PROPERTY` or `MAILING`. A missing identity blocks the production transition instead of sending a partial credit fact.
+- **Delivery remains at least once and receiver-first.** PropStream deduplicates credit on the stable transport `event_id` / `X-Ballpoint-Event-Id`. The wrapped `id` is not the dedup key. The event is disabled by default and is activated per environment only after the receiver is ready; there is no historical backfill for batches that entered production while disabled.
+- **Artifact sync:** API Kit, Iframe Kit contract metadata, OpenAPI metadata, Postman metadata, canonical webhook schemas/fixtures, API metadata, iframe metadata/deploy literals, and the PropStream one-pager advance to `1.7.46`. The REST API remains `3.1`, and the iframe `postMessage` envelope remains `1`.
+- **Availability:** prepared for staging validation. This is not a production availability claim.
+
 ## Unreleased — PropStream postcard postal layout v5
 
 - **PropStream 4x6 and 6x9 printed postcards now use the approved postal sizing and placement in final PDFs.** The postage indicia is 0.9in wide by 0.73in high, and the recipient block is enlarged and moved into the approved right-side mailing area for each postcard size.
 - **The handwritten treatment remains source-scoped and deterministic.** PropStream return and recipient addresses use Lexi in royal blue `#3017FE`; the USPS indicia remains Arial and black. Existing customer artwork is preserved, including legacy full-face artwork whose old baked-in indicia is cleared before the new server-owned block is drawn.
 - **The rollout cutoff is fulfillment-safe.** The layout applies to future PropStream postcards and to rerenderable orders still in **Incoming**. Orders already in Prep, Printing, Shipping, or a locked production batch at the rollout cutoff are not changed. Rerendering replaces print artifacts only; it does not rebill, change the production status, or add an order to a batch.
 - **Recipient text never shrinks or clips to force a fit.** The approved address size remains fixed at 12pt on 4x6 and 18pt on 6x9. For the bounded Incoming-order migration, every recipient was preflighted with the same Lexi metrics used by the renderer; when any address in an existing order could not fit the approved frame, that order retained its previously completed PDF instead of publishing a partial or unreadable rerender.
-- **The partner contract is unchanged.** No endpoint, request or response field, webhook, `postMessage` event, pricing rule, or partner-side integration step changed, so the partner contract remains **v1.7.45**.
+- **The partner contract was unchanged by this postal-layout item.** No endpoint, request or response field, webhook, `postMessage` event, pricing rule, or partner-side integration step changed, so that item required no partner-contract bump.
 - **Availability:** live in Ballpoint production in API `v3.26.1` (build `cc4dd6b`) and iframe `v1.13.0` (build `c6857fa`). Staging validation covered all 29 pages of representative 4x6 and 6x9 orders, followed by clean production pilots for both sizes. The bounded Incoming-order migration published v5 PDFs for 61 orders (2,025 pieces). Another 35 orders (17,907 pieces) retained their prior PDFs because at least one recipient failed the fixed-frame migration preflight; one additional one-piece order retained its prior PDFs after staff advanced it to Prep before its merge completed.
 
 ## v1.7.45 — 2026-08-14 — Real-recipient handwritten proof preview
@@ -25,7 +34,7 @@
 - **PropStream return and recipient addresses now match the approved handwriting treatment in final PDFs.** Both postal address blocks use Lexi and the exact royal blue `#3017FE`; the USPS postage indicia remains Arial and black.
 - **Normal and batched postcard rendering use the same source-scoped rule.** The correction applies to PropStream 4x6 and 6x9 printed postcards without changing the non-PropStream rendering path, the customer-authored canvas, or recipient data.
 - **Large rerenders tolerate transient renderer socket resets.** API v3.25.1 retries a recipient-level transport interruption once with a fresh connection while preserving the existing capacity backoff, attempt budget, generation fences, and chunk/merge workflow.
-- **The partner contract is unchanged.** No endpoint, field, webhook, `postMessage` event, pricing rule, or partner-side implementation changed, so the partner contract remains **v1.7.45**.
+- **The partner contract was unchanged by this handwriting item.** No endpoint, field, webhook, `postMessage` event, pricing rule, or partner-side implementation changed, so that item required no partner-contract bump.
 - **Availability:** live and validated in staging and production in Ballpoint API v3.25.1 (build `c84eaec`). The bounded production rerender is complete: **22 orders, 9,141 pieces, and 27,423 recipient artifacts** passed generation/job, DB/S3, merged-PDF, postal-color, and first/last visual QA.
 
 ## Unreleased — Safe SVG upload normalization

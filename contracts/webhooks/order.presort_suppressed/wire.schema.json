@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/order.presort_suppressed/wire.schema.json",
+  "title": "order.presort_suppressed wire body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "type", "version", "created_at", "data",
+    "event_id", "event_type", "timestamp"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Wrapped-payload identifier; distinct from the transport event_id."
+    },
+    "type": { "const": "order.presort_suppressed" },
+    "version": { "const": "2026-08-19" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "data": { "$ref": "logical.schema.json#/$defs/data" },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Canonical transport deduplication key; stable across retries and endpoints."
+    },
+    "event_type": { "const": "order.presort_suppressed" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}

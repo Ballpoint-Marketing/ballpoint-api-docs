@@ -1,0 +1,9 @@
+{
+  "Content-Type": "application/json",
+  "X-Ballpoint-Timestamp": "2026-08-19T17:00:00+00:00",
+  "X-Ballpoint-Event": "order.presort_suppressed",
+  "X-Ballpoint-Event-Id": "77777777-7777-4777-8777-777777777777",
+  "X-Ballpoint-Delivery": "00000010-aaaa-4aaa-8aaa-000000000010",
+  "User-Agent": "Ballpoint-Webhooks/3.1",
+  "X-Ballpoint-Signature": "sha256=332518e1eef2532bb2fb5be42f00906916b32817a05b7d3122e04863d9840fd4"
+}

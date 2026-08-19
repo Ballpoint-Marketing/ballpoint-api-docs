@@ -34,7 +34,7 @@ jobs:
           import pathlib, yaml
           spec = yaml.safe_load(pathlib.Path("docs/ballpoint-api-spec-v2.yaml").read_text())
           assert "/orders/{order_id}/cancel" in spec["paths"]
-          assert len(spec["webhooks"]) == 6
+          assert len(spec["webhooks"]) == 7
           for item in spec["webhooks"].values():
               ref = item["post"]["requestBody"]["content"]["application/json"]["schema"]["$ref"]
               assert (pathlib.Path("docs") / ref).resolve().is_file(), ref
