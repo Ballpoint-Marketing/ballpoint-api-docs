@@ -1,11 +1,19 @@
 # Changelog
 
+## Unreleased — Multi Send postcard-size step alignment
+
+- **The per-piece postcard-size step now matches the approved PropStream design.** Artwork, copy, selected and hover states, and responsive geometry were aligned without changing the surrounding Multi Send flow.
+- **The choices now expose radio-group semantics, arrow-key navigation, and visible keyboard focus.** The existing selection behavior is preserved.
+- **Prices stay current while the step is open.** API-derived prices rerender when pricing arrives after the size step has already opened.
+- **The partner contract is unchanged.** No API route, schema, `postMessage` event, persistence rule, partner-facing integration timing, feature flag, or partner-side implementation changed, so the partner contract remains `1.7.46`.
+- **Availability:** live in Ballpoint production in iframe `v1.15.0` (build `572b84b`) as of 2026-08-20.
+
 ## Unreleased — Custom Postcard catalog retirement
 
 - **`Custom Postcard` is retired from new campaign selection.** The duplicate catalog card no longer appears in Single Send, Multi Send, or A/B Split; **Create Your Own Design** remains the supported blank-postcard entry point in all three flows.
 - **Existing campaigns and integrations remain compatible.** Historical orders saved with `design_name: "Custom Postcard"` continue to resolve their catalog identity, and the legacy Shopify product mapping remains unchanged. No existing campaign or saved design is deleted.
 - **The partner contract is unchanged.** No API route, request or response field, webhook, `postMessage` event, pricing rule, or partner-side integration step changes, so the partner contract remains `1.7.46`.
-- **Availability:** this behavior will enter production only through a later, separately authorized iframe release.
+- **Availability:** live in Ballpoint production in iframe `v1.15.0` (build `572b84b`) as of 2026-08-20.
 
 ## v1.7.46 — 2026-08-19 — AccuZIP presort suppression credits
 
