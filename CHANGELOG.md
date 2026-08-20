@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Custom Postcard catalog retirement
+
+- **`Custom Postcard` is retired from new campaign selection.** The duplicate catalog card no longer appears in Single Send, Multi Send, or A/B Split; **Create Your Own Design** remains the supported blank-postcard entry point in all three flows.
+- **Existing campaigns and integrations remain compatible.** Historical orders saved with `design_name: "Custom Postcard"` continue to resolve their catalog identity, and the legacy Shopify product mapping remains unchanged. No existing campaign or saved design is deleted.
+- **The partner contract is unchanged.** No API route, request or response field, webhook, `postMessage` event, pricing rule, or partner-side integration step changes, so the partner contract remains `1.7.46`.
+- **Availability:** this behavior will enter production only through a later, separately authorized iframe release.
+
 ## v1.7.46 — 2026-08-19 — AccuZIP presort suppression credits
 
 - **Ballpoint now defines a dedicated wrapped webhook for pieces removed by AccuZIP.** When an accepted generation irreversibly enters production, each affected order emits one `order.presort_suppressed` event with `orderId`, `suppressedCount`, and one `{ contactId, addressType }` entry per removed physical piece. Orders with no removed pieces emit nothing; an order with every piece removed still emits without manufacturing an empty print PDF.
