@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.46 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.47 and OpenAPI 3.1.0. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: future go-live with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -565,7 +565,7 @@
                     }
                   ]
                 },
-                "description": "Aggregate counts for a dashboard top panel: raw order totals, canonical scheduled_drops, status breakdown, SLA buckets, and RTS summary. scheduled_drops is a non-negative logical-drop count (A/B pair = 1, each Multi-Send drop = 1, accepted included); do not derive it by summing orders_by_status. Optional external_user_id and repeatable list_id narrow the scope."
+                "description": "Aggregate counts for a dashboard top panel: raw order totals, canonical completed_orders, canonical scheduled_drops, status breakdown, SLA buckets, and RTS summary. completed_orders counts each eligible complete or delivered order once and keeps A/B siblings separate; do not derive it by summing orders_by_status. scheduled_drops is a non-negative logical-drop count (A/B pair = 1, each Multi-Send drop = 1, accepted included). Optional external_user_id and repeatable list_id narrow the scope."
               },
               "event": [
                 {
@@ -578,11 +578,17 @@
                       "  var b = pm.response.json();",
                       "  pm.expect(b).to.have.property('total_orders');",
                       "  pm.expect(b).to.have.property('total_pieces');",
+                      "  pm.expect(b).to.have.property('completed_orders');",
                       "  pm.expect(b).to.have.property('scheduled_drops');",
                       "  pm.expect(b).to.have.property('orders_by_status');",
                       "  pm.expect(b).to.have.property('sla_summary');",
                       "  pm.expect(b).to.have.property('rts_summary');",
                       "  pm.expect(b).to.have.property('date_range');",
+                      "});",
+                      "pm.test('completed_orders is a non-negative integer', function () {",
+                      "  var value = pm.response.json().completed_orders;",
+                      "  pm.expect(Number.isInteger(value)).to.eql(true);",
+                      "  pm.expect(value).to.be.at.least(0);",
                       "});",
                       "pm.test('scheduled_drops is a non-negative integer', function () {",
                       "  var value = pm.response.json().scheduled_drops;",

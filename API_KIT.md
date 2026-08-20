@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.46 · August 2026** · live in production (API `v3.27.0`, build `9044b7a`; iframe `v1.14.0`, build `662443b`); `order.presort_suppressed` remains disabled by default until the PropStream receiver is ready
+> **v1.7.47 · August 2026** · prepared for staging validation; production remains on partner contract `v1.7.46`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1244,7 +1244,7 @@ These endpoints power partner-side operational dashboards (per-account aggregate
 
 #### `GET /v1/billing/partner/stats`
 
-Aggregate counts for a dashboard top panel: raw order totals, the canonical Scheduled drop KPI, status breakdown, SLA buckets, and RTS summary.
+Aggregate counts for a dashboard top panel: raw order totals, the canonical Completed order KPI, the canonical Scheduled drop KPI, status breakdown, SLA buckets, and RTS summary.
 
 **Query parameters:**
 
@@ -1267,6 +1267,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/stats?days=30&lis
 {
   "total_orders": 8,
   "total_pieces": 3000,
+  "completed_orders": 2,
   "scheduled_drops": 5,
   "orders_by_status": {
     "pending": 0,
@@ -1298,9 +1299,11 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/stats?days=30&lis
 }
 ```
 
+`completed_orders` is a non-negative integer and is the canonical Completed KPI for a partner-native dashboard. It counts each eligible order once when its display `status` is `complete` or `delivered`. A/B siblings remain separate, so a delivered pair contributes two. Explicitly unconfirmed and soft-deleted orders are excluded. Do **not** derive Completed by adding values from `orders_by_status`: that object is a raw production-status breakdown, and one order must never be counted twice across status dimensions.
+
 `scheduled_drops` is a non-negative integer and is the canonical Scheduled KPI. It counts logical drops, not raw orders: an A/B sibling pair is one drop, while each Multi-Send drop is one. Accepted drops are included. Ordinary unconfirmed/abandoned orders are excluded; all committed drops of a canonical purchased Multi-Send are included under the same fail-closed rule documented for `total_pieces_mailed` in [§6d](#6d-list-orders). Do **not** derive this KPI by summing `orders_by_status`: that object intentionally remains a raw per-order breakdown, so an A/B pair contributes two orders there.
 
-The `days` window is evaluated against order `created_at`. Unknown `list_id` (or one with no orders in the partner's scope) returns the same shape with all counts, including `scheduled_drops`, zero.
+The `days` window is evaluated against order `created_at` for `completed_orders`, raw order totals/statuses, SLA, and `scheduled_drops`; `rts_summary` retains its existing `mail_tracking_summary.last_updated_at` basis. Unknown `list_id` (or one with no orders in the partner's scope) returns the same shape with all counts, including `completed_orders` and `scheduled_drops`, zero.
 
 #### `GET /v1/mail-tracking/account-summary`
 
@@ -1449,7 +1452,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.46"
+    "partner": "1.7.47"
   }
 }
 ```
