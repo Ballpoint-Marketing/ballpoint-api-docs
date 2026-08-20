@@ -7,7 +7,7 @@
 - **Count and identity fail closed.** `suppressedCount` always equals `recipients.length`; duplicate contact/address pairs are preserved because each entry represents one paid piece. `contactId` is a non-empty string and `addressType` is `PROPERTY` or `MAILING`. A missing identity blocks the production transition instead of sending a partial credit fact.
 - **Delivery remains at least once and receiver-first.** PropStream deduplicates credit on the stable transport `event_id` / `X-Ballpoint-Event-Id`. The wrapped `id` is not the dedup key. The event is disabled by default and is activated per environment only after the receiver is ready; there is no historical backfill for batches that entered production while disabled.
 - **Artifact sync:** API Kit, Iframe Kit contract metadata, OpenAPI metadata, Postman metadata, canonical webhook schemas/fixtures, API metadata, iframe metadata/deploy literals, and the PropStream one-pager advance to `1.7.46`. The REST API remains `3.1`, and the iframe `postMessage` envelope remains `1`.
-- **Availability:** prepared for staging validation. This is not a production availability claim.
+- **Availability:** the `1.7.46` contract is live in Ballpoint production in API `v3.27.0` (build `9044b7a`) and iframe `v1.14.0` (build `662443b`). `order.presort_suppressed` remains disabled by default and will be activated only after the PropStream receiver is ready; no historical events are backfilled while it is disabled.
 
 ## Unreleased — PropStream postcard postal layout v5
 
