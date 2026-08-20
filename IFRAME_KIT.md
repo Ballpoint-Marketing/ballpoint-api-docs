@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.46** (live in production in iframe `v1.14.0`, build `662443b`; the iframe message envelope remains version `1`)
+Partner contract version: **v1.7.47** (prepared for staging validation; the iframe message envelope remains version `1` and production remains on partner contract `v1.7.46`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -527,6 +527,8 @@ Backed by the repeated `list_id` query parameter on the dashboard read endpoints
 
 The Pieces Mailed tile follows the matching purchased-Multi exception: all committed drops are included, and cancelled/failed orders remain included; Active, Completed, RTS, and status-tab behavior are unchanged. For `account-summary`, Scheduled retains its logical-drop order Creation Date basis, while Pieces/Active/Completed/RTS retain their campaign Creation Date basis.
 
+**Partner-native Completed parity (v1.7.47).** This does not change the iframe's Completed tile or its `account-summary` response. A separate parent dashboard can read top-level `completed_orders` from `GET /v1/billing/partner/stats`; it counts each eligible order once when display `status` is `complete` or `delivered`, while keeping A/B siblings separate. The raw `orders_by_status` object remains a production-status breakdown and must not be summed to derive Completed.
+
 **Local date bounds (v1.7.38).** Every bounded insights preset resolves the browser's IANA time zone and passes it through the JavaScript API client as camelCase `timeZone`; the client serializes it on the wire as `time_zone`. The `from` / `to` strings are inclusive local calendar dates in that zone. The API converts them to a half-open UTC interval from local midnight at `from` through local midnight on the day after `to`, so the **Today** preset follows the user's local day across UTC rollover and DST. At local day `2026-08-04` in `America/New_York`, the exact UTC interval is `[2026-08-04T04:00:00Z, 2026-08-05T04:00:00Z)`; spring-forward and fall-back local days produce 23-hour and 25-hour windows.
 
 **All Time remains unchanged:** it sends no `from`, `to`, or `timeZone` and therefore stays unbounded. If browser IANA-zone resolution throws or returns no usable identifier, bounded presets send `UTC`. These request details do not add or change a `postMessage`, metric date basis, cohort/list ownership rule, or account-summary response field.
@@ -812,7 +814,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.46"
+    "partner": "1.7.47"
   }
 }
 ```

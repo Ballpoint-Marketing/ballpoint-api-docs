@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.47 — 2026-08-20 — Canonical Completed KPI for partner stats
+
+- **`GET /v1/billing/partner/stats` now exposes `completed_orders` as a top-level non-negative integer.** It is the canonical Completed KPI for a partner-native dashboard and counts each eligible order once when its display `status` is `complete` or `delivered`.
+- **A/B siblings stay separate.** A delivered A/B pair contributes two completed orders. A single order that has reached both production complete and USPS delivered still contributes only one because the KPI classifies the order's display status rather than summing status dimensions.
+- **The existing `/stats` scope is preserved.** `completed_orders` inherits the partner tenant, optional `external_user_id`, repeatable `list_id`, soft-deletion, and rolling `days` window over order Creation Date. Orders with `payment_confirmed=false` are excluded.
+- **Existing consumers remain stable.** `orders_by_status` is still the raw production-status breakdown and must not be summed to derive Completed. The other `/stats` fields, `/account-summary` response, iframe Completed tile, A/B grouping elsewhere, and `postMessage` contract are unchanged.
+- **Artifact sync:** API Kit, Iframe Kit context, OpenAPI metadata/schema, Postman metadata/tests, API metadata, and iframe metadata/deploy literals advance to `1.7.47`. The REST API remains `3.1`, and the iframe `postMessage` envelope remains `1`. Postman environments are unchanged because no variable, host, credential, or safety tier changed.
+- **Availability:** prepared for Ballpoint staging validation. Production remains on partner contract `1.7.46` until an explicitly authorized production release.
+
 ## Unreleased — Multi Send postcard-size step alignment
 
 - **The per-piece postcard-size step now matches the approved PropStream design.** Artwork, copy, selected and hover states, and responsive geometry were aligned without changing the surrounding Multi Send flow.
