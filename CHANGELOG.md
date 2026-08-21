@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased — Create Your Own unified postal panel
+## v1.7.48 — 2026-08-21 — Create Your Own unified postal panel
 
 - **PropStream's exact Create Your Own Design product gains one proof-to-print postal profile.** When the audited rollout flag is enabled, new 4x6 and 6x9 `build-your-own-blank` orders show and print one opaque white panel containing the return address, indicia, recipient block, and IMb barcode area; 4x6 also keeps its approved container/sequence mark. Other products keep their existing postal layout.
 - **The accepted layout is immutable per order.** The iframe declares the profile it displayed and the API compares it with the authoritative rollout state before any mutation; absence or disagreement when unified is selected returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH` for a fresh proof review. Ballpoint then freezes `cyo_unified_white_v1` or `standard_v7` at order creation and carries it into batch rendering, so a later flag change cannot silently alter what was submitted. Historical orders without a frozen profile retain the historical renderer behavior.
 - **Production can distinguish fact from inference.** The dashboard exposes the exact Ballpoint-received timestamp plus the frozen postal profile. It explicitly does not label the timestamp as customer approval time; legacy orders are shown as not recorded instead of being guessed.
 - **Rollout is fail-closed and reversible for future submissions.** The new audited feature flag defaults false. Unknown frozen profiles refuse rendering, while disabling the flag returns future Create Your Own submissions to `standard_v7` without changing existing orders.
-- **Partner contract impact is additive only.** `GET /v1/config` adds one boolean flag consumed automatically by the iframe. No partner request, `postMessage`, billing, pricing, or webhook change is required, so the prepared staging contract remains `1.7.47`.
+- **Partner contract impact is additive only.** `GET /v1/config` adds one boolean flag consumed automatically by the iframe. No partner request, `postMessage`, billing, pricing, or webhook change is required; the coordinated staging contract advances to `1.7.48`.
 - **Availability:** prepared for coordinated Ballpoint staging validation; production is unchanged.
 
 ## v1.7.47 — 2026-08-20 — Canonical Completed KPI for partner stats
