@@ -90,7 +90,7 @@
                     "config"
                   ]
                 },
-                "description": "Safe read used automatically by the iframe. Returns boolean-only flags and a 60-second private cache TTL."
+                "description": "Safe read used automatically by the iframe. Returns boolean-only flags, including the coordinated Create Your Own postal-panel rollout flag, and a 60-second private cache TTL."
               },
               "event": [
                 {

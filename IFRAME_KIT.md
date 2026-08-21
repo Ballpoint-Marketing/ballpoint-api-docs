@@ -221,6 +221,18 @@ button, checkbox, copy, or layout**. PropStream continues to own visibility of
 its Send Mail entry point; Ballpoint owns the submit decision after the user
 enters the iframe. Non-PropStream embeds are unchanged.
 
+`propstream_cyo_unified_postal_panel_enabled` coordinates the proof and final
+print layout only for the exact **Create Your Own Design** product
+(`build-your-own-blank`). When enabled, its 4x6 and 6x9 back proof shows one
+opaque white postal panel containing the return-address, indicia, recipient,
+IMb barcode, and the 4x6 container/sequence area. Ballpoint freezes that profile when
+the order is submitted, so a later rollout change cannot alter the approved
+order. The iframe declares the displayed profile on `POST /orders`; if the
+authoritative flag changed during the cache window, Ballpoint returns
+`409 POSTAL_LAYOUT_PROFILE_MISMATCH` before the idempotency claim or any
+mutation. Refresh the proof and require review before resubmitting. Other
+products are unchanged and the flag defaults false.
+
 ### Automatic funnel analytics traffic (no partner action)
 
 During a staging campaign flow after this contract is deployed, the iframe is
