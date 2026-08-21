@@ -241,6 +241,7 @@ components:
             type: boolean
           example:
             propstream_send_mail_enabled: false
+            propstream_cyo_unified_postal_panel_enabled: false
         evaluated_at:
           type: string
           format: date-time
@@ -1044,6 +1045,15 @@ components:
           - type: 'null'
           title: Postcard Size
           description: 'Postcard size: 4x6 or 6x9'
+        postal_layout_profile:
+          anyOf:
+          - type: string
+            enum:
+            - standard_v7
+            - cyo_unified_white_v1
+          - type: 'null'
+          title: Postal Layout Profile
+          description: Postal proof profile shown by the embedded iframe. For PropStream printed postcards, Ballpoint verifies it against the authoritative rollout state before any mutation and freezes the matching value on the accepted order. Missing remains backward-compatible only when the selected profile is standard_v7; otherwise absence or mismatch returns 409 POSTAL_LAYOUT_PROFILE_MISMATCH.
         canvas_json:
           anyOf:
           - additionalProperties: true
@@ -2396,6 +2406,9 @@ paths:
         For PropStream, `propstream_send_mail_enabled` also gates both order
         creation routes authoritatively; disabled requests return
         `403 FEATURE_DISABLED` before any mutation.
+        `propstream_cyo_unified_postal_panel_enabled` coordinates the proof and
+        immutable print profile for the exact `build-your-own-blank` product;
+        it defaults false and does not change other products.
       security:
       - partnerKeyAuth: []
       parameters:
@@ -2571,7 +2584,7 @@ paths:
       tags:
       - Partner Orders
       summary: Create order (partner format)
-      description: Accepts the partner iframe order format and translates to internal model. PropStream requests return 403 FEATURE_DISABLED before any mutation when propstream_send_mail_enabled resolves false. PropStream 4x6_printed and 6x9_printed requests return 400 INVALID_PRODUCT_CONFIG before the idempotency claim, campaign/order creation, or billing unless postcard_size matches and canvas_json contains non-empty front and back objects.
+      description: Accepts the partner iframe order format and translates to internal model. PropStream requests return 403 FEATURE_DISABLED before any mutation when propstream_send_mail_enabled resolves false. PropStream 4x6_printed and 6x9_printed requests return 400 INVALID_PRODUCT_CONFIG before the idempotency claim, campaign/order creation, or billing unless postcard_size matches and canvas_json contains non-empty front and back objects. The iframe-supplied postal_layout_profile is compared with the authoritative proof profile; a mismatch returns 409 POSTAL_LAYOUT_PROFILE_MISMATCH before any mutation.
       operationId: partner_create_order_orders_post
       security:
       - partnerKeyAuth: []
@@ -2597,6 +2610,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Account suspended or PropStream Send Mail feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Request conflict, including idempotency conflicts or a postal proof profile that changed before submission
           content:
             application/json:
               schema:

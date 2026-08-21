@@ -663,6 +663,16 @@ POST /v1/billing/orders
 
 For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, or unsafe artwork with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. This conditional rule does not change other partners or non-printed-postcard products.
 
+For the exact PropStream Create Your Own printed-postcard product, the current
+iframe also sends `postal_layout_profile` as `standard_v7` or
+`cyo_unified_white_v1`. Catalog postcard requests may omit it. Ballpoint
+compares that proof profile with the authoritative rollout state before the
+idempotency claim and freezes the matching value on the accepted order. A
+missing profile remains backward-compatible only while the server-selected
+profile is `standard_v7`; a missing or different value when the unified layout
+is selected returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH`. Refresh and let the
+user review the updated proof before resubmitting with the same idempotency key.
+
 The partner/iframe request shape may include an optional `sender` object. Empty or `null` contact fields remain optional for partial Marketing Profiles. Invalid non-empty contact values return `422` before idempotency or order creation.
 
 | `sender` field | Accepted format |
@@ -1894,7 +1904,10 @@ curl https://api.ballpointmarketing.com/v1/config \
 
 ```json
 {
-  "flags": { "propstream_send_mail_enabled": false },
+  "flags": {
+    "propstream_send_mail_enabled": false,
+    "propstream_cyo_unified_postal_panel_enabled": false
+  },
   "evaluated_at": "2026-07-14T16:00:00Z",
   "evaluation_context": {
     "principal_type": "partner",
@@ -1920,6 +1933,14 @@ For PropStream, `propstream_send_mail_enabled` authoritatively gates both
 partner sources and internal flows are unchanged. This flag is a rollout
 control, not strong user authorization: the external user ID is asserted by
 the partner holding the shared partner key.
+
+`propstream_cyo_unified_postal_panel_enabled` coordinates the proof and final
+print layout for PropStream's exact `build-your-own-blank` product. When true,
+new 4x6 and 6x9 Create Your Own Design orders use one opaque white postal panel
+containing the return address, indicia, recipient block, IMb barcode area, and
+the 4x6 container/sequence mark. The selected layout profile is frozen when the order
+is accepted, so later flag changes cannot alter a previously submitted order.
+The flag defaults false; other products and historical orders are unchanged.
 
 ### 6s. Search Recipients Across Direct Mail
 
