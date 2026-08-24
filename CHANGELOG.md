@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.49 — 2026-08-24 — Immutable six-line 6x9 recipient frame
+
+- **New 6x9 PropStream proofs use the approved six-line recipient frame.** The iframe displays and submits `standard_v8`, which expands the 6x9 recipient frame symmetrically from 1.62in to 1.68in while preserving its center, Lexi at 18pt, the one-em minimum leading, the IMb guide, and every USPS clearance. This allows a wrapped six-line address to print without shrinking the type.
+- **Previously approved proofs remain immutable.** `standard_v7`, `cyo_unified_white_v1`, and historical orders with no recorded profile retain their exact prior geometry. The API accepts and freezes `standard_v8` only when the iframe explicitly declares that it displayed the v8 proof; an omitted profile remains `standard_v7` for backward compatibility. Unknown profiles still fail closed.
+- **Rollout and rollback are additive.** The API accepts both standard profiles, so API-first deployment keeps the current iframe working and the new iframe begins creating v8 orders only after it is live. Rolling the iframe back returns new submissions to v7 without changing any frozen order. The Create Your Own unified-panel flag and its v1 geometry are unchanged.
+- **Partner action:** none. The Ballpoint-hosted iframe supplies the profile automatically. The REST API stays `3.1`, the iframe message envelope stays `1`, and the coordinated staging partner contract advances to `1.7.49`.
+- **Availability:** prepared for coordinated Ballpoint staging validation. Production remains on partner contract `1.7.47`; repairing the already-frozen affected production order and retrying its batch require a separate explicitly authorized production operation after deployment.
+
 ## v1.7.48 — 2026-08-21 — Create Your Own unified postal panel
 
 - **PropStream's exact Create Your Own Design product gains one proof-to-print postal profile.** When the audited rollout flag is enabled, new 4x6 and 6x9 `build-your-own-blank` orders show and print one opaque white panel containing the return address, indicia, recipient block, and IMb barcode area; 4x6 also keeps its approved container/sequence mark. Other products keep their existing postal layout.
