@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.48 · August 2026** · prepared for staging validation; production remains on partner contract `v1.7.46`
+> **v1.7.49 · August 2026** · prepared for staging validation; production remains on partner contract `v1.7.47`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -663,15 +663,15 @@ POST /v1/billing/orders
 
 For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, or unsafe artwork with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. This conditional rule does not change other partners or non-printed-postcard products.
 
-For the exact PropStream Create Your Own printed-postcard product, the current
-iframe also sends `postal_layout_profile` as `standard_v7` or
-`cyo_unified_white_v1`. Catalog postcard requests may omit it. Ballpoint
-compares that proof profile with the authoritative rollout state before the
-idempotency claim and freezes the matching value on the accepted order. A
-missing profile remains backward-compatible only while the server-selected
-profile is `standard_v7`; a missing or different value when the unified layout
-is selected returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH`. Refresh and let the
-user review the updated proof before resubmitting with the same idempotency key.
+For every PropStream printed postcard, the current Ballpoint-hosted iframe also
+sends the exact `postal_layout_profile` it displayed: `standard_v8` for the
+current standard proof, or `cyo_unified_white_v1` when the exact Create Your Own
+unified-panel rollout is enabled. Ballpoint freezes that value on the accepted
+order. `standard_v7` remains accepted for previously deployed iframe bundles,
+and an omitted profile remains backward-compatible as `standard_v7`; neither
+case is silently upgraded. A stale or different Create Your Own profile returns
+`409 POSTAL_LAYOUT_PROFILE_MISMATCH` before the idempotency claim. Refresh and
+let the user review the updated proof before resubmitting with the same key.
 
 The partner/iframe request shape may include an optional `sender` object. Empty or `null` contact fields remain optional for partial Marketing Profiles. Invalid non-empty contact values return `422` before idempotency or order creation.
 
@@ -1462,7 +1462,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.48"
+    "partner": "1.7.49"
   }
 }
 ```

@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.48** (prepared for staging validation; the iframe message envelope remains version `1` and production remains on partner contract `v1.7.46`)
+Partner contract version: **v1.7.49** (prepared for staging validation; the iframe message envelope remains version `1` and production remains on partner contract `v1.7.47`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -232,6 +232,14 @@ authoritative flag changed during the cache window, Ballpoint returns
 `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before the idempotency claim or any
 mutation. Refresh the proof and require review before resubmitting. Other
 products are unchanged and the flag defaults false.
+
+Every current PropStream 4x6/6x9 proof also records its standard postal profile.
+The Ballpoint-hosted iframe now declares `standard_v8`; on 6x9 this is the
+approved six-line recipient frame, while 4x6 geometry is unchanged. The API
+freezes the declared value on the order. Historical `standard_v7`,
+`cyo_unified_white_v1`, and profile-less orders retain their prior geometry and
+are never upgraded by a renderer deploy. This handoff is automatic and requires
+no PropStream-side message or API change.
 
 ### Automatic funnel analytics traffic (no partner action)
 
@@ -826,7 +834,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.48"
+    "partner": "1.7.49"
   }
 }
 ```
