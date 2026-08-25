@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.49** (live in Ballpoint production; the iframe message envelope remains version `1`)
+Partner contract version: **v1.7.50** (prepared for staging validation; the iframe message envelope remains version `1`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -834,7 +834,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.49"
+    "partner": "1.7.50"
   }
 }
 ```
@@ -1532,6 +1532,28 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 > **Ordinary popup close: send nothing.** Do not send [`payment_result: cancelled`](#payment_result--payment-popup-outcome-parent--iframe) merely because the user closes the payment popup without a final outcome. The iframe keeps **Continue to Payment** enabled, and the next click follows the cached replay path above. Reserve `cancelled` / `failed` for final abandoned or failed outcomes; both remain valid status values.
 >
 > **Refetch authoritative amounts before charging — including after a replay.** The emitted `total_tcents` / `total_dollars` values are UX/display only. The partner backend must refetch authoritative billing amounts through [`POST /v1/billing/campaigns/preview`](API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) before collecting payment. `GET /v1/billing/partner/orders` is a dashboard/read model, not the current-price billing source.
+>
+> **Reloaded order history uses an immutable retail snapshot.** Starting with
+> partner contract `1.7.50`, the iframe prefers the nullable
+> `retail_unit_price_tcents` / `retail_total_price_tcents` fields returned by
+> Get/List Orders. Legacy `null` values fall back to that order's stored base
+> fields; the iframe never applies today's account markup to an old order.
+> This changes no `campaign_submitted` field or payment/ledger authority.
+>
+> **The review price and recipient count are bound to order creation.** Starting
+> with the same contract, the iframe sends the displayed per-piece retail quote
+> and total as `expected_retail_unit_price_tcents` and
+> `expected_retail_total_price_tcents` on `POST /orders`. Ballpoint validates
+> both atomically with order creation. The total check prevents a same-tier
+> recipient-count change from silently altering what the customer pays. If
+> pricing or the reviewed total changed, the API returns
+> `409 PRICE_QUOTE_STALE` before any order, charge, job, campaign, or
+> idempotency claim is written. The iframe refreshes the total and returns to
+> review; it never background-retries that stale quote and does not emit
+> `campaign_submitted` until the user explicitly continues again. Single, A/B,
+> and Multi all submit the exact review snapshots. Multi resumes the original
+> batch by local order/drop index, reusing accepted orders and their idempotency
+> keys while creating only drops that had not yet been attempted.
 
 ```json
 {
