@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.49 · August 2026** · live in Ballpoint production; REST API contract remains `3.1`
+> **v1.7.50 · August 2026** · prepared for staging validation; REST API contract remains `3.1`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -363,6 +363,20 @@ Response when no partner markup is configured (partner markup changes only
 ]
 ```
 
+#### Account markup administration (privileged key)
+
+`GET /v1/billing/partner/pricing` returns the account markup configuration and
+effective prices to any valid partner key for that account. `PUT` and `DELETE`
+on the same path change account-wide customer pricing and therefore require a
+separate server-controlled key whose scopes include **`pricing:write`**.
+Ordinary iframe/read keys receive `403` and must never be granted this scope.
+Both mutations support `If-Match: <config_updated_at>` and return `409` if an
+administrator attempts to overwrite a newer configuration.
+
+This is an intentional least-privilege boundary: do not embed the privileged
+key in the iframe or any other end-user browser bundle. Provision and rotate it
+through the controlled partner-administration service for each environment.
+
 #### `sla_business_days` (integer, additive since v1.7.7)
 
 Business days of production lead time between the scheduled production start date and `mail_date` for the row's `product_type`. Range: **1–15** (practically **3–6** today). Identical across all postage variants of the same product type.
@@ -673,6 +687,28 @@ case is silently upgraded. A stale or different Create Your Own profile returns
 `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before the idempotency claim. Refresh and
 let the user review the updated proof before resubmitting with the same key.
 
+The current iframe sends both `expected_retail_unit_price_tcents` and
+`expected_retail_total_price_tcents`: the exact per-piece quote and total shown
+on the review screen. Ballpoint compares both with the canonical account
+markup and submitted piece count while holding the same account lock and
+database transaction used to create the order. This means an unchanged unit
+tier cannot authorize a recipient-count/total change the customer never saw.
+If either value changed, `POST /orders` returns `409 PRICE_QUOTE_STALE` before
+creating a campaign, order, fulfillment job, charge, or idempotency claim. The
+iframe refreshes pricing and returns the user to review; it does not retry in
+the background and does not emit `campaign_submitted`. Multi-send recovery
+reuses each existing local order/idempotency key and creates only the remaining
+drops from the original reviewed batch, so it neither duplicates nor loses a
+drop. After review, the same idempotency key may be reused. Legacy callers may
+omit the fields during the API-first rolling deployment, but new integrations
+should always send both.
+
+On success, `POST /orders` returns the accepted
+`retail_unit_price_tcents` and `retail_total_price_tcents` in its `200`
+response. These values are the exact customer-facing snapshot persisted on the
+order; they do not replace the separately stored wholesale cost or the
+charge-now campaign preview.
+
 The partner/iframe request shape may include an optional `sender` object. Empty or `null` contact fields remain optional for partial Marketing Profiles. Invalid non-empty contact values return `422` before idempotency or order creation.
 
 | `sender` field | Accepted format |
@@ -716,15 +752,18 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders \
 }
 ```
 
-The `unit_price_tcents` / `total_price_tcents` above are a **creation-time
-estimate** persisted on the order row for display — they are **not** the amount
-debited. As of PROPS-3087 the wholesale charge is resolved against the
+The `unit_price_tcents` / `total_price_tcents` above are a **wholesale/base
+estimate** persisted on the order row — they are **not** the customer-facing
+marked-up quote and are not necessarily the final amount debited. As of
+PROPS-3087 the wholesale charge is resolved against the
 **current** pricing tier at [`/confirm-payment`](#6k-confirm-payment-partner-payment-gate),
 and [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate)
 recomputes the same way — always refetch that preview immediately before
 charging. Because these estimate columns are captured at creation, an order
 created before the July 12, 2026 cutover may still show the prior base price in
 these fields, but the debit uses the pricing tier in effect at confirmation.
+The immutable customer-facing history is exposed by the nullable `retail_*`
+fields on Get/List Orders for orders created under contract `1.7.50` or later.
 
 **Example — letter (requires `envelope_style`):**
 
@@ -777,6 +816,8 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
   "piece_count": 500,
   "unit_price_tcents": 5054,
   "total_price_tcents": 2527000,
+  "retail_unit_price_tcents": 5654,
+  "retail_total_price_tcents": 2827000,
   "production_status": "printing",
   "usps_status": null,
   "display_status": "printing",
@@ -795,6 +836,13 @@ curl -s https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b \
   "cancelled_at": null
 }
 ```
+
+`unit_price_tcents` / `total_price_tcents` are Ballpoint wholesale/base
+snapshots. `retail_unit_price_tcents` / `retail_total_price_tcents` are the
+customer-facing quote captured with the partner markup. The retail pair is
+`null` on legacy orders when the checkout-time markup cannot be proven; do not
+fill those gaps with the account's current markup. None of these display/read
+fields replaces the authoritative charge-now preview or the settled ledger.
 
 `display_status` is the single field to show your users. `usps_status` is `null` until USPS scans arrive (1–2 days after production completes).
 
@@ -861,6 +909,8 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
       "piece_count": 500,
       "unit_price_tcents": 5054,
       "total_price_tcents": 2527000,
+      "retail_unit_price_tcents": 5654,
+      "retail_total_price_tcents": 2827000,
       "production_status": "complete",
       "usps_status": "delivered",
       "display_status": "delivered",
@@ -883,6 +933,8 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/orders?external_user_id=u
 - Use `total` for pagination: if `total > limit + offset`, there are more pages.
 
 Each element has the same shape as §6c, including the `payment_confirmed` and `cancelled_at` fields.
+The two nullable `retail_*` fields are also present exactly as described in
+§6c; clients must preserve `null` as "historical retail quote unknown."
 
 ---
 
@@ -1462,7 +1514,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.49"
+    "partner": "1.7.50"
   }
 }
 ```
@@ -1644,7 +1696,7 @@ X-Partner-Key: pk_test_...
 Content-Type: application/json
 ```
 
-For Edit Leads recipient replacement on future/unbilled drops. Replaces all recipients on the order, resizes `piece_count` to match the new count, and recomputes display pricing fields (`unit_price_tcents`, `total_price_tcents`) via the canonical pricing helper. Backend gate is order-level and campaign-type-neutral — applies to single send, A/B split, and multi-month equally.
+For Edit Leads recipient replacement on future/unbilled drops. Replaces all recipients on the order, resizes `piece_count` to match the new count, and atomically recomputes wholesale (`unit_price_tcents`, `total_price_tcents`) plus customer-facing retail (`retail_unit_price_tcents`, `retail_total_price_tcents`) snapshots via the canonical pricing helpers. Backend gate is order-level and campaign-type-neutral — applies to single send, A/B split, and multi-month equally.
 
 **Distinction from `POST /v1/billing/orders/{order_id}/recipients`:** the POST endpoint is for **initial recipient upload** (or chunked append). It does NOT resize `piece_count` and is NOT the Edit Leads PATCH flow. Use this PATCH instead for Edit Leads.
 
@@ -1704,8 +1756,8 @@ Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, 
 | `previous_piece_count` / `new_piece_count` | Order `piece_count` before/after this PATCH. |
 | `previous_unit_price_tcents` | integer or null. Wholesale unit price (tenth-cents) before this PATCH. **Populated for gated orders created on/after the gated price-freeze (2026-06-23)** — `POST /orders` freezes `unit_price_tcents` / `total_price_tcents` on the order row at creation (no debit; the wholesale debit still happens only at `/confirm-payment`). `null` only for **legacy** gated orders created before that change. Tier-aware: shrinking past a volume tier boundary changes the per-piece rate. |
 | `new_unit_price_tcents` | integer. Wholesale unit price after this PATCH. Always populated because this PATCH recomputes via the canonical `get_unit_price` helper. |
-| `previous_total_price_tcents` | integer or null. Display total before this PATCH (unit × count). **Populated for gated orders created on/after 2026-06-23** (price frozen at creation); `null` only for legacy gated orders created before that change — same as `previous_unit_price_tcents`. |
-| `new_total_price_tcents` | integer. Display total after this PATCH (`new_unit_price_tcents` × `new_piece_count`). Always populated. |
+| `previous_total_price_tcents` | integer or null. Wholesale/base total before this PATCH (unit × count). **Populated for gated orders created on/after 2026-06-23**; `null` only for legacy gated orders created before that change — same as `previous_unit_price_tcents`. |
+| `new_total_price_tcents` | integer. Wholesale/base total after this PATCH (`new_unit_price_tcents` × `new_piece_count`). Always populated. |
 | `payment_confirmed` | Always `false` (endpoint gate rejects `true`). |
 
 **409 error codes:**
@@ -1718,7 +1770,7 @@ Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, 
 
 **Billing semantics:**
 
-This endpoint does NOT debit, charge, or hold balance. It updates `unit_price_tcents` and `total_price_tcents` on the order row for display, but `/confirm-payment` recomputes pricing at charge time using the (newly-updated) `piece_count` via the canonical pricing helper, so this PATCH cannot cause incorrect billing. `/confirm-payment` remains the sole billing source of truth.
+This endpoint does NOT debit, charge, or hold balance. It updates the wholesale and retail snapshot pairs on the order row, but `/confirm-payment` recomputes wholesale pricing at charge time using the (newly-updated) `piece_count` via the canonical pricing helper, so this PATCH cannot cause incorrect billing. `/confirm-payment` remains the sole billing source of truth and never rewrites the retail snapshot after confirmation.
 
 **Audit log:** every successful PATCH writes an `audit_log` row with `action="recipients_edit_leads"` and `detail` containing previous/new piece_count, unit_price_tcents, and total_price_tcents.
 
@@ -1860,7 +1912,7 @@ Campaign-level delta add/remove endpoint. One call applies recipient changes acr
 
 **Idempotency:** Naturally idempotent. A repeated call: `added[]` upserts same values (no-op), `removed[]` finds nothing → all reported as `removed_not_found_count`. Response reflects current state.
 
-**Billing semantics:** Same as §6o — this endpoint does NOT charge. It recomputes `unit_price_tcents` and `total_price_tcents` on each affected order for display. `/confirm-payment` recomputes at charge time using the updated `piece_count`.
+**Billing semantics:** Same as §6o — this endpoint does NOT charge. It recomputes both wholesale and retail snapshot pairs on each affected order. `/confirm-payment` recomputes wholesale at charge time using the updated `piece_count` and leaves the retail snapshot frozen.
 
 **Audit log:** `action="recipients_campaign_delta"` with detail containing counts and affected/locked order IDs.
 
