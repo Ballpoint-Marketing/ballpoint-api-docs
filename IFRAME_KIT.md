@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.50** (prepared for staging validation; the iframe message envelope remains version `1`)
+Partner contract version: **v1.7.51** (prepared for staging validation; the iframe message envelope remains version `1`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -224,22 +224,29 @@ enters the iframe. Non-PropStream embeds are unchanged.
 `propstream_cyo_unified_postal_panel_enabled` coordinates the proof and final
 print layout only for the exact **Create Your Own Design** product
 (`build-your-own-blank`). When enabled, its 4x6 and 6x9 back proof shows one
-opaque white postal panel containing the return-address, indicia, recipient,
-IMb barcode, and the 4x6 container/sequence area. Ballpoint freezes that profile when
-the order is submitted, so a later rollout change cannot alter the approved
-order. The iframe declares the displayed profile on `POST /orders`; if the
-authoritative flag changed during the cache window, Ballpoint returns
+compact opaque white recipient panel using the approved 4x6/6x9 dimensions;
+the return-address, indicia, IMb barcode, and 4x6 container/sequence regions
+remain separate. A minimal opaque band behind the full IMb/quiet area keeps
+customer artwork out of the barcode without changing the approved box.
+Ballpoint freezes that profile when the order is submitted,
+so a later rollout change cannot alter the approved order. The iframe declares
+the displayed profile on `POST /orders`; if the authoritative flag changed
+during the cache window, Ballpoint returns
 `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before the idempotency claim or any
 mutation. Refresh the proof and require review before resubmitting. Other
 products are unchanged and the flag defaults false.
 
-Every current PropStream 4x6/6x9 proof also records its standard postal profile.
-The Ballpoint-hosted iframe now declares `standard_v8`; on 6x9 this is the
-approved six-line recipient frame, while 4x6 geometry is unchanged. The API
-freezes the declared value on the order. Historical `standard_v7`,
-`cyo_unified_white_v1`, and profile-less orders retain their prior geometry and
-are never upgraded by a renderer deploy. This handoff is automatic and requires
-no PropStream-side message or API change.
+Every current PropStream 4x6/6x9 proof also records its postal profile. The
+Ballpoint-hosted iframe declares `standard_v9` for standard proofs; this adds the
+approved 4x6 six-line frame at 12pt and preserves the approved `standard_v8`
+6x9 frame. When the Create Your Own rollout flag is enabled, the iframe declares
+`cyo_compact_white_v2` and displays the approved compact 4x6/6x9 recipient box.
+The API freezes the declared value on the order. Historical `standard_v7`,
+`standard_v8`, `cyo_unified_white_v1`, and profile-less orders retain their
+prior geometry and are never upgraded by a renderer deploy. A visible/exported
+text object still set to the exact default `Enter Text` blocks Save and final
+submission. This handoff is automatic and requires no PropStream-side message
+or API change.
 
 ### Automatic funnel analytics traffic (no partner action)
 
@@ -834,7 +841,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.50"
+    "partner": "1.7.51"
   }
 }
 ```
