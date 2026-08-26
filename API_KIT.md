@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.50 · August 2026** · prepared for staging validation; REST API contract remains `3.1`
+> **v1.7.51 · August 2026** · prepared for staging validation; REST API contract remains `3.1`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -675,15 +675,16 @@ POST /v1/billing/orders
 
 **Partner iframe compatibility sender (`POST /orders`):**
 
-For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, or unsafe artwork with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. This conditional rule does not change other partners or non-printed-postcard products.
+For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, unsafe artwork, or an exported text object left at the exact default `Enter Text` with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. Hidden/non-exported placeholders and changed copy do not trigger this guard. This conditional rule does not change other partners or non-printed-postcard products.
 
 For every PropStream printed postcard, the current Ballpoint-hosted iframe also
-sends the exact `postal_layout_profile` it displayed: `standard_v8` for the
-current standard proof, or `cyo_unified_white_v1` when the exact Create Your Own
-unified-panel rollout is enabled. Ballpoint freezes that value on the accepted
-order. `standard_v7` remains accepted for previously deployed iframe bundles,
-and an omitted profile remains backward-compatible as `standard_v7`; neither
-case is silently upgraded. A stale or different Create Your Own profile returns
+sends the exact `postal_layout_profile` it displayed: `standard_v9` for the
+current standard proof, or `cyo_compact_white_v2` when the exact Create Your Own
+rollout is enabled. Ballpoint freezes that value on the accepted order.
+`standard_v7`, `standard_v8`, `cyo_unified_white_v1`, and profile-less historical
+orders retain their frozen geometry and are never silently upgraded. An omitted
+profile remains backward-compatible as `standard_v7` for old iframe bundles. A
+stale or different Create Your Own profile returns
 `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before the idempotency claim. Refresh and
 let the user review the updated proof before resubmitting with the same key.
 
@@ -1514,7 +1515,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.50"
+    "partner": "1.7.51"
   }
 }
 ```
