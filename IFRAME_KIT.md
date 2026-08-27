@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.51** (prepared for staging validation; the iframe message envelope remains version `1`)
+Partner contract version: **v1.7.51** (live in Ballpoint production; the iframe message envelope remains version `1`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -221,6 +221,13 @@ button, checkbox, copy, or layout**. PropStream continues to own visibility of
 its Send Mail entry point; Ballpoint owns the submit decision after the user
 enters the iframe. Non-PropStream embeds are unchanged.
 
+For new PropStream orders, choosing First Class uses Ballpoint's direct
+fulfillment path from the frozen recipients. It does not invoke AccuZIP and
+does not present IMb, container, or tracking claims that do not exist. This
+release validated the 4x6 and 6x9 postcard paths; Standard/Presort continues
+through the existing AccuZIP path. This is automatic and adds no partner-side
+message or integration step.
+
 `propstream_cyo_unified_postal_panel_enabled` coordinates the proof and final
 print layout only for the exact **Create Your Own Design** product
 (`build-your-own-blank`). When enabled, its 4x6 and 6x9 back proof shows one
@@ -234,7 +241,9 @@ the displayed profile on `POST /orders`; if the authoritative flag changed
 during the cache window, Ballpoint returns
 `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before the idempotency claim or any
 mutation. Refresh the proof and require review before resubmitting. Other
-products are unchanged and the flag defaults false.
+products are unchanged. The migration/bootstrap default remains false for a
+fail-closed coordinated deployment; the PropStream default state is enabled in
+Ballpoint production as of partner contract `1.7.51`.
 
 Every current PropStream 4x6/6x9 proof also records its postal profile. The
 Ballpoint-hosted iframe declares `standard_v9` for standard proofs; this adds the
