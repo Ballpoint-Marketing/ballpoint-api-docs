@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.51 · August 2026** · prepared for staging validation; REST API contract remains `3.1`
+> **v1.7.51 · August 2026** · live in Ballpoint production; REST API contract remains `3.1`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -676,6 +676,13 @@ POST /v1/billing/orders
 **Partner iframe compatibility sender (`POST /orders`):**
 
 For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, unsafe artwork, or an exported text object left at the exact default `Enter Text` with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. Hidden/non-exported placeholders and changed copy do not trigger this guard. This conditional rule does not change other partners or non-printed-postcard products.
+
+For new PropStream orders, `postage_type: "first_class"` uses the direct
+fulfillment path from the frozen recipient list. It does not pass through
+AccuZIP and therefore does not expose fabricated IMb, container, or tracking
+claims. This release validated the 4x6 and 6x9 postcard paths;
+`standard` and `presort` continue to use the existing AccuZIP workflow. No
+request field or partner-side action changed.
 
 For every PropStream printed postcard, the current Ballpoint-hosted iframe also
 sends the exact `postal_layout_profile` it displayed: `standard_v9` for the
@@ -1989,11 +1996,17 @@ the partner holding the shared partner key.
 
 `propstream_cyo_unified_postal_panel_enabled` coordinates the proof and final
 print layout for PropStream's exact `build-your-own-blank` product. When true,
-new 4x6 and 6x9 Create Your Own Design orders use one opaque white postal panel
-containing the return address, indicia, recipient block, IMb barcode area, and
-the 4x6 container/sequence mark. The selected layout profile is frozen when the order
-is accepted, so later flag changes cannot alter a previously submitted order.
-The flag defaults false; other products and historical orders are unchanged.
+new 4x6 and 6x9 Create Your Own Design orders use the approved compact opaque
+recipient panel while the return-address, indicia, IMb barcode, and 4x6
+container/sequence regions remain separate. A minimal opaque band protects the
+full IMb/quiet area without changing the approved recipient box. The selected
+layout profile is frozen when the order is accepted, so later flag changes
+cannot alter a previously submitted order.
+Migration/bootstrap defaults the flag to false so a coordinated deployment can
+fail closed. It is enabled in Ballpoint production for the PropStream default
+state as of partner contract `1.7.51`; the scope remains limited to
+`build-your-own-blank` 4x6/6x9 printed postcards. Other products and historical
+orders are unchanged.
 
 ### 6s. Search Recipients Across Direct Mail
 
