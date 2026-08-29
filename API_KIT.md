@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.51 · August 2026** · live in Ballpoint production; REST API contract remains `3.1`
+> **v1.7.52 · August 2026** · release candidate; REST API contract remains `3.1`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1522,7 +1522,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.51"
+    "partner": "1.7.52"
   }
 }
 ```
