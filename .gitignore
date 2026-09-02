@@ -1,2 +1,8 @@
-# Internal tooling — not for partner-facing public repo
+# Local-only configuration and working notes
+AGENTS.md
 CLAUDE.md
+.agents/
+.claude/
+.codex/
+.ballpoint-memory/
+.impeccable.md

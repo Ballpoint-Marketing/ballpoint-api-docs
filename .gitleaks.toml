@@ -1,8 +1,5 @@
-# Gitleaks config for ballpoint-dashboard.
-# Used by `bp-gate gitleaks` (read from index, not work tree — see
-# ~/.claude/scripts/bp-gate.sh). Keep this file identical across the 4
-# Ballpoint repos (ballpoint-dashboard, ballpoint-api, ballpoint-iframe,
-# ballpoint-api-docs). Drift = audit quarterly.
+# Secret-scanning rules shared by the Ballpoint repositories.
+# Keep the rules aligned across all four repositories.
 #
 # Rule design:
 # - Char classes include `-` (last in class, literal) so hyphen-bearing
@@ -14,6 +11,11 @@
 
 [extend]
 useDefault = true
+
+[[rules]]
+id = "qa-session-url"
+description = "Pre-authenticated QA session URL"
+regex = '''https?://app\.qa\.propstream\.com/[^\s"'<>\x60]*[?&]c=[A-Za-z0-9_%+-]+'''
 
 [[rules]]
 id = "ballpoint-staging-key"
