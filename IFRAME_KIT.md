@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.52** (live in Ballpoint production; the iframe message envelope remains version `1`)
+Partner contract version: **v1.7.53** (documented ahead of rollout; staging and production availability pending validation; the iframe message envelope remains version `1`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -298,6 +298,7 @@ does not assert staging deployment or production availability.
 | `externalAccountId` | string | Your account/tenant identifier |
 | `externalUserId` | string | Your user identifier |
 | `externalUserIsAccountOwner` | boolean | Optional. Gates the iframe's sender-info "Set up now" CTA for this user. `true` → CTA visible, user may set up / edit sender info. `false` or missing → CTA hidden; the Sender Information step shows the blocked-state copy when setup is incomplete, and the Direct Mail Dashboard hides the Sender Information card entirely in every sender state. Default if absent or non-`true`: `false` (deny-by-default; partners who do not send the field get the same non-owner presentation). Mutable on `set_list` refresh — see [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner). |
+| `customerNumber` | string | Optional in v1.7.53+. PropStream Customer Number, for example `"000123"`. Nonblank, at most 256 Unicode characters; sent literally as `external_user_metadata.customer_number` when creating each order. First accepted singular `set_list` is authoritative, including absence. See [Customer Number](#customer-number-customernumber). |
 | `piece_counts` | object | Optional. Pre-computed piece counts for the 6 combinations of `Deliver To` × `Remove duplicates`. When present, the iframe shows 2 user-facing controls on the piece-selection page (Deliver To select + Remove duplicates checkbox) and uses these values as the authoritative count + price input. When absent, the controls are hidden and the iframe falls back to `count` (legacy behavior — existing partners are unaffected). See [Recipient selection contract](#recipient-selection-contract-piece-count--dedup) for the full walkthrough. |
 | `tenantKey` | string | Optional. Tenant scope key |
 
@@ -333,7 +334,20 @@ Semantics:
 >
 > See [Campaign Dedup (automatic)](#campaign-dedup-automatic) for the only server-side dedupe Ballpoint performs (cross-order A/B-split guard-rail), and [Recipient Upload Flow](#7-recipient-upload-flow) for same-order behavior.
 
+#### Customer Number (`customerNumber`)
+
+**Availability:** this v1.7.53 input contract is published ahead of rollout. Wait for Ballpoint's staging/build confirmation before testing it; an older iframe does not forward this field. The `ready.contractVersions.partner` value identifies the iframe contract, but is not by itself proof of end-to-end deployment or PropStream parent wiring.
+
+- Send the optional field on the **first accepted singular `set_list`**. It is not supported on plural `set_lists`, `set_tenant`, or a new standalone message.
+- If present, the value must be a string with at least one non-whitespace character and at most 256 Unicode characters. Valid strings are preserved literally, including leading zeros and surrounding spaces; no numeric conversion, trimming, or truncation is applied to the stored value. Omit it when unavailable. `null`, numbers, objects, arrays, empty/whitespace-only strings, and oversized values are invalid: the whole message is rejected before changing list context, using the existing validation path without logging the number.
+- The existing API metadata ceiling also applies: at most 2,048 bytes for the compact JSON object, counting non-ASCII characters as JSON Unicode escapes. This is a second limit, not an alternative to the 256-character limit; some Unicode-heavy strings reach it sooner. No metadata limit is raised by this feature.
+- The first accepted value **or absence** is a session snapshot. A same-list refresh may omit it or repeat it; supplying a different valid value does not replace it, and supplying it after initial omission does not fill it in. Invalid values still reject the whole refresh. A tenant change or iframe remount clears the snapshot and requires fresh context; it never inherits the previous tenant's number.
+- Single Send, every Multi Send drop, both A/B variants, and retries reuse the captured value or absence. A retry does not read a newer customer context. When present, the order-creation request carries `external_user_metadata: {"customer_number": "000123"}`; when absent, no Customer Number key is added.
+- This is an order attribution label, **not** `externalUserId`, `externalAccountId`, `tenantKey`, an order ID, or payment authorization. It adds no field to iframe lifecycle/analytics events. Existing metadata/webhook handling and retention still apply; old orders are not automatically backfilled.
+
 #### Full `set_list` example with `piece_counts`
+
+First accepted list context, including optional Customer Number:
 
 ```json
 {
@@ -346,6 +360,7 @@ Semantics:
   "externalAccountId": "your_account_id",
   "externalUserId": "your_user_id",
   "externalUserIsAccountOwner": true,
+  "customerNumber": "000123",
   "piece_counts": {
     "property": { "dedup_off": 480, "dedup_on": 440 },
     "mailing":  { "dedup_off": 498, "dedup_on": 472 },
@@ -362,9 +377,10 @@ After PropStream's Edit Leads modal saves changes to the recipient list, the par
 - **Updatable fields on refresh:** `count`, `name`, `piece_counts`, `externalUserIsAccountOwner`. These are re-validated and re-applied. The iframe's count display, pricing UI, recipient selection state, and sender-info CTA visibility refresh in place.
 - **Preserving vs clearing `piece_counts` on refresh:** if the refresh payload OMITS the `piece_counts` key entirely, the iframe preserves the currently-active `piece_counts` table AND the user's combo selection (pricing continues working). To explicitly replace the table, include `piece_counts` in the refresh payload with the new values — this resets the Deliver To / Remove duplicates selection to the [default](#default-selection). To explicitly clear it back to legacy single-count behavior, include `piece_counts: null`. Omitting the key is NOT the same as clearing.
 - **Pricing/display on refresh when `piece_counts` is active:** on a refresh that OMITS `piece_counts`, the refreshed count is applied to internal state while the visible recipient count and price stay aligned with the user's current Deliver To + Remove duplicates selection (via the existing piece_counts lookup). A refresh that INCLUDES `piece_counts` resets the selection to the default first, so the displayed count and price follow the default combination, not the user's prior choice. If `piece_counts` is not active on the active list, the refreshed raw count drives display + price directly (legacy behavior).
-- **Immutable fields on refresh:** `externalAccountId`, `externalUserId`, `tenantKey`. The values from the first-receipt set_list are authoritative for the session. Refresh payloads attempting to change these are:
+- **Immutable fields on refresh:** `externalAccountId`, `externalUserId`, `tenantKey`, `customerNumber`. The values from the first-receipt set_list are authoritative for the session. Refresh payloads attempting to change these are:
   - `externalAccountId` / `externalUserId`: ignored (existing values preserved).
   - `tenantKey` mismatch: ENTIRE refresh message rejected, no state change applied.
+  - `customerNumber`: the first value or absence is preserved. Omitting it does not clear it; adding/changing a valid value does not overwrite the snapshot. An invalid value rejects the entire message before any count/name update.
 - **Backward compatibility:** partners that do not send `set_list` a second time are unaffected. First-receipt behavior is unchanged. Partners that previously relied on second-receipt rejection still get the same rejection for *different-listId* attempts.
 - **Representative proof reset:** every accepted same-list refresh clears the in-memory preview recipient immediately. Send the replacement `set_preview_recipient` after the refresh, or send `recipient: null` when no valid lead remains.
 
@@ -852,7 +868,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.52"
+    "partner": "1.7.53"
   }
 }
 ```

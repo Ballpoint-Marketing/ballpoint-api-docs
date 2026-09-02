@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.53 — 2026-09-02 — PropStream Customer Number attribution
+
+- **Optional `set_list.customerNumber`.** The first accepted singular list context may include a nonblank string of at most 256 Unicode characters. The iframe preserves it literally, including leading zeros, as `external_user_metadata.customer_number` on each new order. Omission keeps the existing flow; `null`, non-string, blank, and oversized values reject the message before context mutation.
+- **Snapshot, not identity.** The first value or absence is preserved on same-list refreshes, Single Send, Multi Send drops, A/B variants, and retries. Tenant changes/remounts clear the context. No user, account, tenant, payment, or idempotency identity is replaced, and no new iframe lifecycle/analytics event field is added.
+- **Existing Ballpoint order lookup and details recognize the number.** Eligible management and production staff remain limited to their existing order visibility. The existing order-list `q` ceiling increases from 120 to 256 characters so a full Customer Number can be searched; it remains bounded. Support retains metadata redaction and does not gain Customer Number matches; no generic metadata exposure or new partner search endpoint is introduced. Historical orders are not backfilled, and existing metadata retention remains in effect.
+- **Partner action:** send `customerNumber` in the first singular `set_list` after Ballpoint confirms the compatible build. See the Iframe Kit for validation, immutable-absence, and refresh rules. PropStream's parent implementation and real-session validation remain separate from Ballpoint's rollout.
+- **Artifacts:** Iframe Kit, API Kit, OpenAPI query limit/example/metadata, Postman example/metadata, API runtime metadata, iframe runtime/deploy metadata, and the one-pager advance together to `1.7.53`. REST contract `3.1`, message envelope `1`, order-body schemas, and webhook schemas/fixtures are unchanged; the existing metadata object already accepts this key.
+- **Documentation clarification only:** API Kit attribution guidance now points to the existing per-trigger webhook field inventory instead of promising metadata on every status event. Order-job dead-letter already omits it; no webhook producer or payload is changed here. The existing two-character minimum for the dashboard's Search Server action is unchanged.
+- **Availability:** documented ahead of rollout. Staging validation and production release are pending; this entry does not claim a deployed build or completed PropStream end-to-end flow.
+
 ## 2026-08-30 — Order Summary parity, Color Letter batching, and renderer font reliability
 
 - **Order Summary now matches the approved PropStream layout.** The hosted iframe presents the approved background, typography, icons, cards, totals, alignment, and action placement for Single Send, Multi Send, and A/B Split Test. The Bill Date uses the user's local calendar date; campaign calculations, payment handoff, submission behavior, and the existing `campaign_submitted` payload are unchanged.
