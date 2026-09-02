@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.52 · August 2026** · live in Ballpoint production; REST API contract remains `3.1`
+> **v1.7.53 · September 2026** · documented ahead of rollout; staging and production availability pending validation; REST API contract remains `3.1`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1111,7 +1111,17 @@ POST /v1/billing/orders
 }
 ```
 
-We do not read or interpret the contents. Whatever you send is echoed verbatim on every `order.status_changed` webhook for that order, so you can reconcile to your own per-end-user records without an additional API call.
+The metadata is attribution data, not identity or authorization. It is echoed on the existing `order.status_changed` webhook paths that carry this field, so you can reconcile to your own per-end-user records without an additional API call. Under partner contract v1.7.53, Ballpoint additionally recognizes the PropStream `customer_number` key for order lookup/display by eligible staff; other keys remain uninterpreted. **Documentation clarification, not a webhook change:** this is not a promise that every status-event producer carries metadata; the existing [per-trigger field inventory](#d1-order-status_changed-field-name-pairs) already excludes it from order-job dead-letter events.
+
+**PropStream Customer Number (v1.7.53; rollout pending):** the iframe accepts optional `customerNumber` on the first singular `set_list` and forwards it on `POST /orders` in the existing field:
+
+```json
+"external_user_metadata": { "customer_number": "000123" }
+```
+
+This fragment augments the existing partner-format order body; it does not introduce a new endpoint or required field. The iframe requires a nonblank string of at most 256 Unicode characters and preserves it literally, including leading zeros. Its first context, including absence, is immutable through same-list refreshes and captured for all drops/retries; see the [iframe Customer Number contract](IFRAME_KIT.md#customer-number-customernumber). Direct API callers still use the existing metadata validator and limits below. Orders without the key continue to work and old orders are not backfilled. Existing retention applies. The number does not replace `external_user_id`, account/tenant identity, or billing authorization; no partner lookup route or webhook shape is added. Staff lookup/display remains within each user's existing order scope; the support-role metadata redaction is unchanged.
+
+For staff lookup, the existing `GET /v1/billing/orders` `q` parameter accepts up to 256 characters so the full number can be searched. Management and employee callers may match the PropStream Customer Number only within their existing authorized order scope. This does not give support or partner callers a new Customer Number lookup path or broaden station/tenant visibility. The dashboard's existing **Search Server** action still requires at least two characters; a one-character Customer Number can be found in loaded orders or viewed in Order Details, but does not by itself enable that server-search action.
 
 **Limits (validated at the API boundary):**
 
@@ -1122,14 +1132,14 @@ We do not read or interpret the contents. Whatever you send is echoed verbatim o
 | Max key length | 64 chars |
 | Max value length | 256 chars (after string conversion) |
 | Nested objects/arrays | Not allowed (flat dict only) |
-| Max total size | 2,048 bytes (compact JSON) |
+| Max total size | 2,048 bytes (compact JSON, non-ASCII characters counted as JSON Unicode escapes); applies in addition to the per-value character limit |
 
 Validator violations return `422 Unprocessable Entity` with a descriptive error message.
 
 **Lifecycle:**
 
 - Captured **only at order creation** — represents the end-user who placed the order. Subsequent `PATCH /v1/billing/orders/{order_id}` calls cannot mutate it.
-- Echoed on every `order.status_changed` event (covers status changes, cancel, complete, payment_failed).
+- Echoed on the existing metadata-bearing `order.status_changed` paths, including staff transitions, partner cancellation, and payment-expiry scheduling; see the [per-trigger field inventory](#d1-order-status_changed-field-name-pairs). No webhook producer is expanded by the Customer Number feature.
 - Subject to the same retention window as recipient PII — when an order ages past the partner-controlled retention threshold, this field is scrubbed from our storage automatically.
 
 **Sample webhook payload with the field present** (flat envelope — see [§7 Envelope Shape on the Wire](#envelope-shape-on-the-wire)):
@@ -1522,7 +1532,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.52"
+    "partner": "1.7.53"
   }
 }
 ```
