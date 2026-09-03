@@ -5,7 +5,7 @@
 - **Paid scheduled orders notify the partner when they enter the accepted state.** Automatic promotion previously saved the status without enqueuing its notification. The correction persists the status and `order.status_changed` together, using the existing production-transition payload and durable delivery retries.
 - **Historical and mailing states are unchanged.** The correction applies to subsequent eligible promotions; it does not replay past acceptance events, confirm physical postage, change billing, or advance existing accepted orders to complete.
 - **Partner action:** no new payload format or integration endpoint. Existing consumers of the production-transition variant receive the previously missing acceptance notification. Partner contract remains `1.7.53`.
-- **Availability:** not yet deployed. Staging and production validation are pending.
+- **Availability:** deployed and validated in Ballpoint staging as of 2026-09-03 (API build `0e0d0af`), including a real PropStream UAT checkout, acceptance notification acknowledged with HTTP 200 by the QA endpoint, and matching status in the embedded iframe and staff dashboard. Not yet deployed to production.
 
 ## 2026-09-03 — Workflow and print reliability maintenance
 
