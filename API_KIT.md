@@ -2318,16 +2318,19 @@ When an order's status changes, we send an `order.status_changed` event. **Flat 
 
 #### <a id="d1-order-status_changed-field-name-pairs"></a>Two field-name pairs by trigger
 
-`order.status_changed` is enqueued by **four** code paths (internal-staff status change, partner-initiated cancel, scheduler expiring an unconfirmed payment, and order-job dead-letter). They share the same event type but **use two different field-name pairs** to describe the transition:
+`order.status_changed` uses **two different field-name pairs** across the existing payload variants. Automatic promotion of a paid scheduled order reuses the production-transition variant rather than introducing a new payload shape. The acceptance notification correction below is pending deployment; see the CHANGELOG availability entry.
 
 | Trigger path | Transition field pair | Also carried |
 |---|---|---|
 | Internal-staff status change | `previous_production_status` → `production_status` | `usps_status`, `display_status`, `note`, `refund` (object, only when a refund was executed on a cancel) |
+| Scheduler promotes a paid, due order (pending deployment) | `previous_production_status` → `production_status` (values `scheduled` → `accepted`) | `usps_status`, `display_status`, `note` (`null`); same production-transition variant, no refund |
 | Partner-initiated cancel | `previous_status` → `new_status` (values `scheduled`/`accepted` → `cancelled`) | — |
 | Scheduler expires an unconfirmed payment | `previous_status` → `new_status` (values `scheduled` → `payment_failed`) | `trigger` (`payment_confirmation_expired`), `failure_reason` (`expired_no_payment_confirmation`) |
 | Order-job dead-letter (terminal failure) | `previous_production_status` → `production_status` (`failed` terminal) | `error_message` |
 
-**A robust consumer reads either field-name pair.** The `production_status` / `new_status` value string set is identical across paths (`scheduled | accepted | prep | printing | writing | inserting | stamping | shipping | complete | cancelled | failed | payment_failed`); only the field name carrying the value changes. Fields present on all four triggers: `order_id`, `campaign_id`, `external_user_id`. Fields present on staff-path, partner-cancel, and scheduler-expire (not dead-letter): `list_id`, `external_user_metadata`. Fields present only on staff-path and dead-letter — not on partner-cancel or scheduler-expire, since those two pass `source`/`external_account_id` to `enqueue_webhook_event` for outbox routing only and neither key appears in the delivered JSON on those two paths: `source`, `external_account_id`.
+**A robust consumer reads either field-name pair.** The `production_status` / `new_status` value string set is identical across paths (`scheduled | accepted | prep | printing | writing | inserting | stamping | shipping | complete | cancelled | failed | payment_failed`); only the field name carrying the value changes. Fields present on every trigger: `order_id`, `campaign_id`, `external_user_id`. Fields present on staff transitions, scheduler promotion, partner cancellation, and scheduler expiry (not dead-letter): `list_id`, `external_user_metadata`. Fields present on staff transitions, scheduler promotion, and dead-letter — not on partner cancellation or scheduler expiry, which use these fields only for outbox routing: `source`, `external_account_id`.
+
+Promotion and its notification are committed together. Reprocessing an already-promoted order does not create another acceptance event; a later legitimate reschedule and promotion is a distinct transition. The correction does not replay historical acceptance events or mark previously accepted orders as mailed.
 
 ### `order.rescheduled` Payload Format (v1.4.0+)
 
