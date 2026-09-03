@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.53 · September 2026** · documented ahead of rollout; staging and production availability pending validation; REST API contract remains `3.1`
+> **v1.7.53 · September 2026** · compatible Ballpoint builds live in staging and production as of September 3; PropStream Customer Number population depends on its parent integration; REST API contract remains `3.1`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -1113,7 +1113,7 @@ POST /v1/billing/orders
 
 The metadata is attribution data, not identity or authorization. It is echoed on the existing `order.status_changed` webhook paths that carry this field, so you can reconcile to your own per-end-user records without an additional API call. Under partner contract v1.7.53, Ballpoint additionally recognizes the PropStream `customer_number` key for order lookup/display by eligible staff; other keys remain uninterpreted. **Documentation clarification, not a webhook change:** this is not a promise that every status-event producer carries metadata; the existing [per-trigger field inventory](#d1-order-status_changed-field-name-pairs) already excludes it from order-job dead-letter events.
 
-**PropStream Customer Number (v1.7.53; rollout pending):** the iframe accepts optional `customerNumber` on the first singular `set_list` and forwards it on `POST /orders` in the existing field:
+**PropStream Customer Number (v1.7.53; compatible Ballpoint builds live):** the iframe accepts optional `customerNumber` on the first singular `set_list` and forwards it on `POST /orders` in the existing field:
 
 ```json
 "external_user_metadata": { "customer_number": "000123" }
