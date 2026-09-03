@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.53** (documented ahead of rollout; staging and production availability pending validation; the iframe message envelope remains version `1`)
+Partner contract version: **v1.7.53** (compatible Ballpoint builds live in staging and production as of September 3; PropStream Customer Number population depends on its parent integration; the iframe message envelope remains version `1`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -336,7 +336,7 @@ Semantics:
 
 #### Customer Number (`customerNumber`)
 
-**Availability:** this v1.7.53 input contract is published ahead of rollout. Wait for Ballpoint's staging/build confirmation before testing it; an older iframe does not forward this field. The `ready.contractVersions.partner` value identifies the iframe contract, but is not by itself proof of end-to-end deployment or PropStream parent wiring.
+**Availability:** compatible Ballpoint builds are live in staging and production as of September 3, 2026 (production iframe `v1.20.0`, build `03d69fe`). An older iframe does not forward this field. The `ready.contractVersions.partner` value identifies the iframe contract, but is not by itself proof of PropStream parent wiring or a completed end-to-end validation.
 
 - Send the optional field on the **first accepted singular `set_list`**. It is not supported on plural `set_lists`, `set_tenant`, or a new standalone message.
 - If present, the value must be a string with at least one non-whitespace character and at most 256 Unicode characters. Valid strings are preserved literally, including leading zeros and surrounding spaces; no numeric conversion, trimming, or truncation is applied to the stored value. Omit it when unavailable. `null`, numbers, objects, arrays, empty/whitespace-only strings, and oversized values are invalid: the whole message is rejected before changing list context, using the existing validation path without logging the number.

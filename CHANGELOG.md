@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-03 — Workflow and print reliability maintenance
+
+- **Product-step navigation and the save-template decision now match the approved layout.** Previous/Next keep their intended dimensions across selection states, and the save-template choices use the corrected order and alignment. Creation and editor exits share the approved confirmation dialog; Cancel preserves the current context and unsaved edits.
+- **Print preparation avoids unnecessary image-data scans.** The change preserves canvas contents, personalization, and PDF output; the improvement depends on the design and does not promise a fixed reduction in total processing time.
+- **Frozen postal destinations are checked before expensive batch rendering.** A destination that cannot fit its approved postal frame fails early instead of consuming a full rendering attempt repeatedly. Historical orders keep their frozen profiles; this release does not upgrade or rerender them automatically.
+- **Partner action:** none for these maintenance corrections. Public routes, request/response shapes, webhook payloads, pricing, and payment behavior are unchanged. The optional Customer Number integration below is a separate additive capability.
+- **Availability:** live in Ballpoint production as of 2026-09-03 in API `v3.34.0` (build `fc16ed5`), dashboard `v1.13.0` (build `494bfa9`), and iframe `v1.20.0` (build `03d69fe`). This records Ballpoint deployment availability, not a new PropStream production-session validation or a historical-order repair.
+
 ## v1.7.53 — 2026-09-02 — PropStream Customer Number attribution
 
 - **Optional `set_list.customerNumber`.** The first accepted singular list context may include a nonblank string of at most 256 Unicode characters. The iframe preserves it literally, including leading zeros, as `external_user_metadata.customer_number` on each new order. Omission keeps the existing flow; `null`, non-string, blank, and oversized values reject the message before context mutation.
@@ -8,7 +16,7 @@
 - **Partner action:** send `customerNumber` in the first singular `set_list` after Ballpoint confirms the compatible build. See the Iframe Kit for validation, immutable-absence, and refresh rules. PropStream's parent implementation and real-session validation remain separate from Ballpoint's rollout.
 - **Artifacts:** Iframe Kit, API Kit, OpenAPI query limit/example/metadata, Postman example/metadata, API runtime metadata, iframe runtime/deploy metadata, and the one-pager advance together to `1.7.53`. REST contract `3.1`, message envelope `1`, order-body schemas, and webhook schemas/fixtures are unchanged; the existing metadata object already accepts this key.
 - **Documentation clarification only:** API Kit attribution guidance now points to the existing per-trigger webhook field inventory instead of promising metadata on every status event. Order-job dead-letter already omits it; no webhook producer or payload is changed here. The existing two-character minimum for the dashboard's Search Server action is unchanged.
-- **Availability:** documented ahead of rollout. Staging validation and production release are pending; this entry does not claim a deployed build or completed PropStream end-to-end flow.
+- **Availability:** the compatible Ballpoint builds are live in staging and production as of 2026-09-03. Production runs API `v3.34.0` (`fc16ed5`), dashboard `v1.13.0` (`494bfa9`), and iframe `v1.20.0` (`03d69fe`), with partner contract `1.7.53`. Populating Customer Number still depends on PropStream supplying the optional value; deployment does not establish that the parent integration or its end-to-end validation is complete.
 
 ## 2026-08-30 — Order Summary parity, Color Letter batching, and renderer font reliability
 
