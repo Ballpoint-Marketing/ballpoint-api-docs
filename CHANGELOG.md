@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.54 — 2026-09-04 — PropStream postcard batch reliability
+
+- **6x9 Standard batches now print the same internal container/sequence marker as 4x6.** The marker uses the existing production format and placement rules, and a malformed AccuZIP container identifier fails closed before rendering.
+- **Oversized AccuZIP name fields are shortened deterministically before export.** Whole-word `And`, `Revocable`, and, only when still required, `Trust` are reduced to `&`, `Rev.`, and `Tr.`. Values already within AccuZIP's 50-character limit remain byte-for-byte unchanged; fields that are still oversized fail closed. PropStream First Class remains on the direct path and is unaffected.
+- **New standard postcard proofs use `standard_v10`.** It preserves the approved `standard_v9` 4x6 and 6x9 postal geometry while telling the renderer not to add the legacy indicia-cleanup mask to clean catalog artwork. Frozen `standard_v7`, `standard_v8`, `standard_v9`, Create Your Own, profile-less, and historical orders retain their existing behavior and are not upgraded or rerendered automatically.
+- **Partner action:** none. The Ballpoint-hosted iframe supplies the new profile automatically. The REST API remains `3.1`, the iframe message envelope remains `1`, and the coordinated partner contract advances to `1.7.54`.
+- **Availability:** prepared for coordinated staging deployment and real-session PropStream UAT. Production remains on partner contract `1.7.53` until an explicitly authorized production release. Any repair or rerender of an existing production order remains a separate production operation.
+
 ## 2026-09-03 — Scheduled acceptance notifications
 
 - **Paid scheduled orders notify the partner when they enter the accepted state.** Automatic promotion previously saved the status without enqueuing its notification. The correction persists the status and `order.status_changed` together, using the existing production-transition payload and durable delivery retries.
