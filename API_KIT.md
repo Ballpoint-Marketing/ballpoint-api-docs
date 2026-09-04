@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.53 · September 2026** · compatible Ballpoint builds live in staging and production as of September 3; PropStream Customer Number population depends on its parent integration; REST API contract remains `3.1`
+> **v1.7.54 · September 2026** · prepared for coordinated staging validation; production remains on `1.7.53` until an explicitly authorized release; REST API contract remains `3.1`
 >
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
@@ -685,11 +685,14 @@ claims. This release validated the 4x6 and 6x9 postcard paths;
 request field or partner-side action changed.
 
 For every PropStream printed postcard, the current Ballpoint-hosted iframe also
-sends the exact `postal_layout_profile` it displayed: `standard_v9` for the
-current standard proof, or `cyo_compact_white_v2` when the exact Create Your Own
-rollout is enabled. Ballpoint freezes that value on the accepted order.
-`standard_v7`, `standard_v8`, `cyo_unified_white_v1`, and profile-less historical
-orders retain their frozen geometry and are never silently upgraded. An omitted
+sends the exact `postal_layout_profile` it displayed: `standard_v10` for a
+new standard proof, or `cyo_compact_white_v2` when the exact Create Your Own
+rollout is enabled. `standard_v10` preserves the approved `standard_v9`
+geometry while omitting the renderer's legacy indicia-cleanup mask for clean
+catalog artwork. Ballpoint freezes that value on the accepted order.
+`standard_v7`, `standard_v8`, `standard_v9`, `cyo_unified_white_v1`, and
+profile-less historical orders retain their frozen geometry and are never
+silently upgraded or rerendered. An omitted
 profile remains backward-compatible as `standard_v7` for old iframe bundles. A
 stale or different Create Your Own profile returns
 `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before the idempotency claim. Refresh and
@@ -1532,7 +1535,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.53"
+    "partner": "1.7.54"
   }
 }
 ```

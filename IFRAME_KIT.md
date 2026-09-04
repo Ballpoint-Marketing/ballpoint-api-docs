@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.53** (compatible Ballpoint builds live in staging and production as of September 3; PropStream Customer Number population depends on its parent integration; the iframe message envelope remains version `1`)
+Partner contract version: **v1.7.54** (prepared for coordinated staging validation; production remains on `1.7.53` until an explicitly authorized release; the iframe message envelope remains version `1`)
 
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
@@ -246,12 +246,13 @@ fail-closed coordinated deployment; the PropStream default state is enabled in
 Ballpoint production as of partner contract `1.7.51`.
 
 Every current PropStream 4x6/6x9 proof also records its postal profile. The
-Ballpoint-hosted iframe declares `standard_v9` for standard proofs; this adds the
-approved 4x6 six-line frame at 12pt and preserves the approved `standard_v8`
-6x9 frame. When the Create Your Own rollout flag is enabled, the iframe declares
+Ballpoint-hosted iframe declares `standard_v10` for new standard proofs. It
+preserves the approved `standard_v9` 4x6 and 6x9 geometry while telling the
+renderer not to add the legacy indicia-cleanup mask to clean catalog artwork.
+When the Create Your Own rollout flag is enabled, the iframe declares
 `cyo_compact_white_v2` and displays the approved compact 4x6/6x9 recipient box.
 The API freezes the declared value on the order. Historical `standard_v7`,
-`standard_v8`, `cyo_unified_white_v1`, and profile-less orders retain their
+`standard_v8`, `standard_v9`, `cyo_unified_white_v1`, and profile-less orders retain their
 prior geometry and are never upgraded by a renderer deploy. A visible/exported
 text object still set to the exact default `Enter Text` blocks Save and final
 submission. This handoff is automatic and requires no PropStream-side message
@@ -868,7 +869,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.53"
+    "partner": "1.7.54"
   }
 }
 ```
