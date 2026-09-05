@@ -1,12 +1,19 @@
 # Changelog
 
+## 2026-09-05 — Campaign tracking in shared batches
+
+- **Campaign tracking includes the campaign's pieces inside shared production batches.** Campaign summaries, paginated pieces, return-to-sender lists and scan-event reads now follow exact order membership rather than looking only for tracking stored directly on the original campaign. Unrelated orders in the same batch remain excluded. Existing response fields can therefore show previously missing pieces and postal activity; this does not create new scans or confirm delivery where no delivery scan exists.
+- **Piece pagination no longer skips the next page's first record.** The continuation cursor now follows the last returned piece. Existing authorization, tenant boundaries, personal-data permissions, status thresholds and response formats remain unchanged.
+- **Partner action:** none. Partner contract remains `1.7.54`, REST API remains `3.1`, and iframe message envelope remains `1`. Account-level KPI readers and webhook emission are unchanged by this tracking correction.
+- **Availability:** live in Ballpoint production in API `v3.34.4` (build `cd579f2`). This records Ballpoint deployment availability, not a historical-order repair or a new PropStream production-session validation.
+
 ## v1.7.54 — 2026-09-04 — PropStream postcard batch reliability
 
 - **6x9 Standard batches now print the same internal container/sequence marker as 4x6.** The marker uses the existing production format and placement rules, and a malformed AccuZIP container identifier fails closed before rendering.
 - **Oversized AccuZIP name fields are shortened deterministically before export.** Whole-word `And`, `Revocable`, and, only when still required, `Trust` are reduced to `&`, `Rev.`, and `Tr.`. Values already within AccuZIP's 50-character limit remain byte-for-byte unchanged; fields that are still oversized fail closed. PropStream First Class remains on the direct path and is unaffected.
 - **New standard postcard proofs use `standard_v10`.** It preserves the approved `standard_v9` 4x6 and 6x9 postal geometry while telling the renderer not to add the legacy indicia-cleanup mask to clean catalog artwork. Frozen `standard_v7`, `standard_v8`, `standard_v9`, Create Your Own, profile-less, and historical orders retain their existing behavior and are not upgraded or rerendered automatically.
 - **Partner action:** none. The Ballpoint-hosted iframe supplies the new profile automatically. The REST API remains `3.1`, the iframe message envelope remains `1`, and the coordinated partner contract advances to `1.7.54`.
-- **Availability:** prepared for coordinated staging deployment and real-session PropStream UAT. Production remains on partner contract `1.7.53` until an explicitly authorized production release. Any repair or rerender of an existing production order remains a separate production operation.
+- **Availability:** live in Ballpoint production in API `v3.34.4` (build `cd579f2`), dashboard `v1.13.1` (build `8fb6a82`), and iframe `v1.20.1` (build `1a82da4`), with partner contract `1.7.54`. Exact-candidate checks and deployment/runtime checks passed. This records Ballpoint release availability, not a new end-to-end PropStream production-session validation. Any repair or rerender of an existing production order remains a separate production operation.
 
 ## 2026-09-03 — Scheduled acceptance notifications
 
