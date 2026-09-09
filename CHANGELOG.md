@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Postal identifiers retain optional routing during tracking imports.** Valid identifiers with optional routing are no longer omitted during manifest indexing and USPS scan matching. Subsequent successful imports can include pieces and postal activity previously omitted by this handling; this does not create delivery scans or replay historical files.
+- **Postcard printing preserves the intended font and standard divider.** Roboto is available locally to the print renderer, and the canonical standard postcard divider remains above the postal panel when present in the saved artwork. This does not release new templates or change back-customization behavior.
+- **Large generated print PDFs can finish without a single-copy size failure.** Artifact finalization uses multipart copy without reducing print quality or changing the recipient set. Deployment does not reset failed jobs or grant additional attempts; existing transient-error retries remain unchanged.
+- **Partner action:** none. Partner contract remains `1.7.54`, REST API remains `3.1`, and iframe message envelope remains `1`. Public routes, response fields and webhook payloads are unchanged.
+- **Availability:** live in Ballpoint production in API `v3.35.0` (build `3d0db32`). Iframe production remains `v1.20.1`; this release does not include new templates. Existing-order repairs and manual job retries remain separate operations. This records Ballpoint deployment availability, not a new PropStream production-session validation.
+
 ## 2026-09-05 — Campaign tracking in shared batches
 
 - **Campaign tracking includes the campaign's pieces inside shared production batches.** Campaign summaries, paginated pieces, return-to-sender lists and scan-event reads now follow exact order membership rather than looking only for tracking stored directly on the original campaign. Unrelated orders in the same batch remain excluded. Existing response fields can therefore show previously missing pieces and postal activity; this does not create new scans or confirm delivery where no delivery scan exists.
