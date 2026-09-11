@@ -5,7 +5,7 @@
 - **Behavior:** new flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`. The recipient box, address typography and indicia retain their approved measurements; the barcode and required clear area move inside the white box, removing the protruding white band.
 - **Compatibility:** 4x6 remains on `cyo_compact_white_v2`. Previously accepted orders retain their frozen profiles; no order is rerendered or mailed again. A stale 6x9 proof receives the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and must be reviewed again.
 - **Partner action:** none. The Ballpoint-hosted iframe supplies the matching profile. API and iframe require coordinated rollout. REST API remains `3.1`; iframe envelope remains `1`.
-- **Availability:** implementation and validation in progress; not released to production.
+- **Availability:** available in Ballpoint staging in API `37ad018` with its matching renderer and iframe `4636ef3`. Verified with actual-font PDF proofs plus staging runtime and published-asset checks. Production rollout is pending.
 
 ## Unreleased
 
