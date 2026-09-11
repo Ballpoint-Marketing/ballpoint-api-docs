@@ -1,7 +1,9 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.54 · September 2026** · live in Ballpoint staging and production; REST API contract remains `3.1`; existing-order repairs remain separate operations
+> **v1.7.55 · September 2026** · documented ahead of coordinated rollout; production release pending; REST API contract remains `3.1`; existing-order repairs remain separate operations
 >
+
+New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barcode and its clear area fit within the unchanged recipient box. New 4x6 proofs keep `cyo_compact_white_v2`, and frozen earlier orders are never silently upgraded or rerendered. During coordinated API/iframe rollout, an outdated 6x9 proof returns the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and requires review of the current proof. No PropStream-side payload change is required.
 > Everything your dev team needs to integrate direct mail ordering, tracking,
 > and real-time status updates into your platform.
 >
@@ -1535,7 +1537,7 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/health" \
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.54"
+    "partner": "1.7.55"
   }
 }
 ```
