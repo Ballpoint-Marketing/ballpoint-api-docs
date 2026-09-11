@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Additional long recipient names can pass AccuZIP export.** When the existing abbreviations are insufficient, whole-word `Living`, `Residential`, and `Company` can be shortened to `Liv.`, `Res.`, and `Co.`. Original recipient records are retained; names that already passed export keep their previous output. Fields still beyond the export limits remain blocked.
+- **Recipient validation runs before batch assignment and again at lock.** An invalid recipient prevents the assignment before orders are added to the batch. Validation includes the existing address-field limits as well as names. Direct PropStream First Class remains unchanged.
+- **Partner action:** none. Partner contract remains `1.7.54`, REST API remains `3.1`, and iframe message envelope remains `1`. Public routes, response fields and webhook payloads are unchanged.
+- **Availability:** live in Ballpoint production on 2026-09-11 in API `v3.35.1` (build `55b0648`). Deployment does not reassign existing orders or restart production jobs. This records Ballpoint deployment availability, not a new PropStream production-session validation.
+
+## 2026-09-09 — Tracking and print reliability
+
 - **Postal identifiers retain optional routing during tracking imports.** Valid identifiers with optional routing are no longer omitted during manifest indexing and USPS scan matching. Subsequent successful imports can include pieces and postal activity previously omitted by this handling; this does not create delivery scans or replay historical files.
 - **Postcard printing preserves the intended font and standard divider.** Roboto is available locally to the print renderer, and the canonical standard postcard divider remains above the postal panel when present in the saved artwork. This does not release new templates or change back-customization behavior.
 - **Large generated print PDFs can finish without a single-copy size failure.** Artifact finalization uses multipart copy without reducing print quality or changing the recipient set. Deployment does not reset failed jobs or grant additional attempts; existing transient-error retries remain unchanged.
