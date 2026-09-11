@@ -1,7 +1,9 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.54** (live in Ballpoint staging and production; the iframe message envelope remains version `1`; existing-order repairs remain separate operations)
+Partner contract version: **v1.7.55** (documented ahead of coordinated rollout; production release pending; the iframe message envelope remains version `1`; existing-order repairs remain separate operations)
 
+
+New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barcode and its clear area fit within the unchanged recipient box. New 4x6 proofs keep `cyo_compact_white_v2`, and frozen earlier orders are never silently upgraded or rerendered. During coordinated API/iframe rollout, an outdated 6x9 proof returns the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and requires review of the current proof. No PropStream-side payload change is required.
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
 > See [CHANGELOG.md](CHANGELOG.md) for revision history.
@@ -869,7 +871,7 @@ All messages from the iframe have this shape:
   "contractVersions": {
     "iframe": "1",
     "api": "3.1",
-    "partner": "1.7.54"
+    "partner": "1.7.55"
   }
 }
 ```
