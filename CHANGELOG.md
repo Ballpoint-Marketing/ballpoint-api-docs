@@ -5,7 +5,16 @@
 - **Behavior:** new flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`. The recipient box, address typography and indicia retain their approved measurements; the barcode and required clear area move inside the white box, removing the protruding white band.
 - **Compatibility:** 4x6 remains on `cyo_compact_white_v2`. Previously accepted orders retain their frozen profiles; no order is rerendered or mailed again. A stale 6x9 proof receives the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and must be reviewed again.
 - **Partner action:** none. The Ballpoint-hosted iframe supplies the matching profile. API and iframe require coordinated rollout. REST API remains `3.1`; iframe envelope remains `1`.
-- **Availability:** available in Ballpoint staging in API `37ad018` with its matching renderer and iframe `4636ef3`. Verified with actual-font PDF proofs plus staging runtime and published-asset checks. Production rollout is pending.
+- **Availability:** live in production on September 12, 2026 in API `v3.35.2` (`37ad018`) with its matching renderer and iframe `v1.20.2` (`c3331e9`). Verified with actual-font PDF proofs and real PropStream UAT editor, review, save and reopen flows before rollout; production builds and service health checked after rollout.
+
+## 2026-09-12 — Postcard editor and preview fixes
+
+- **Classic postcard backs preview the current artwork.** The piece-review screen includes the back's postal areas and current artwork, including when a saved design is reopened. Existing saved-template card thumbnails retain their behavior.
+- **Greeting logos stay on the insert preview.** The envelope preview no longer repeats the sender logo intended for the insert.
+- **Create Your Own starter areas can be removed through Layers.** Empty areas no longer intercept uploaded-image dragging or resizing. Removing an area participates in undo/redo and saved-design restoration.
+- **Replacement notices receive their full four-second lifetime.** A previous notice's timer no longer dismisses the current notice early.
+- **Partner action:** none. REST API remains `3.1` and iframe message envelope remains `1`. This is the selected iframe maintenance scope accompanying partner contract `1.7.55`.
+- **Availability:** live in production on September 12, 2026 in iframe `v1.20.2` (`c3331e9`). Verified in real PropStream UAT before rollout, including image dragging/resizing, Layers undo/redo, saved designs, Classic back previews, Greeting insert/envelope logo separation and replacement-notice timing.
 
 ## Unreleased
 
