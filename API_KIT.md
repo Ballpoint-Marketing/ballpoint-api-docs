@@ -1698,6 +1698,12 @@ If an initial A/B upload has already reduced an order to `piece_count: 0`, retry
 
 **Allowed order statuses:** `scheduled`, `pending_payment`, `accepted`, `prep`. Any other status → `409 RECIPIENTS_LOCKED`.
 
+**Recipient export validation (pending staging delivery; not released to production).** For orders using AccuZIP, incoming rows must fit the existing export contract after its approved normalization and name/company abbreviations. The conditional limits are 50 characters for `first_name`, `last_name`, `company`, `address2` and `city`, and 100 for `address`; blank required address/city values after trimming also fail. Only the direct **PropStream + First Class** path is exempt. Submitted and stored values are preserved; Ballpoint does not truncate or rewrite the source list.
+
+An incompatible row returns HTTP **400 `RECIPIENT_MASTER_CONTRACT_INVALID`** in the existing error envelope, with a 1-based position in the submitted list, field and length/limit, without recipient values. The request makes no recipient, count, pricing or render-generation changes. Existing initial-upload soft rejection for missing names and campaign duplicates still applies before this check. Correct the source list and retry; do not proceed to payment using an earlier successful upload response.
+
+This validation also applies to Edit Leads replacements (§6o) and campaign additions (§6p). Campaign additions are checked against every editable drop before any drop is changed, including mixed-postage campaigns. Creation and price preview do not receive recipient data, so this is validation at upload/edit, not validation before an order exists. Request/response fields and iframe messages remain unchanged.
+
 **Partial acceptance:** rows missing BOTH `first_name` and `last_name` are rejected per-row into `rejected_details`, and the request still succeeds with the valid rows. (Malformed REQUIRED fields — bad zip, non-2-letter state, missing address/city/state/zip — fail validation for the whole request: `422`.)
 
 **Errors:**
@@ -1706,6 +1712,7 @@ If an initial A/B upload has already reduced an order to `piece_count: 0`, retry
 |------|------|------|
 | 404 | `ORDER_NOT_FOUND` | Order does not exist OR belongs to another tenant (never 403, to prevent existence probing). |
 | 409 | `RECIPIENTS_LOCKED` | Order status not in `{scheduled, pending_payment, accepted, prep}`. |
+| 400 | `RECIPIENT_MASTER_CONTRACT_INVALID` | Incoming rows fail the conditional export validation above; request rejected without mutation. |
 | 400 | `RECIPIENT_COUNT_EXCEEDS_PIECE_COUNT` | Existing (if `append`) + accepted exceeds the order's `piece_count`. |
 | 422 | — | Malformed recipient fields. |
 
@@ -1782,6 +1789,8 @@ Any invalid recipient → `422` with FastAPI's default Pydantic error envelope, 
 | `previous_total_price_tcents` | integer or null. Wholesale/base total before this PATCH (unit × count). **Populated for gated orders created on/after 2026-06-23**; `null` only for legacy gated orders created before that change — same as `previous_unit_price_tcents`. |
 | `new_total_price_tcents` | integer. Wholesale/base total after this PATCH (`new_unit_price_tcents` × `new_piece_count`). Always populated. |
 | `payment_confirmed` | Always `false` (endpoint gate rejects `true`). |
+
+**400 `RECIPIENT_MASTER_CONTRACT_INVALID`:** incompatible replacements fail before recipient replacement, repricing or render reset. See the conditional export validation in [§6n](#6n-upload-recipients-initial-upload).
 
 **409 error codes:**
 
@@ -1932,6 +1941,8 @@ Campaign-level delta add/remove endpoint. One call applies recipient changes acr
 | `mailed` | Status `complete`. |
 | `delivered` | Status in `{shipped, in_transit, out_for_delivery, delivered}`. |
 | `terminal` | Status in `{cancelled, failed, payment_failed}`. |
+
+**400 `RECIPIENT_MASTER_CONTRACT_INVALID`:** incompatible additions for any editable drop reject the whole request before removals, upserts, repricing or render reset. Existing lists stay intact. See the conditional export validation in [§6n](#6n-upload-recipients-initial-upload).
 
 **Idempotency:** Naturally idempotent. A repeated call: `added[]` upserts same values (no-op), `removed[]` finds nothing → all reported as `removed_not_found_count`. Response reflects current state.
 

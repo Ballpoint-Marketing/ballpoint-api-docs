@@ -2022,6 +2022,12 @@ Cross-order dedup is a server-side safety net, not a substitute for constructing
 
 Once the initial POST has reduced an order to zero, a positive retry on that same endpoint exceeds the order's current piece count. Recover an eligible gated, unconfirmed order with the Edit Leads `PATCH /v1/billing/orders/{order_id}/recipients` using a verified recipient-disjoint replacement slice, or cancel and recreate the order. The PATCH does not perform cross-order A/B dedup, so slice correctness remains the partner's responsibility. If you recover by cancelling, drop the cancelled order's id from every later `POST /v1/billing/campaigns/preview` call — a cancelled order that is still at `piece_count: 0` keeps returning `409 INVALID_PIECE_COUNT` for the whole preview; pass only the ids of the orders you intend to charge (the recreated submission's `campaign_submitted.orders[]`).
 
+#### Recipient export validation errors
+
+Pending staging delivery, not released to production: recipient upload, Edit Leads replacement and campaign additions can return HTTP `400 RECIPIENT_MASTER_CONTRACT_INVALID` for rows incompatible with the existing AccuZIP export. Only direct PropStream First Class is exempt. The API keeps the existing stored list and render generation intact; diagnostics identify the submitted row position and field/limit without echoing recipient values. See [API Kit §6n](API_KIT.md#6n-upload-recipients-initial-upload) for conditional limits and normalization.
+
+The parent/backend must show the error, let the customer correct the source list, and retry the upload. Do not advance to preview/payment based on an earlier `ready` response after a failed replacement. Continue requiring `ready === true` and `piece_count > 0` on the current upload for every selected order. The iframe receives recipient counts, not the address list; this introduces no postMessage fields or pre-order validation handshake.
+
 #### What this does NOT do
 
 `duplicate_in_campaign` is **cross-order, same-campaign only** (the A/B-split guard-rail). Ballpoint does **not** perform intra-order recipient dedupe and does **not** use `duplicate_in_campaign` (or any other server-side logic) to override the user's same-order "Remove duplicates" selection. Same-order behavior is partner-driven:
