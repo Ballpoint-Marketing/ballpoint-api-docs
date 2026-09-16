@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Recipient admission before processing
+
+- Initial recipient upload, Edit Leads replacement and campaign additions reject data incompatible with the existing AccuZIP export before changing recipients, counts, prices or render state. Direct PropStream First Class remains exempt; approved export-only abbreviations and original source values are preserved.
+- **Partner action:** handle HTTP `400 RECIPIENT_MASTER_CONTRACT_INVALID`, correct the source list and retry before continuing checkout. The existing error envelope identifies the submitted row position and field/limit without recipient values. Creation and price preview do not receive the address list.
+- **Postal address fit:** eligible PropStream 4x6/6x9 postcards also check recipient text against the frozen postal profile, including First Class. `400 RECIPIENT_POSTAL_LAYOUT_INVALID` identifies the submitted row requiring review; `503 POSTAL_VALIDATION_UNAVAILABLE` preserves the order while the service cannot validate. Empty glyphs are also rejected before a name can lose characters in print. No truncation, transliteration, font reduction or artwork movement. `ready` retains its recipient-count meaning, and final rendering/batch validation still applies.
+- **Compatibility:** no request/response fields, routes, webhooks or iframe messages added. REST remains `3.1`, iframe envelope remains `1`.
+- **Availability:** available in staging on 2026-09-16 (API build `6430297`); not released to production.
+
 ## v1.7.55 — 2026-09-11 — Contained barcode area for Create Your Own 6x9
 
 - **Behavior:** new flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`. The recipient box, address typography and indicia retain their approved measurements; the barcode and required clear area move inside the white box, removing the protruding white band.
