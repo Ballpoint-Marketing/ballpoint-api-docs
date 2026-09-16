@@ -1,12 +1,10 @@
 # Changelog
 
-## Unreleased — Recipient admission before processing
+## 2026-09-16 — Recipient admission rollout withdrawn
 
-- Initial recipient upload, Edit Leads replacement and campaign additions reject data incompatible with the existing AccuZIP export before changing recipients, counts, prices or render state. Direct PropStream First Class remains exempt; approved export-only abbreviations and original source values are preserved.
-- **Partner action:** handle HTTP `400 RECIPIENT_MASTER_CONTRACT_INVALID`, correct the source list and retry before continuing checkout. The existing error envelope identifies the submitted row position and field/limit without recipient values. Creation and price preview do not receive the address list.
-- **Postal address fit:** eligible PropStream 4x6/6x9 postcards also check recipient text against the frozen postal profile, including First Class. `400 RECIPIENT_POSTAL_LAYOUT_INVALID` identifies the submitted row requiring review; `503 POSTAL_VALIDATION_UNAVAILABLE` preserves the order while the service cannot validate. Empty glyphs are also rejected before a name can lose characters in print. No truncation, transliteration, font reduction or artwork movement. `ready` retains its recipient-count meaning, and final rendering/batch validation still applies.
-- **Compatibility:** no request/response fields, routes, webhooks or iframe messages added. REST remains `3.1`, iframe envelope remains `1`.
-- **Availability:** available in staging on 2026-09-16 (API build `6430297`); not released to production.
+- **Availability:** the recipient export, postal-fit and font-character checks introduced on September 16 have been withdrawn from staging and are deferred from release. They were not released to production.
+- Recipient upload and editing return to their previous behavior; existing downstream export and rendering checks remain in place. Original recipient data and artwork are unchanged.
+- Reintroduction depends on validating checkout error handling and recovery for the current recipient submission before payment. REST remains `3.1` and the iframe envelope remains `1`.
 
 ## v1.7.55 — 2026-09-11 — Contained barcode area for Create Your Own 6x9
 
