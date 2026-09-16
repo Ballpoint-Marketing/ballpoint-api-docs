@@ -4,6 +4,23 @@ Partner contract version: **v1.7.55** (live in production since September 12, 20
 
 
 New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barcode and its clear area fit within the unchanged recipient box. New 4x6 proofs keep `cyo_compact_white_v2`, and frozen earlier orders are never silently upgraded or rerendered. During coordinated API/iframe rollout, an outdated 6x9 proof returns the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and requires review of the current proof. No PropStream-side payload change is required.
+### Create Your Own review maintenance candidate
+
+**Availability:** release candidate in preparation; not yet released to production.
+
+For eligible Create Your Own postcards, including saved CYO designs used in
+Single, Multi or A/B, the iframe validates the current composition before
+continuing. Designs containing images use an original-artwork and mailing-proof
+review before Save; later artwork or context changes invalidate that review.
+Photos, logos and backgrounds remain supported. The review is visual and does
+not interpret text or QR content embedded in images.
+
+Validation preserves the customer's source artwork. Editable text over mailing
+areas, unfinished placeholders and incomplete assets remain errors to resolve
+in the editor. Each pending CYO piece is checked before submission, and late
+responses from an abandoned design do not advance the current flow. Existing
+parent messages, API payloads and payment integration are unchanged.
+
 This guide explains how to embed the Ballpoint direct mail campaign builder into your application via the embedded iframe pattern. For server-to-server API integration (orders, webhooks, billing, payment gate), see the companion [API_KIT.md](API_KIT.md).
 
 > See [CHANGELOG.md](CHANGELOG.md) for revision history.

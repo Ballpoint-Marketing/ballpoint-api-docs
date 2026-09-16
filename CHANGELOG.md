@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Postcard artwork preservation and Create Your Own review
+
+- **Availability:** release candidate in preparation; these maintenance changes are not yet released to production.
+- **Create Your Own images use a visual mailing-side review.** The customer compares original artwork with the postal proof before saving. Photos, logos and backgrounds are supported; embedded text or QR content is not interpreted automatically.
+- **The reviewed composition stays tied to the current artwork and settings.** Changes require review again. Single, Multi and A/B validate each pending CYO piece before submission, and late editor or template responses do not continue an abandoned design.
+- **Customer artwork is preserved during validation and loading.** Editable text in protected postal areas, unfinished placeholders and incomplete assets remain actionable errors; the validation does not reposition, crop or rewrite artwork.
+- **Photo editing preserves the chosen crop.** Image-area uploads open Crop, small images remain centered without forced enlargement, and delayed uploads remain tied to the initiating side and editor session. Undo/Redo restores text and starter areas consistently.
+- **Uniform styles survive merge-field expansion.** A replacement keeps the token's uniform character style and the surrounding text's styles. Mixed-style tokens retain their existing behavior. The change applies to newly generated artwork and does not rebuild historical orders.
+- **Partner action:** none. Partner contract stays at 1.7.55, REST at 3.1, and iframe envelope at 1. Routes, payloads, pricing and payment semantics are unchanged. The recipient-admission checks described in the September 16 withdrawal remain deferred.
+
 ## 2026-09-16 — Recipient admission rollout withdrawn
 
 - **Availability:** the recipient export, postal-fit and font-character checks introduced on September 16 have been withdrawn from staging and are deferred from release. They were not released to production.
