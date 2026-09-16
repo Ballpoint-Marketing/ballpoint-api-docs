@@ -2026,7 +2026,9 @@ Once the initial POST has reduced an order to zero, a positive retry on that sam
 
 Pending staging delivery, not released to production: recipient upload, Edit Leads replacement and campaign additions can return HTTP `400 RECIPIENT_MASTER_CONTRACT_INVALID` for rows incompatible with the existing AccuZIP export. Only direct PropStream First Class is exempt. The API keeps the existing stored list and render generation intact; diagnostics identify the submitted row position and field/limit without echoing recipient values. See [API Kit §6n](API_KIT.md#6n-upload-recipients-initial-upload) for conditional limits and normalization.
 
-The parent/backend must show the error, let the customer correct the source list, and retry the upload. Do not advance to preview/payment based on an earlier `ready` response after a failed replacement. Continue requiring `ready === true` and `piece_count > 0` on the current upload for every selected order. The iframe receives recipient counts, not the address list; this introduces no postMessage fields or pre-order validation handshake.
+For eligible PropStream 4x6/6x9 postcard canvases, `400 RECIPIENT_POSTAL_LAYOUT_INVALID` also rejects text that cannot fit the frozen postal profile or uses unsupported characters. This visual check includes First Class. It preserves addresses, font size and artwork. This includes characters mapped to empty glyphs; do not silently strip accents or rewrite recipient names to bypass the check. `503 POSTAL_VALIDATION_UNAVAILABLE` means the required metrics are unavailable: pause checkout and retry after service recovery. These checks do not make `ready=true` a PDF-completion signal.
+
+The parent/backend must show a recipient validation error, let the customer correct the source list, and retry the upload. Do not advance to preview/payment based on an earlier `ready` response after a failed replacement. Continue requiring `ready === true` and `piece_count > 0` on the current upload for every selected order. The iframe receives recipient counts, not the address list; this introduces no postMessage fields or pre-order validation handshake.
 
 #### What this does NOT do
 
