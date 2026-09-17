@@ -1,7 +1,9 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.55** (live in production since September 12, 2026 (API `v3.35.2`, iframe `v1.20.2`); the iframe message envelope remains version `1`; existing-order repairs remain separate operations)
+Partner contract version: **v1.7.56** (privileged operations dashboard staging candidate; production pending; iframe message envelope remains version `1`)
 
+
+Contract 1.7.56 adds a separate operations portal protected by `dashboard:read`. Customer iframe keys, payloads, messages and existing KPIs are unchanged. Never pass an operations key to the embedded customer iframe. See [API_KIT.md](API_KIT.md#privileged-operations-portal-contract-1756).
 
 New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barcode and its clear area fit within the unchanged recipient box. New 4x6 proofs keep `cyo_compact_white_v2`, and frozen earlier orders are never silently upgraded or rerendered. During coordinated API/iframe rollout, an outdated 6x9 proof returns the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and requires review of the current proof. No PropStream-side payload change is required.
 ### Create Your Own review maintenance candidate
