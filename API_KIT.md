@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.55 · September 2026** · live in production since September 12, 2026 (API `v3.35.2`, iframe `v1.20.2`); REST API contract remains `3.1`; existing-order repairs remain separate operations
+> **v1.7.56 · September 2026** · privileged operations dashboard staging candidate; production pending; REST API remains `3.1`
 >
 
 New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barcode and its clear area fit within the unchanged recipient box. New 4x6 proofs keep `cyo_compact_white_v2`, and frozen earlier orders are never silently upgraded or rerendered. During coordinated API/iframe rollout, an outdated 6x9 proof returns the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and requires review of the current proof. No PropStream-side payload change is required.
@@ -1323,7 +1323,79 @@ Payment retry logic lives **on the partner side**. Ballpoint does not retry the 
 
 ### 6l. Partner Dashboard Endpoints
 
-These endpoints power partner-side operational dashboards (per-account aggregate stats, paginated order list with SLA, drill-down by user or campaign list). The `/v1/billing/partner/*` reads require an `X-Partner-Key`; `account-summary` accepts that same partner principal as well as the other authenticated principals described in this kit. Every response remains scoped to the caller's authorized tenant.
+### Privileged operations portal (contract 1.7.56)
+
+These reads are for named partner operations users and authorized Ballpoint staff
+using separately provisioned partner operations keys. Send `X-Partner-Key` with
+the explicit **`dashboard:read`** scope. Do not distribute this key to customer
+iframe sessions. `pricing:write` is independent; `summary.can_edit_pricing` tells
+the hosted portal whether it can offer editing. Ballpoint provisions scopes;
+callers cannot grant them with request headers.
+
+| Method | Path | Data scope |
+|---|---|---|
+| GET | `/v1/billing/partner/ops/summary?days=30` | Key's account + source, across customer tenants |
+| GET | `/v1/billing/partner/ops/orders?days=30&postage_type=standard` | Same order scope, paginated |
+| GET | `/v1/billing/partner/ops/invoices?limit=20&offset=0` | Entire billing account |
+| GET | `/v1/billing/partner/ops/invoices/{invoice_id}` | Frozen invoice and line items in the billing account |
+
+A missing operations scope returns 403, including on the older
+`GET /v1/billing/accounts/{account_id}/invoices` and
+`GET /v1/billing/invoices/{invoice_id}` when called by partner keys.
+Cross-account invoice IDs on the new operations route return 404.
+Invoices are account-wide billing records and do not inherit customer, source
+or order date filters.
+
+**Mailing SLG.** `days` (1–365, default 30) selects orders by Creation Date;
+the response explicitly identifies this cohort and the `America/Chicago` facility
+timezone. The committed date is `metadata.mail_date`, or the stored UTC calendar
+date of an explicit `sla_due_at` override (date-only overrides are stored at
+UTC midnight and retain that date). An open order is `on_schedule`
+through that entire day, then `overdue`. Production-start dates and time spent
+in an intermediate production stage do not change this commitment.
+
+A positive frozen mailed count plus `drop_completed_at` proves historical
+`mailed_on_time` or `mailed_late`; subsequent tracking updates do not reset it.
+Missing/invalid commitments or incomplete completion evidence are `unknown`.
+Cancelled, unconfirmed-payment, zero-mailed and ship-to-client orders are
+`excluded`; deleted orders are omitted. Failed production without mailing
+evidence is unknown. Neither unknown nor excluded orders inflate the rate.
+
+Summary returns `slg_summary` and `slg_by_postage`, with all six counts,
+`assessed_mailed` and `on_time_rate` (0–1, null when none assessed).
+The rate is completed on-time mailings divided by assessed completed mailings;
+open overdue orders are a separate count. Each order is counted separately,
+including A/B siblings. This is distinct from the existing customer logical-drop
+KPIs, which are unchanged. Order filters are `status`, `product_type`,
+`postage_type`, `search` and `slg`; pagination is `limit` (1–500, default
+50), `offset` (0–100000). Returned orders include `slg_status`,
+`slg_reason`, `committed_mail_date` and `mailed_date`.
+
+**Invoice audit.** List accepts `status` (draft, finalized, sent, paid, void,
+uncollectible), `limit` (1–100, default 20) and `offset` (0–100000).
+It returns `invoices`, `total`, `limit`, `offset`, `has_more`.
+Headers expose period, due date, status, subtotal in cents, hosted/PDF URLs and
+`is_overdue`. Only sent/uncollectible, unpaid invoices past their facility
+calendar due date are overdue; a draft or finalized invoice is not yet issued.
+
+Detail adds `line_items`, `groups`, `line_total_cents` and `reconciled`.
+Groups use product + postage and contain the same frozen lines, billed quantity,
+distinct order count and summed cents. A null order/product/postage can be an
+adjustment and is retained. Unit rates are in tcents (**10,000 tcents = $1**);
+line totals are frozen cents rounded by order. Groups may contain mixed unit
+rates: never recalculate a group as quantity multiplied by a current rate.
+Earlier-period catch-up lines remain in the invoice. A reconciliation mismatch
+is surfaced, not silently corrected.
+
+New sent Stripe invoices group the frozen amounts by product/postage.
+Previously started invoices retain their original retry layout and existing
+issued PDFs are not rewritten. Net-15 and billed amounts stay unchanged.
+The customer iframe requires no payload, message, permission or KPI change.
+
+
+#### Existing customer dashboard routes
+
+The existing statistics and orders routes below power customer dashboards, scoped to source + external_account_id. They require an `X-Partner-Key`; `account-summary` also accepts the authenticated principals described in this kit. These customer filters do not apply to the separately authorized operations routes above.
 
 > **For payment-gate flows:** do not use these dashboard endpoints for pre-confirmation pricing. After `campaign_submitted`, call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with the caller-selected set of `ballpointOrderId`s intended for the current payment event. Use `campaign_partner_debit_cents` as the exact whole-cent amount recorded when confirmation succeeds and the `partner_cost_*_tcents` fields only for raw wholesale reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`. Browser-side values like `campaign_submitted.total_dollars` are UX/display only. See [§6k](#6k-confirm-payment-partner-payment-gate) and [IFRAME_KIT.md](IFRAME_KIT.md) for the full payment-gate context.
 

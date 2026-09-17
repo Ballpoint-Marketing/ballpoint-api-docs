@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.55 (postcard batch reliability staging rollout pending) and OpenAPI 3.1.0. Get/List Orders expose nullable retail_unit_price_tcents and retail_total_price_tcents snapshots alongside the existing wholesale fields; null means the historical retail quote is unknown and must not be reconstructed from current markup. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: live host for a tenant provisioned with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.56 (privileged operations dashboard staging candidate; production pending) and OpenAPI 3.1.0. Get/List Orders expose nullable retail_unit_price_tcents and retail_total_price_tcents snapshots alongside the existing wholesale fields; null means the historical retail quote is unknown and must not be reconstructed from current markup. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: internal test key on api.ballpointmarketing.com (no real mail).\n- Ballpoint Production: live host for a tenant provisioned with a pk_live key.\n\nSANDBOX MODEL: a pk_test_ key against the production host creates orders but NO real mail is printed or sent.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -21,7 +21,18 @@
       }
     }
   ],
-  "variable": [],
+  "variable": [
+    {
+      "key": "ops_partner_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "invoice_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
   "item": [
     {
       "name": "Tier A - Safe reads and preview",
@@ -296,7 +307,7 @@
                     "exec": [
                       "var orderId = pm.variables.get('ballpoint_order_id');",
                       "if (!orderId || orderId === '' || /seed|REPLACE/i.test(orderId)) {",
-                      "  console.log('Skipping: ballpoint_order_id is not seeded (Tier A2 \u2014 needs a real ballpointOrderId from campaign_submitted).');",
+                      "  console.log('Skipping: ballpoint_order_id is not seeded (Tier A2 — needs a real ballpointOrderId from campaign_submitted).');",
                       "  pm.execution.skipRequest();",
                       "}"
                     ]
@@ -1222,7 +1233,7 @@
                     }
                   ]
                 },
-                "description": "Return-to-sender suppression list with pagination. include_forwarded defaults true. Each suppression_list[] entry now also includes per-piece contact_id and contact_type (PROPERTY|MAILING) \u2014 partner-supplied opaque identifiers, always returned (not gated on allow_pii_exports)."
+                "description": "Return-to-sender suppression list with pagination. include_forwarded defaults true. Each suppression_list[] entry now also includes per-piece contact_id and contact_type (PROPERTY|MAILING) — partner-supplied opaque identifiers, always returned (not gated on allow_pii_exports)."
               },
               "event": [
                 {
@@ -2102,6 +2113,129 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Operations portal - privileged reads (manual)",
+      "description": "Requires a separately provisioned dashboard:read key in ops_partner_key. Do not reuse customer iframe keys. Invoice reads are account-wide; order reads account/source-wide. Staging candidate, production pending.",
+      "item": [
+        {
+          "name": "Mailing SLG summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{ops_partner_key}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/partner/ops/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "partner",
+                "ops",
+                "summary"
+              ]
+            },
+            "description": "Requires a separately provisioned dashboard:read key in ops_partner_key. Do not reuse customer iframe keys. Invoice reads are account-wide; order reads account/source-wide. Staging candidate, production pending."
+          }
+        },
+        {
+          "name": "Operations order list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{ops_partner_key}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/partner/ops/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "partner",
+                "ops",
+                "orders"
+              ]
+            },
+            "description": "Requires a separately provisioned dashboard:read key in ops_partner_key. Do not reuse customer iframe keys. Invoice reads are account-wide; order reads account/source-wide. Staging candidate, production pending."
+          }
+        },
+        {
+          "name": "Account invoice history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{ops_partner_key}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/partner/ops/invoices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "partner",
+                "ops",
+                "invoices"
+              ]
+            },
+            "description": "Requires a separately provisioned dashboard:read key in ops_partner_key. Do not reuse customer iframe keys. Invoice reads are account-wide; order reads account/source-wide. Staging candidate, production pending."
+          }
+        },
+        {
+          "name": "Invoice frozen details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{ops_partner_key}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/billing/partner/ops/invoices/{{invoice_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "billing",
+                "partner",
+                "ops",
+                "invoices",
+                "{{invoice_id}}"
+              ]
+            },
+            "description": "Requires a separately provisioned dashboard:read key in ops_partner_key. Do not reuse customer iframe keys. Invoice reads are account-wide; order reads account/source-wide. Staging candidate, production pending."
+          }
         }
       ]
     }
