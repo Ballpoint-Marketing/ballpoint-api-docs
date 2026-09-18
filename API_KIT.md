@@ -282,6 +282,18 @@ Envelope + insert. Letter orders **require** an `envelope_style` field.
 | `hybrid_letter` | Handwritten | Printed | 5x7 | `first_class`, `presort` |
 | `greeting_letter` | Handwritten | Handwritten | 5x7 | `first_class`, `presort` |
 
+#### Legacy product aliases
+
+Three retired catalog names remain accepted in `product_type` and are normalized to their canonical product before any validation, pricing, or persistence:
+
+| Sent value | Resolved product |
+|-----------|------------------|
+| `check_mailer` | `color_letter` |
+| `commercial_letter` | `color_letter` |
+| `hybrid_greeting` | `hybrid_letter` |
+
+An alias is a compatibility affordance for cached partner bundles, not a distinct product, and the resolved product's rules then apply in full: postage is validated against the resolved product, and an order resolved to `color_letter` must satisfy the Color Letter V1 contract below — one-sided `canvas_json.front`, at most 500 pieces. Any other unrecognized `product_type` is rejected with `400 INVALID_PRODUCT_CONFIG` listing the accepted values, before the idempotency claim, campaign/order creation, or billing. Send the canonical product type; the aliases may be retired in a future release.
+
 #### Envelope Styles
 
 Available styles: `candy`, `party`, `pastel`, `confetti`, `desert`, `floral`, `stone`, `retro`, `deco`, `doodle`, `plain_white`
@@ -665,7 +677,7 @@ POST /v1/billing/orders
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `campaign_id` | string | Yes | Campaign to fulfill (provided by Ballpoint) |
-| `product_type` | string | Yes | One of the 7 product types |
+| `product_type` | string | Yes | One of the 7 product types. The three legacy aliases (`check_mailer`, `commercial_letter`, `hybrid_greeting`) are accepted and normalized to their canonical product before validation, pricing, and persistence — see [Legacy product aliases](#legacy-product-aliases). |
 | `postage_type` | string | Yes | `first_class`, `standard`, or `presort` |
 | `piece_count` | integer | Yes | Number of mail pieces |
 | `envelope_style` | string | Letters only | Required for letter products, rejected for postcards |
