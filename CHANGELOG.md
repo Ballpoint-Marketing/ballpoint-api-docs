@@ -18,6 +18,15 @@
 - **Uniform styles survive merge-field expansion.** A replacement keeps the token's uniform character style and the surrounding text's styles. Mixed-style tokens retain their existing behavior. The change applies to newly generated artwork and does not rebuild historical orders.
 - **Partner action:** none. Partner contract stays at 1.7.55, REST at 3.1, and iframe envelope at 1. Routes, payloads, pricing and payment semantics are unchanged. The recipient-admission checks described in the September 16 withdrawal remain deferred.
 
+## Unreleased — Create Your Own mailing-side guide
+
+- **Availability:** staging only. These changes are not part of the *Postcard artwork preservation and Create Your Own review* release candidate and have no production date.
+- **The mailing areas stay on top while the customer designs.** On the Create Your Own back, the postage, return, recipient and barcode areas are always drawn above the customer's artwork in the editor and in Preview, as they are at print. Artwork can still be selected, moved, cropped and reordered underneath. This adds no new restriction: editable text over the mailing areas remains an error to resolve, and images that reach the mailing areas are still accepted after the existing mailing-side review.
+- **The guide previews the printed addresses.** The return area shows the customer's own return address from their sender information. On the compact Create Your Own layouts (`cyo_compact_white_v2` and `cyo_compact_white_v3`, the PropStream default), the recipient area shows a fictional sample address. Both use the handwriting face, colour, size and placement used at print. The sample is illustrative: real recipient addresses and the barcode are produced per piece at print. When the sender information is incomplete, the return area keeps its existing placeholder label. The mailing-side review image carries the same guide.
+- **Display only.** The guide is never saved with the design, submitted with the order or printed; saved designs, review decisions and order payloads are unchanged.
+- **Representative recipient unchanged.** `set_preview_recipient` continues to apply only to the eligible proofs of the 37 approved printed postcard products, as IFRAME_KIT states. Create Your Own (listed there as Build Your Own) neither reads nor displays it, and those eligible proofs still never show fictional recipient data; the fictional sample is confined to the Create Your Own editor guide.
+- **Partner action:** none. No message, payload, route, postal profile or protocol version changes; partner contract, REST and iframe envelope versions are unchanged.
+
 ## 2026-09-16 — Recipient admission rollout withdrawn
 
 - **Availability:** the recipient export, postal-fit and font-character checks introduced on September 16 have been withdrawn from staging and are deferred from release. They were not released to production.
