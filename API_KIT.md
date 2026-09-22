@@ -292,7 +292,7 @@ Three retired catalog names remain accepted in `product_type` and are normalized
 | `commercial_letter` | `color_letter` |
 | `hybrid_greeting` | `hybrid_letter` |
 
-An alias is a compatibility affordance for cached partner bundles, not a distinct product, and the resolved product's rules then apply in full: postage is validated against the resolved product, and an order resolved to `color_letter` must satisfy the Color Letter V1 contract below — one-sided `canvas_json.front`, at most 500 pieces. Any other unrecognized `product_type` is rejected with `400 INVALID_PRODUCT_CONFIG` listing the accepted values, before the idempotency claim, campaign/order creation, or billing. Send the canonical product type; the aliases may be retired in a future release.
+An alias is a compatibility affordance for cached partner bundles, not a distinct product, and the resolved product's rules then apply in full: postage is validated against the resolved product, and an order resolved to `color_letter` must satisfy the Color Letter V1 contract below, including a one-sided `canvas_json.front`. Any other unrecognized `product_type` is rejected with `400 INVALID_PRODUCT_CONFIG` listing the accepted values, before the idempotency claim, campaign/order creation, or billing. Send the canonical product type; the aliases may be retired in a future release.
 
 #### Envelope Styles
 
