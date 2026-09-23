@@ -4,6 +4,7 @@
 
 - **Availability:** documented ahead of activation; no contract version change (`1.7.56`). Campaign tracking, the pieces list and the RTS list share a per-key budget of distinct campaigns per hour (50 by default). Beyond it, the next new campaign returns `429 CAMPAIGN_BUDGET_EXCEEDED` with `Retry-After` and `X-RateLimit-Limit`; campaigns already read in the hour stay available; server keys with `dashboard:read` are exempt. The brake is switched on per partner on an agreed date; until then nothing changes.
 - **Artifacts:** API Kit §6f; OpenAPI `429` descriptions on the three routes. Postman collection checked - no update needed (no request or variable changes).
+
 ## 2026-09-23 — `POST /orders`: malformed `mail_date` is rejected
 
 - **Behaviour fix, no contract version change (`1.7.56`).** A `mail_date` that is present but not `YYYY-MM-DD` now returns `400 MAIL_DATE_INVALID_FORMAT` (the reschedule endpoint's code) after the replay check for an identical, already-accepted request and before the idempotency claim or any write. Until now the value was silently ignored and the order opened as send-now, so a caller that meant a future date mailed immediately. The iframe always sends `YYYY-MM-DD`; only server-to-server callers sending another format are affected, and they were already mailing early.
