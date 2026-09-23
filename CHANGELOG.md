@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-23 — Partner key classes and scopes, staging sandbox, error envelope
+
+- **Availability:** documentation lands ahead of activation. Enforcement of the new scopes is activated per partner on an agreed date, after that partner's backend has switched to a server key; current integrations are unaffected until then. This entry does not advance the partner contract version (`1.7.56`, REST `3.1`, iframe envelope `1`); the version advances with the release that activates enforcement for the first partner.
+- **Two key classes.** Partner keys are now described as *server keys* (backend only) and *embed keys* (delivered to the Ballpoint iframe in the end user's browser). Nothing changes for the embed: every route it uses keeps working with the key it has today.
+- **Two new scopes, server key only.** `payments:write` governs `POST /v1/billing/orders/{id}/confirm-payment`; `recipients:write` governs `POST` and `PATCH /v1/billing/orders/{id}/recipients` and `PATCH /v1/billing/campaigns/{id}/recipients`. A key without the scope receives `403 INSUFFICIENT_SCOPE`, with `required_scope` and `granted_scopes` in the error body. `dashboard:read` and `pricing:write` are unchanged and keep returning `403 FORBIDDEN`.
+- **Staging is the sandbox.** The quick start, `START_HERE.md`, §1 and §11 now point test traffic at `https://staging-api.ballpointmarketing.com`. The earlier text implied that a `pk_test_` key against production would not print; production has no test mode, and the Postman *sandbox* environment now targets staging.
+- **Error envelope corrected.** §10 documents the shape the API actually returns — `{"detail": {"error": {"type", "code", "message", "trace_id", …}}}` — and the FastAPI list shape used for request-validation failures. A few responses (`confirm-payment` `404`/`409`, `GET /orders/{id}/status` `404`) carry the same `error` object at the top level; read `body.detail?.error ?? body.error`. The previous `error_code` top-level shape was never emitted.
+- **Partner action:** none today. Before enforcement is switched on for your account, point your backend at its server key for payment confirmation and recipient uploads; the embed needs no change. Postman: the collection's payment and recipient requests now read `{{backend_partner_key}}`, present in all three environments.
+- **Artifacts:** API Kit §1, §6k, §6n–§6p, §10, §11, §12; START_HERE; OpenAPI (`INSUFFICIENT_SCOPE` code, `403` on the campaign delta route, error-envelope and security descriptions); Postman collection and the three environments.
+
 ## Unreleased — Color Letter order size limit removed
 
 - **Availability:** live in production since 2026-09-23 (API v3.37.0, iframe v1.20.5).

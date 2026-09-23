@@ -222,7 +222,7 @@ All messages must include these base fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `apiBaseUrl` | string | Ballpoint API base URL |
-| `apiToken` | string | Partner API key (`pk_...`) |
+| `apiToken` | string | Partner **embed** key (`pk_...`). Never the server key that holds `payments:write` / `recipients:write` (API Kit §1) |
 | `tenantKey` | string | Optional. Tenant scope key for storage isolation |
 
 `set_api_config` can be sent more than once to refresh tokens. The separately documented `set_preview_recipient` message is also re-applicable because list edits can replace or remove the representative lead; other bootstrap context remains governed by its per-message rules.

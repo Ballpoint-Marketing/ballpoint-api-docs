@@ -16,7 +16,7 @@ New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barc
 Verify your credentials work — paste this into a terminal:
 
 ```bash
-curl -s -X POST https://api.ballpointmarketing.com/v1/billing/orders \
+curl -s -X POST https://staging-api.ballpointmarketing.com/v1/billing/orders \
   -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
   -H "Idempotency-Key: ps-quickstart-$(date +%s)" \
   -H "Content-Type: application/json" \
@@ -28,7 +28,7 @@ curl -s -X POST https://api.ballpointmarketing.com/v1/billing/orders \
   }'
 ```
 
-You should get back `202 Accepted` with an `order_id`. That's a real test order — no mail is printed or sent with your test key.
+You should get back `202 Accepted` with an `order_id`. This ran against **staging**, the partner sandbox: nothing there is printed or mailed. Do not send test traffic to `api.ballpointmarketing.com` — production has no test mode, and an order created there with any live key is fulfilled and invoiced.
 
 **New here?** Start with [`START_HERE.md`](START_HERE.md) for a 5-minute quickstart.
 
@@ -88,9 +88,10 @@ You should get back `202 Accepted` with an `order_id`. That's a real test order 
 
 | What | Value |
 |------|-------|
-| **Test API Key** | `pk_test_PARTNER_REPLACE_ME` |
-| **Live API Key** | `pk_live_REPLACE_WITH_YOUR_LIVE_KEY` |
-| **Base URL** | `https://api.ballpointmarketing.com` |
+| **Staging API Key** | `pk_test_PARTNER_REPLACE_ME` |
+| **Production API Key** | `pk_live_…` (issued at go-live) |
+| **Base URL (production)** | `https://api.ballpointmarketing.com` |
+| **Base URL (staging sandbox)** | `https://staging-api.ballpointmarketing.com` |
 | **Webhook Secret** | Provisioned during onboarding — send us your endpoint URL |
 
 ### Authentication
@@ -101,10 +102,29 @@ Every request must include your API key in the `X-Partner-Key` header:
 X-Partner-Key: pk_test_PARTNER_REPLACE_ME
 ```
 
-- **Test key** (`pk_test_...`) — no real mail printed or sent. Use freely during development.
-- **Live key** (`pk_live_...`) — real orders, real mail sent. Invoiced after completion.
+- **Staging key** (`pk_test_...`) — works only against `https://staging-api.ballpointmarketing.com`. Nothing on staging is printed or mailed; production status advances only when Ballpoint staff move an order.
+- **Production key** (`pk_live_...`) — works only against `https://api.ballpointmarketing.com`. Real orders, real mail, invoiced after completion. The `pk_test_` / `pk_live_` prefix is a label: it is the **environment** that decides whether mail goes out, never the key.
 
 Keys are provisioned by Ballpoint. Contact us if you need to rotate them.
+
+### Key classes and scopes
+
+Ballpoint issues partner keys in two classes, and every key carries an explicit list of scopes. Most routes need only a valid partner key of either class; a handful of server-side operations require a scope that is granted to server keys alone.
+
+| Class | Lives | Typical use |
+|---|---|---|
+| **Server key** | On your backend only. Never sent to a browser, an embed or a mobile app. | Payment confirmation, recipient uploads and edits, operations dashboard reads |
+| **Embed key** | Delivered to the Ballpoint iframe running in your end user's browser | Everything the embedded experience does: quotes, order creation, cancel/reschedule, tracking reads, templates |
+
+| Scope | Grants | Routes |
+|---|---|---|
+| `payments:write` | Confirming a partner-side payment outcome | `POST /v1/billing/orders/{id}/confirm-payment` |
+| `recipients:write` | Uploading or replacing mailing lists | `POST /v1/billing/orders/{id}/recipients`, `PATCH /v1/billing/orders/{id}/recipients`, `PATCH /v1/billing/campaigns/{id}/recipients` |
+| `dashboard:read` | Account-wide operations portal reads | §6l operations portal |
+| `pricing:write` | Account-wide retail markup changes | `PUT /v1/billing/partner/pricing` and its removal counterpart (§6l) |
+| *(none required)* | Every other partner route | — |
+
+A key used on a route that requires `payments:write` or `recipients:write` without holding it receives `403 INSUFFICIENT_SCOPE`, with the required scope named in the error body (see §10). The `dashboard:read` and `pricing:write` checks predate this change and keep returning `403 FORBIDDEN`. **Rollout:** enforcement of `payments:write` and `recipients:write` is activated per partner on an agreed date, after that partner's backend has switched to its server key; your current integration is unaffected until then.
 
 ---
 
@@ -1192,6 +1212,7 @@ For accounts where Ballpoint waits for the partner to debit the end-user before 
 
 - The end-user payment is captured **on the partner side** using the partner's own payment provider. Ballpoint never sees card data, payment-method data, or any PCI-relevant payload.
 - `/confirm-payment` is a **server-to-server** call by integration contract. It must be issued from the partner backend after the partner has confirmed the payment outcome with its payment provider. The customer browser must **not** call this endpoint directly — the partner key would be exposed.
+- **Scope (server key only):** this route requires the `payments:write` scope, which is granted to server keys and never to embed keys. A key without it receives `403 INSUFFICIENT_SCOPE`. Enforcement starts on the date agreed with your team once your backend uses its server key (see §1, *Key classes and scopes*).
 - **Principal enforcement (v1.7.27):** only a **partner principal** (`X-Partner-Key`, matched on the full tenant identity `account_id + source + external_account_id` — the same triple the campaign preview enforces) or Ballpoint's internal ops key may call this endpoint. Same-account `live`/`test` Bearer tokens are rejected with `401 PARTNER_KEY_REQUIRED`; a malformed partner principal missing `source`/`external_account_id` gets `401 MISSING_PARTNER_CONTEXT` (defensive — real partner keys always carry both). Like `INVALID_PIECE_COUNT` below, these `401`s use the `detail`-wrapped envelope rather than the endpoint's top-level `error` object. A partner key whose tenant identity does not match the order returns `404 ORDER_NOT_FOUND` (never `403` — no cross-tenant existence disclosure).
 - Pricing values shown in the iframe or carried on browser-side events (e.g. `campaign_submitted.total_dollars`) are **for UX/display only**. After `campaign_submitted`, the partner backend must upload and validate recipients for each order it intends to charge in the current payment event. Only after every selected upload reports `ready === true` with `piece_count > 0` may it call [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) once with that selected set of `ballpointOrderId`s. Read `campaign_partner_debit_cents` as the exact whole-cent amount Ballpoint records when confirmation succeeds (already excludes any already-confirmed drops), and use the `partner_cost_*_tcents` fields only for raw wholesale reconciliation. Browser-provided values must never be treated as authoritative.
 
@@ -1710,6 +1731,8 @@ X-Partner-Key: pk_test_...
 Content-Type: application/json
 ```
 
+**Scope:** server key with `recipients:write` (never the embed key); `403 INSUFFICIENT_SCOPE` otherwise once enforcement is active for your account — see §1.
+
 The PropStream flow is create the order first (with `piece_count`, via `POST /orders` or `POST /v1/billing/orders`), then upload the mailing addresses with this endpoint. This is the initial recipient-upload endpoint; it is distinct from the Edit Leads PATCH below.
 
 **Request body:**
@@ -1803,6 +1826,8 @@ X-Partner-Key: pk_test_...
 Content-Type: application/json
 ```
 
+**Scope:** server key with `recipients:write`; `403 INSUFFICIENT_SCOPE` otherwise once enforcement is active for your account — see §1.
+
 For Edit Leads recipient replacement on future/unbilled drops. Replaces all recipients on the order, resizes `piece_count` to match the new count, and atomically recomputes wholesale (`unit_price_tcents`, `total_price_tcents`) plus customer-facing retail (`retail_unit_price_tcents`, `retail_total_price_tcents`) snapshots via the canonical pricing helpers. Backend gate is order-level and campaign-type-neutral — applies to single send, A/B split, and multi-month equally.
 
 **Distinction from `POST /v1/billing/orders/{order_id}/recipients`:** the POST endpoint is for **initial recipient upload** (or chunked append). It does NOT resize `piece_count` and is NOT the Edit Leads PATCH flow. Use this PATCH instead for Edit Leads.
@@ -1888,6 +1913,8 @@ PATCH /v1/billing/campaigns/{campaign_id}/recipients
 X-Partner-Key: pk_test_...
 Content-Type: application/json
 ```
+
+**Scope:** server key with `recipients:write`; `403 INSUFFICIENT_SCOPE` otherwise once enforcement is active for your account — see §1.
 
 Campaign-level delta add/remove endpoint. One call applies recipient changes across all editable drops in a campaign. Editable = status ∈ `{scheduled, pending_payment}` with `payment_confirmed=false`. Locked drops (accepted, in production, mailed, delivered, terminal) are skipped and reported in the response.
 
@@ -2929,23 +2956,49 @@ The account billing policy runs on `/confirm-payment success` (same `charge_orde
 
 ### Error Response Format
 
-All error responses (4xx, 5xx) return a JSON object with this shape:
+Most errors raised by the API (4xx, 5xx) return a JSON object with this shape — the error object sits under `detail`:
 
 ```json
 {
-  "error_code": "INVALID_PRODUCT_TYPE",
-  "message": "Product type 'magic_letter' is not available",
-  "detail": {}
+  "detail": {
+    "error": {
+      "type": "validation_error",
+      "code": "INVALID_PRODUCT_CONFIG",
+      "message": "Unknown product_type 'magic_letter'",
+      "trace_id": "tr_9f2a1c7b4e6d0a13"
+    }
+  }
 }
 ```
 
 | Field | Always present | Description |
 |-------|---------------|-------------|
-| `error_code` | Yes | Machine-readable code (e.g., `INVALID_PRODUCT_TYPE`, `MISSING_FIELD`, `IDEMPOTENCY_KEY_REUSE`) |
-| `message` | Yes | Human-readable explanation |
-| `detail` | No | Additional context (e.g., field-level validation details) |
+| `detail.error.type` | Yes | Error class, including `validation_error`, `authentication_error`, `authorization_error`, `not_found`, `conflict`, `rate_limit_error`, `billing_error`, `payload_error`, `server_error` |
+| `detail.error.code` | Yes | Machine-readable code (e.g., `INVALID_PRODUCT_CONFIG`, `IDEMPOTENCY_KEY_REQUIRED`, `INSUFFICIENT_SCOPE`) |
+| `detail.error.message` | Yes | Human-readable explanation |
+| `detail.error.trace_id` | Usually | Quote it in support requests |
+| other keys under `detail.error` | No | Extra context for that code (for example `required_scope` and `granted_scopes` on `INSUFFICIENT_SCOPE`, or the price fields on `PRICE_QUOTE_STALE`) |
 
-Use `error_code` for programmatic handling. Use `message` for logging/display.
+Branch on `detail.error.code`; use `message` for logging and display. Request-validation failures raised before a handler runs (a missing required field, a wrong type) use FastAPI's own shape instead: `detail` is a **list** of `{"loc", "msg", "type"}` entries with status `422`.
+
+A few endpoints return the same `error` object at the **top level** of the body instead of under `detail`: the `404` and `409` responses of `POST /v1/billing/orders/{id}/confirm-payment` and the `404` of `GET /orders/{id}/status`. The fields are identical, so read errors as `body.detail?.error ?? body.error` and branch on `code`.
+
+A `403 INSUFFICIENT_SCOPE` looks like this:
+
+```json
+{
+  "detail": {
+    "error": {
+      "type": "authorization_error",
+      "code": "INSUFFICIENT_SCOPE",
+      "message": "This partner key is not authorized for this route; it requires the payments:write scope.",
+      "required_scope": "payments:write",
+      "granted_scopes": ["read"],
+      "trace_id": "tr_9f2a1c7b4e6d0a13"
+    }
+  }
+}
+```
 
 ### Status Code Reference
 
@@ -2956,7 +3009,7 @@ Use `error_code` for programmatic handling. Use `message` for logging/display.
 | `400` | Bad request (malformed JSON, missing fields) | **No** | Fix your request payload |
 | `401` | Authentication failed | **No** | Check your API key |
 | `402` | Insufficient balance or spending limit hit | **No** | Applies only to accounts with prepaid balance or spending-limit enforcement; `billing_mode: none` accounts always pass balance checks |
-| `403` | Account suspended | **No** | Contact Ballpoint |
+| `403` | Account suspended, or the key lacks a required scope (`INSUFFICIENT_SCOPE`) | **No** | Contact Ballpoint; for `INSUFFICIENT_SCOPE`, call the route from your backend with the server key (see §1) |
 | `404` | Resource not found | **No** | Check the ID |
 | `409` | Conflict (idempotency key reuse with different body) | **No** | Use a new idempotency key |
 | `422` | Validation error (bad product type, missing envelope_style) | **No** | Fix your request |
@@ -3091,26 +3144,27 @@ does not assert staging runtime deployment or production availability.
 
 ## 11. Sandbox & Testing
 
-### Test vs. Live
+### Staging vs. production
 
-| | Test Key (`pk_test_...`) | Live Key (`pk_live_...`) |
+The partner sandbox is the **staging environment**: `https://staging-api.ballpointmarketing.com`, with your `pk_test_...` key. It runs the same code and the same validation as production, backed by its own database and its own keys. **There is no test mode in production**: the key prefix is a label, and an order created on `api.ballpointmarketing.com` with any live key is printed, mailed and invoiced.
+
+| | Staging — `pk_test_...` against `https://staging-api.ballpointmarketing.com` | Production — `pk_live_...` against `https://api.ballpointmarketing.com` |
 |---|---|---|
 | Orders created | Yes | Yes |
 | Real mail printed & sent | **No** | **Yes** |
 | USPS tracking | No (no physical mail) | Yes (1-2 days after drop) |
-| Billing | Invoiced (same as live) | Invoiced |
+| Billing | No real charge (nothing is fulfilled) | Invoiced |
 | Validation & error responses | Identical | Identical |
 
-### Test Key Behavior
+### Staging key behavior
 
-Your test key (`pk_test_PARTNER_REPLACE_ME`):
+Your staging key (`pk_test_PARTNER_REPLACE_ME`):
 
-- All orders succeed immediately (`billing_mode: none`)
-- No real mail is printed or sent
-- Validation, status codes, and error responses are identical to production
+- Orders are created exactly as in production and go through the same validation and payment gate
+- Nothing is printed or mailed, so nothing reaches an invoice
 - Use `camp_test` as the campaign ID for testing
 
-**What happens to test orders?** Test orders are created with status `accepted` and stay there — production status does not auto-advance because there is no physical fulfillment. To test your webhook handler, ask us to trigger test events against your endpoint. We can simulate the full lifecycle (`accepted` → `prep` → `printing` → ... → `shipping` → `complete` → `shipped` → `delivered`) so you can verify your handler end-to-end without waiting for real mail.
+**What happens to staging orders?** They are created with their normal initial status and stay there — production status does not auto-advance because there is no physical fulfillment. To test your webhook handler, ask us to trigger test events against your endpoint. We can simulate the full lifecycle (`accepted` → `prep` → `printing` → ... → `shipping` → `complete` → `shipped` → `delivered`) so you can verify your handler end-to-end without waiting for real mail.
 
 ### Webhook Testing
 
@@ -3124,7 +3178,7 @@ Once you've given us your webhook URL, we can:
 Before switching to your live key:
 
 ```
-[ ] Orders create successfully with test key (202 response)
+[ ] Orders create successfully on staging with your staging key (202 response)
 [ ] Preview endpoint returns expected pricing
 [ ] Webhook handler receives events and verifies signature
 [ ] Webhook handler deduplicates on X-Ballpoint-Event-Id
@@ -3149,7 +3203,7 @@ Before switching to your live key:
 | Get order | `GET` | `/v1/billing/orders/{id}` | `X-Partner-Key` |
 | List orders | `GET` | `/v1/billing/orders?external_user_id=...&status=...&limit=20&offset=0` | `X-Partner-Key` |
 | Cancel order | `POST` | `/orders/{id}/cancel` | `X-Partner-Key` |
-| Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` (server-to-server only) |
+| Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` — **server key, `payments:write`** |
 | Partner dashboard stats | `GET` | `/v1/billing/partner/stats?days=30&list_id=...&external_user_id=...` | `X-Partner-Key` |
 | Account insights summary (iframe automatic) | `GET` | `/v1/mail-tracking/account-summary?from=...&to=...&time_zone=...&list_id=...` | `X-Partner-Key` |
 | Partner dashboard orders | `GET` | `/v1/billing/partner/orders?days=30&list_id=...&status=...` | `X-Partner-Key` |
