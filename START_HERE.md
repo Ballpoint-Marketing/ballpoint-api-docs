@@ -7,7 +7,7 @@
 ## 1. Verify Your Key (30 seconds)
 
 ```bash
-curl -s https://api.ballpointmarketing.com/health
+curl -s https://staging-api.ballpointmarketing.com/health
 ```
 
 You should see `{"status": "ok", ...}`. The API is up.
@@ -17,7 +17,7 @@ You should see `{"status": "ok", ...}`. The API is up.
 ## 2. Create Your First Order (2 minutes)
 
 ```bash
-curl -s -X POST https://api.ballpointmarketing.com/v1/billing/orders \
+curl -s -X POST https://staging-api.ballpointmarketing.com/v1/billing/orders \
   -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
   -H "Idempotency-Key: quickstart-$(date +%s)" \
   -H "Content-Type: application/json" \
@@ -44,14 +44,14 @@ curl -s -X POST https://api.ballpointmarketing.com/v1/billing/orders \
 }
 ```
 
-No mail is printed and no amount is charged with your test key — this is a safe sandbox order. Use the preview endpoint to inspect the current displayed and base prices before creating it.
+No mail is printed and no amount is charged on staging — this is a safe sandbox order. Use the preview endpoint to inspect the current displayed and base prices before creating it.
 
 ---
 
 ## 3. Check Order Status
 
 ```bash
-curl -s https://api.ballpointmarketing.com/v1/billing/orders/ORDER_ID_HERE \
+curl -s https://staging-api.ballpointmarketing.com/v1/billing/orders/ORDER_ID_HERE \
   -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME"
 ```
 

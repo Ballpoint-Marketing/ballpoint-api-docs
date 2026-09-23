@@ -29,7 +29,7 @@ Everything you need to integrate with the Ballpoint Marketing direct mail API: o
 ### Postman Environments
 
 - [Staging](examples/ballpoint-staging.postman_environment.json) — PropStream integration testing (`staging-api.ballpointmarketing.com`; paste your staging `pk_test` key)
-- [Sandbox](examples/ballpoint-sandbox.postman_environment.json) — internal test key on `api.ballpointmarketing.com` (no real mail)
+- [Sandbox](examples/ballpoint-sandbox.postman_environment.json) — same staging host as above, kept for setups that already import it (paste your staging `pk_test` key; nothing is mailed on staging)
 - [Production](examples/ballpoint-production.postman_environment.json) — live host for a tenant provisioned with a `pk_live` key
 
 ## Webhook Security

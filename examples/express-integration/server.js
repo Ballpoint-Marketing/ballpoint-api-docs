@@ -21,7 +21,8 @@ const PORT = process.env.PORT || 3000;
 
 // --- Configuration ---
 
-const BALLPOINT_BASE = process.env.BALLPOINT_BASE || "https://api.ballpointmarketing.com";
+// Staging is the sandbox; point BALLPOINT_BASE at api.ballpointmarketing.com only with a pk_live key.
+const BALLPOINT_BASE = process.env.BALLPOINT_BASE || "https://staging-api.ballpointmarketing.com";
 const API_KEY = process.env.BALLPOINT_API_KEY || "";
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 
