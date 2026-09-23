@@ -1125,7 +1125,7 @@ components:
           - type: string
           - type: 'null'
           title: Product Type
-          description: Canonical Ballpoint product_type (e.g. '4x6_printed', '6x9_printed', '4x6_cursive', '6x9_cursive', 'color_letter', 'hybrid_letter', 'greeting_letter'). When present, validated against VALID_PRODUCT_TYPES and used as canonical. When absent, the server derives type from product_id/product_name (transitional internal fallback — do not rely on).
+          description: Canonical Ballpoint product_type (e.g. '4x6_printed', '6x9_printed', '4x6_cursive', '6x9_cursive', 'color_letter', 'hybrid_letter', 'greeting_letter'). When present, validated against VALID_PRODUCT_TYPES and used as canonical. The legacy catalog aliases 'check_mailer' and 'commercial_letter' (resolved to 'color_letter') and 'hybrid_greeting' (resolved to 'hybrid_letter') are also accepted here and normalized before validation, pricing, and persistence; the resolved product's rules — including the Color Letter V1 canvas insert — then apply in full, and any other value is rejected with 400 INVALID_PRODUCT_CONFIG. When absent, the server derives type from product_id/product_name (transitional internal fallback — do not rely on).
         external_user_metadata:
           anyOf:
           - additionalProperties: true
