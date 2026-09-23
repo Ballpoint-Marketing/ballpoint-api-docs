@@ -1049,6 +1049,8 @@ curl -s https://api.ballpointmarketing.com/v1/orders/ord_7f3a2b/mail-tracking \
 
 Get aggregate USPS tracking for an entire campaign (across all orders).
 
+**Distinct-campaign budget (activated per partner).** Campaign tracking, the pieces list and the RTS list share a budget of distinct campaigns per key per hour (50 by default). Reading a campaign already read in the hour never costs budget; the next *new* campaign beyond the budget returns `429 CAMPAIGN_BUDGET_EXCEEDED` with `Retry-After` and `X-RateLimit-Limit`. Server keys that carry `dashboard:read` are exempt. This brake is switched on per partner on an agreed date; until then the routes behave as today.
+
 ```
 GET /v1/campaigns/{campaign_id}/mail-tracking
 ```
