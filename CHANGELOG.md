@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-23 — `POST /orders`: malformed `mail_date` is rejected
+
+- **Behaviour fix, no contract version change (`1.7.56`).** A `mail_date` that is present but not `YYYY-MM-DD` now returns `400 MAIL_DATE_INVALID_FORMAT` (the reschedule endpoint's code) after the replay check for an identical, already-accepted request and before the idempotency claim or any write. Until now the value was silently ignored and the order opened as send-now, so a caller that meant a future date mailed immediately. The iframe always sends `YYYY-MM-DD`; only server-to-server callers sending another format are affected, and they were already mailing early.
+- **Artifacts:** API Kit §6b (`mail_date` format note); OpenAPI `POST /orders` `400` description. Postman collection checked - no update needed (no request or variable changes).
+
 ## 2026-09-23 — Partner key classes and scopes, staging sandbox, error envelope
 
 - **Availability:** documentation lands ahead of activation. Enforcement of the new scopes is activated per partner on an agreed date, after that partner's backend has switched to a server key; current integrations are unaffected until then. This entry does not advance the partner contract version (`1.7.56`, REST `3.1`, iframe envelope `1`); the version advances with the release that activates enforcement for the first partner.

@@ -711,6 +711,8 @@ POST /v1/billing/orders
 
 For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, unsafe artwork, or an exported text object left at the exact default `Enter Text` with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. Hidden/non-exported placeholders and changed copy do not trigger this guard. This conditional rule does not change other partners or non-printed-postcard products.
 
+**`mail_date` format (`POST /orders`):** when `mail_date` is present it must be `YYYY-MM-DD`. Any other value (`09/30/2026`, a datetime, an empty string) is rejected with `400 MAIL_DATE_INVALID_FORMAT` — the same code the reschedule endpoint uses (§6k) — after the replay check for an identical request already accepted, and before the idempotency claim, campaign/order creation or billing. Previously a malformed value was ignored and the order opened as send-now.
+
 For new PropStream orders, `postage_type: "first_class"` uses the direct
 fulfillment path from the frozen recipient list. It does not pass through
 AccuZIP and therefore does not expose fabricated IMb, container, or tracking
