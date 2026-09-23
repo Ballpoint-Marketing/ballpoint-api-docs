@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Color Letter order size limit removed
+
+- **Availability:** live in production since 2026-09-23 (API v3.37.0, iframe v1.20.5).
+- **`color_letter` no longer has a 500-piece per-order limit.** A Color Letter order, and an edit-leads replacement list for one, is now bounded only by the global `pieces` maximum that applies to every product. Requests that used to return `400 INVALID_PRODUCT_CONFIG` for size alone ("Color Letter V1 supports at most 500 pieces per order") are accepted.
+- **Unchanged:** a Color Letter still requires a non-empty printable `canvas_json.front` insert, and its canvas input boundary (20 MiB, depth 50, 10,000 JSON nodes, 1,000 Fabric objects, 14 MiB of embedded image data, approved remote asset paths) still fails closed before order creation. Pricing, postage options and routes are unchanged.
+- **Partner action:** none required. A client that split Color Letter lists into orders of 500 or fewer may stop doing so. Partner contract stays at 1.7.56, REST at 3.1, and iframe envelope at 1.
+
 ## v1.7.56 — 2026-09-17 — Privileged operations dashboard
 
 - **Availability:** staging candidate; production release and access provisioning are pending.
