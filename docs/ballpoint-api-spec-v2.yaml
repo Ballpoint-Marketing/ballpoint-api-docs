@@ -2565,7 +2565,7 @@ paths:
         '404':
           description: Campaign not found
         '429':
-          description: Rate limit exceeded
+          description: Rate limit exceeded, or `CAMPAIGN_BUDGET_EXCEEDED` once the per-partner distinct-campaign budget is active (see API Kit §6f)
           content:
             application/json:
               schema:
@@ -2610,7 +2610,7 @@ paths:
         '200':
           description: Paginated piece list
         '429':
-          description: Rate limit exceeded
+          description: Rate limit exceeded, or `CAMPAIGN_BUDGET_EXCEEDED` once the per-partner distinct-campaign budget is active (see API Kit §6f)
           content:
             application/json:
               schema:
@@ -2664,7 +2664,7 @@ paths:
             `recipient_zip`) are only included when the account has
             `allow_pii_exports` enabled.
         '429':
-          description: Rate limit exceeded
+          description: Rate limit exceeded, or `CAMPAIGN_BUDGET_EXCEEDED` once the per-partner distinct-campaign budget is active (see API Kit §6f)
           content:
             application/json:
               schema:
