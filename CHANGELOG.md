@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Color Letter order size limit removed
+
+- **Availability:** live in production since 2026-09-23 (API v3.37.0, iframe v1.20.5).
+- **`color_letter` no longer has a 500-piece per-order limit.** A Color Letter order, and an edit-leads replacement list for one, is now bounded only by the global `pieces` maximum that applies to every product. Requests that used to return `400 INVALID_PRODUCT_CONFIG` for size alone ("Color Letter V1 supports at most 500 pieces per order") are accepted.
+- **Unchanged:** a Color Letter still requires a non-empty printable `canvas_json.front` insert, and its canvas input boundary (20 MiB, depth 50, 10,000 JSON nodes, 1,000 Fabric objects, 14 MiB of embedded image data, approved remote asset paths) still fails closed before order creation. Pricing, postage options and routes are unchanged.
+- **Partner action:** none required. A client that split Color Letter lists into orders of 500 or fewer may stop doing so. Partner contract stays at 1.7.56, REST at 3.1, and iframe envelope at 1.
+
 ## 2026-09-18 — Legacy product aliases accepted on `POST /orders`
 
 - **`product_type` now accepts the three legacy catalog aliases.** `check_mailer` and `commercial_letter` resolve to `color_letter`, and `hybrid_greeting` resolves to `hybrid_letter`. The alias map previously applied only when `product_type` was omitted and the server fell back to `product_id`, so a client that sent a retired name explicitly was rejected `400 INVALID_PRODUCT_CONFIG` on every attempt — deterministically, with no order, campaign, charge, or `campaign_submitted` event. Cached partner bundles keep sending retired names for days after an iframe release; accepting them removes that dead end.
@@ -7,7 +14,7 @@
 - **Rejections are now diagnosable.** Every product-config rejection emits one PII-free Ballpoint-side diagnostic carrying the failure reason, the resolved product/postage/envelope, the piece count, partner identifiers, and a trace id. When reporting a blocked checkout, send the attempt's timestamp and, when available, your `external_id` — no payload or recipient data is needed.
 - **Partner action:** none required, and no request field, response shape, webhook, or price changed. Sending the canonical `product_type` remains correct and is still recommended; the aliases are a compatibility affordance and may be retired in a future release. This correction does not advance the partner contract: the documented version remains `1.7.56`, REST contract `3.1`, message envelope `1`.
 - **Artifacts:** API Kit (Products and `POST /orders` request table) and the OpenAPI `product_type` description record the accepted aliases. Iframe Kit, Postman collection and environments, webhook schemas and fixtures were reviewed and remain unchanged: no route, field, message, webhook, or integration step is added or altered.
-- **Availability:** alias acceptance and the diagnostics are live in Ballpoint staging as of 2026-09-18, validated against the deployed staging build with authenticated partner requests: each alias resolved to its canonical product and priced identically to that product, an unknown value was rejected with the accepted-value list, and the diagnostics appeared with the expected reasons. No order, campaign, or charge was created during validation. The Color Letter contract enforcement described above ships in the same API release. Production ships with the next tagged API release.
+- **Availability:** live in production since 2026-09-19 (API v3.36.0).
 
 ## v1.7.56 — 2026-09-17 — Privileged operations dashboard
 
