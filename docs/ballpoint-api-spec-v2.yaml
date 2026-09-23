@@ -3121,7 +3121,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PartnerOrderCreateResponse'
         '400':
-          description: Missing idempotency key, invalid product configuration, or invalid PropStream printed-postcard artwork
+          description: Missing idempotency key, invalid product configuration, invalid PropStream printed-postcard artwork, or a `mail_date` that is not `YYYY-MM-DD` (`MAIL_DATE_INVALID_FORMAT`)
           content:
             application/json:
               schema:
