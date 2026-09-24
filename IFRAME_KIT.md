@@ -1,6 +1,8 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.57** (envelope `source` bound to the partner of the parent origin; staging candidate; production pending; iframe message envelope remains version `1`)
+Partner contract version: **v1.7.58** (PropStream partner contract rules apply to every partner onboarded on it; staging candidate; production pending; iframe message envelope remains version `1`)
+
+Contract 1.7.58: **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices. Nothing changes for PropStream.
 
 Contract 1.7.57 binds the envelope `source` to the partner that owns the parent origin. PropStream keeps sending `"propstream"` with no change; each other partner sends the source identifier assigned at onboarding. A message whose `source` does not belong to its origin's partner is ignored. Message types, payloads and envelope version `1` are unchanged.
 
@@ -242,7 +244,7 @@ The API independently re-evaluates the flag on both order-creation routes, so
 the browser check is not the security boundary. The flag introduces **no new
 button, checkbox, copy, or layout**. PropStream continues to own visibility of
 its Send Mail entry point; Ballpoint owns the submit decision after the user
-enters the iframe. Non-PropStream embeds are unchanged.
+enters the iframe. Embeds outside the PropStream partner contract are unchanged.
 
 For new PropStream orders, choosing First Class uses Ballpoint's direct
 fulfillment path from the frozen recipients. It does not invoke AccuZIP and
@@ -1462,7 +1464,7 @@ No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` /
 
 #### `auto_suppress_next_drop_changed` — User changed the next-drop auto-suppress preference
 
-Sent when the user checks or unchecks **Auto-suppress on next drop** in the RTS Suppression List. This is a PropStream-only, fire-and-forget preference intent. It tells the parent what the user selected; it does not perform suppression inside the iframe.
+Sent when the user checks or unchecks **Auto-suppress on next drop** in the RTS Suppression List. It is part of the PropStream partner contract: a fire-and-forget preference intent. It tells the parent what the user selected; it does not perform suppression inside the iframe.
 
 ```json
 {

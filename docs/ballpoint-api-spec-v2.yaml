@@ -2831,7 +2831,7 @@ paths:
       description: |
         Returns boolean-only partner feature flags for the current source/user
         context. The iframe caches this response in memory for 60 seconds.
-        For PropStream, `propstream_send_mail_enabled` also gates both order
+        For the PropStream partner contract, `propstream_send_mail_enabled` also gates both order
         creation routes authoritatively; disabled requests return
         `403 FEATURE_DISABLED` before any mutation.
         `propstream_cyo_unified_postal_panel_enabled` coordinates the proof and
@@ -3052,7 +3052,7 @@ paths:
       - Billing
       summary: Create an order with billing gate enforced
       operationId: create_order_v1_billing_orders_post
-      description: PropStream requests return 403 FEATURE_DISABLED before idempotency, order creation, or billing when propstream_send_mail_enabled resolves false. Other sources are unchanged.
+      description: PropStream partner contract requests return 403 FEATURE_DISABLED before idempotency, order creation, or billing when propstream_send_mail_enabled resolves false. Sources outside that contract are unchanged.
       security:
       - partnerKeyAuth: []
       parameters:

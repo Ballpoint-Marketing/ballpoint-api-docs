@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.58 — 2026-09-24 — PropStream partner contract applies to every partner on it
+
+- **Availability:** staging candidate; production pending.
+- **What changed:** the rules documented for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, presort suppression and RTS webhooks, auto-suppress) now apply to every partner onboarded on the PropStream partner contract, each with its own source identifier, account, keys, orders and invoices.
+- **Partner action:** PropStream, none: nothing changes for PropStream. Other partners on the contract follow the PropStream integration: send `contactId` and `contactType` on recipients (RTS webhooks require them), and handle `order.presort_suppressed` and the `drop_*` events on endpoints subscribed to all events.
+- **Unchanged:** request and response shapes, flag names, message types, payloads, envelope version `1` and REST `3.1`.
+- **Artifacts:** Iframe Kit header and the Send Mail and auto-suppress sections; API Kit header; OpenAPI `/v1/config` and `403 FEATURE_DISABLED` descriptions; Postman version marker (no request change).
+
 ## v1.7.57 — 2026-09-23 — Partner-bound envelope `source`
 
 - **Availability:** staging candidate; production pending. Until the production iframe release, the production mailer still accepts only `"propstream"`.

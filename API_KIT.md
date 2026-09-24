@@ -1,6 +1,8 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.57 · September 2026** · iframe envelope `source` bound to the partner of the parent origin (staging candidate; production pending); REST API remains `3.1`
+> **v1.7.58 · September 2026** · PropStream partner contract rules apply to every partner onboarded on it (staging candidate; production pending); REST API remains `3.1`
+>
+> **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
 
 New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barcode and its clear area fit within the unchanged recipient box. New 4x6 proofs keep `cyo_compact_white_v2`, and frozen earlier orders are never silently upgraded or rerendered. During coordinated API/iframe rollout, an outdated 6x9 proof returns the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and requires review of the current proof. No PropStream-side payload change is required.
