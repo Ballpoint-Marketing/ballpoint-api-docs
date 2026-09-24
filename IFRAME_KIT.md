@@ -1,6 +1,8 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.56** (privileged operations dashboard staging candidate; production pending; iframe message envelope remains version `1`)
+Partner contract version: **v1.7.57** (envelope `source` bound to the partner of the parent origin; staging candidate; production pending; iframe message envelope remains version `1`)
+
+Contract 1.7.57 binds the envelope `source` to the partner that owns the parent origin. PropStream keeps sending `"propstream"` with no change; each other partner sends the source identifier assigned at onboarding. A message whose `source` does not belong to its origin's partner is ignored. Message types, payloads and envelope version `1` are unchanged.
 
 
 Contract 1.7.56 adds a separate operations portal protected by `dashboard:read`. Customer iframe keys, payloads, messages and existing KPIs are unchanged. Never pass an operations key to the embedded customer iframe. See [API_KIT.md](API_KIT.md#privileged-operations-portal-contract-1756).
@@ -215,7 +217,7 @@ All messages must include these base fields:
 }
 ```
 
-> The `source` field must be `"propstream"`. If you're a different partner, reach out and we'll set up your source identifier.
+> The `source` field is your partner source identifier, assigned at onboarding and bound to your registered origins (`"propstream"` for PropStream). A message whose `source` does not match the partner of the sending origin is ignored. On the staging mailer only, local development parents (`http://localhost` or `http://127.0.0.1` on ports 3000, 4173, 4200, 5173 or 8080) may use any assigned identifier. The examples in this kit use `"propstream"`; substitute your own. If you're a new partner, reach out and we'll set up your source identifier.
 
 ### `set_api_config` — API credentials (required)
 
@@ -578,7 +580,7 @@ Use this when your app wants the user to see, in My Campaigns, only the direct-m
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | Yes | Must be `"propstream"`. |
+| `source` | string | Yes | Your partner source identifier (`"propstream"` for PropStream); see §5. |
 | `version` | number | Yes | Must be `1`. |
 | `type` | string | Yes | Always `"set_dashboard_filter"`. |
 | `listIds` | array of strings \| null | No | The list IDs of the marketing group to scope the dashboard to (the same `listId` values you pass on `set_list`). **Optional** — omitting the field (or sending `null`) is the explicit *clear* signal (full account-wide view). See the semantics table below. |
@@ -703,7 +705,7 @@ The iframe does **not** observe the partner-owned payment popup directly. After 
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | Yes | Must be `"propstream"` (the same source identifier required on all parent → iframe messages). |
+| `source` | string | Yes | Your partner source identifier (the same one required on all parent → iframe messages; see §5). |
 | `version` | number | Yes | Must be `1`. The iframe supports the version set `[1]`; other values are ignored. |
 | `type` | string | Yes | Always `"payment_result"`. |
 | `tenantKey` | string | Yes | Must match the active tenant the iframe was scoped to. Mismatched or missing `tenantKey` causes the entire message to be **rejected and ignored** — no result screen is rendered and **no tenant state is mutated** by this message. The check is read-only (this event cannot be used to establish or change tenant scope). |

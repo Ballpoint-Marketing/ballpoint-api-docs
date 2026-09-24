@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.57 — 2026-09-23 — Partner-bound envelope `source`
+
+- **Availability:** staging candidate; production pending. Until the production iframe release, the production mailer still accepts only `"propstream"`.
+- **What changed:** the postMessage envelope `source` now identifies the partner and is bound to that partner's registered parent origins. PropStream origins keep sending `"propstream"`; other partners send the identifier assigned at onboarding. A parent → iframe message whose `source` does not belong to the partner of its origin is ignored, exactly as a message with an unknown `source` was ignored before.
+- **Why:** each partner integration is identified separately; an embed can no longer use another partner's identifier. Tenant, orders and billing remain bound to your API key, as before.
+- **Partner action:** PropStream, none: every message it sends today is unchanged. New partners use the identifier assigned at onboarding. On the staging mailer, local development parents (`http://localhost` or `http://127.0.0.1` on the documented dev ports) may use any assigned identifier.
+- **Unchanged:** envelope version `1`, REST `3.1`, message types, payloads, outbound events (`source: "ballpoint-mailer"`), webhooks and prices.
+- **Artifacts:** Iframe Kit §5 and the `set_dashboard_filter` / `payment_result` field tables; API Kit and Postman version markers. Postman requests and environments checked, no request change (REST only).
+
 ## 2026-09-23 — Distinct-campaign budget on tracking reads (activated per partner)
 
 - **Availability:** documented ahead of activation; no contract version change (`1.7.56`). Campaign tracking, the pieces list and the RTS list share a per-key budget of distinct campaigns per hour (50 by default). Beyond it, the next new campaign returns `429 CAMPAIGN_BUDGET_EXCEEDED` with `Retry-After` and `X-RateLimit-Limit`; campaigns already read in the hour stay available; server keys with `dashboard:read` are exempt. The brake is switched on per partner on an agreed date; until then nothing changes.
