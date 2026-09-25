@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.58 · September 2026** · PropStream partner contract rules apply to every partner onboarded on it (staging candidate; production pending); REST API remains `3.1`
+> **v1.7.59 · September 2026** · Print jobs for print-ready PDFs and least-privilege partner keys (staging candidate; production pending); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -74,6 +74,7 @@ You should get back `202 Accepted` with an `order_id`. This ran against **stagin
    - [6l. Partner Dashboard Endpoints](#6l-partner-dashboard-endpoints)
    - [6r. Partner Feature Configuration](#6r-partner-feature-configuration)
    - [6s. Search Recipients Across Direct Mail](#6s-search-recipients-across-direct-mail)
+   - [6t. Print Jobs (Print-Ready PDFs)](#6t-print-jobs-print-ready-pdfs)
 7. [Status Updates via Webhooks](#7-status-updates-via-webhooks)
    - [Per-piece RTS Push-Back (V1)](#per-piece-rts-push-back-v1)
 8. [Real-Time UI via SSE (Optional)](#8-real-time-ui-via-sse-optional)
@@ -124,7 +125,10 @@ Ballpoint issues partner keys in two classes, and every key carries an explicit 
 | `recipients:write` | Uploading or replacing mailing lists | `POST /v1/billing/orders/{id}/recipients`, `PATCH /v1/billing/orders/{id}/recipients`, `PATCH /v1/billing/campaigns/{id}/recipients` |
 | `dashboard:read` | Account-wide operations portal reads | §6l operations portal |
 | `pricing:write` | Account-wide retail markup changes | `PUT /v1/billing/partner/pricing` and its removal counterpart (§6l) |
-| *(none required)* | Every other partner route | — |
+| `print_jobs:write` | Submitting print-ready PDF jobs (least-privilege keys, §6t) | `POST /v1/print-jobs/upload-url`, `POST /v1/print-jobs` |
+| *(none required)* | Every other partner route — except on least-privilege keys (below) | — |
+
+**Least-privilege keys.** Keys issued for a specific capability, such as print jobs (§6t), reach **only** the routes their scopes open; with `read`, they can also read their own orders (`GET /v1/billing/orders/{id}`). Every other route answers `403 INSUFFICIENT_SCOPE` with `required_scope: null` (the route is not available to the key at all) and the message "This partner key is not authorized for this route." Existing keys are not least-privilege and keep their current access.
 
 A key used on a route that requires `payments:write` or `recipients:write` without holding it receives `403 INSUFFICIENT_SCOPE`, with the required scope named in the error body (see §10). The `dashboard:read` and `pricing:write` checks predate this change and keep returning `403 FORBIDDEN`. **Rollout:** enforcement of `payments:write` and `recipients:write` is activated per partner on an agreed date, after that partner's backend has switched to its server key; your current integration is unaffected until then.
 
@@ -2329,6 +2333,103 @@ remove these contacts from future drops. PropStream should consume
 `recipient_opt_out_changed` and apply the mirrored contact-level suppression in
 its own future-drop selection.
 
+### 6t. Print Jobs (Print-Ready PDFs)
+
+For partners that build the finished, print-ready file themselves (for example, personalized warranty booklets). Ballpoint prints exactly the PDF you send: there is no canvas, recipient list, or postal layer. Each accepted job becomes one order you can follow with [Get Order](#6c-get-order).
+
+**Access.** Print jobs need a key provisioned with the `print_jobs:write` scope (plus `read` to check status) on an invoiced account. These keys are **least privilege**: they reach only the routes their scopes open, and every other route answers `403 INSUFFICIENT_SCOPE`.
+
+**PDF requirements (current; confirmed with each partner during onboarding):**
+
+| Rule | Value |
+|------|-------|
+| Page size | Every page 5.5 × 8.5 in (396 × 612 pt), no bleed |
+| Booklet | Saddle-stitched, `pages_per_booklet` of `4` or `8` |
+| Page count | Exactly `booklet_count × pages_per_booklet`, booklets in page order |
+| Mailing address | Printed on each booklet in the PDF itself; no separate recipient list |
+| File | Not encrypted, at most 250 MB, at most 10,000 booklets per job |
+
+**Flow — once per daily batch:**
+
+**Step 1 — Request an upload.** `external_id` is your unique ID for this batch (1–128 characters: letters, digits, `.`, `_`, `:`, `-`, starting with a letter or digit).
+
+```bash
+curl -X POST https://staging-api.ballpointmarketing.com/v1/print-jobs/upload-url \
+  -H "X-Partner-Key: $PARTNER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"external_id": "2026-09-25"}'
+```
+
+```json
+{
+  "external_id": "2026-09-25",
+  "upload": {
+    "method": "POST",
+    "url": "https://<bucket>.s3.amazonaws.com/",
+    "fields": { "key": "…", "policy": "…", "x-amz-signature": "…" },
+    "expires_at": "2026-09-25T15:30:00+00:00",
+    "max_bytes": 262144000
+  }
+}
+```
+
+**Step 2 — Upload the PDF straight to storage.** Send a multipart form POST to `upload.url` with every entry of `upload.fields` first and the file last, before `expires_at` (30 minutes). The file never passes through the API. Storage itself refuses a file over 250 MB at this step (an XML `EntityTooLarge` error from the storage endpoint, not a Ballpoint JSON error).
+
+```bash
+curl -X POST "<upload.url>" \
+  -F "key=<fields.key>" -F "policy=<fields.policy>" … \
+  -F "file=@booklets-2026-09-25.pdf"
+```
+
+**Step 3 — Submit the job.**
+
+```bash
+curl -X POST https://staging-api.ballpointmarketing.com/v1/print-jobs \
+  -H "X-Partner-Key: $PARTNER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"external_id": "2026-09-25", "booklet_count": 120, "pages_per_booklet": 8}'
+```
+
+`201 Created`:
+
+```json
+{
+  "order_id": "ord_…",
+  "external_id": "2026-09-25",
+  "booklet_count": 120,
+  "pages_per_booklet": 8,
+  "production_status": "accepted"
+}
+```
+
+Ballpoint validates the uploaded file before accepting it. A rejected job persists nothing: fix the file, upload it again under the same `external_id` (Step 1 and 2), and resubmit. Submitting the same `external_id` with the same counts again is safe and returns the existing order (`200`); it never creates a duplicate job.
+
+Follow progress with `GET /v1/billing/orders/{order_id}` (`production_status`).
+
+**Errors:**
+
+| Status | Code | Meaning |
+|--------|------|---------|
+| 403 | `INSUFFICIENT_SCOPE` | The key does not hold `print_jobs:write` |
+| 403 | `PRINT_JOBS_NOT_ENABLED` | Print jobs are not enabled for this account |
+| 409 | `PRINT_JOB_EXISTS` | Upload requested for an `external_id` that was already submitted |
+| 409 | `PRINT_JOB_CONFLICT` | `external_id` already submitted with different counts |
+| 409 | `PDF_CHANGED_DURING_SUBMIT` | The upload changed while it was being validated; submit again |
+| 422 | `PDF_NOT_UPLOADED` | Nothing uploaded for this `external_id` (uploads expire after 7 days) |
+| 422 | `PDF_TOO_LARGE` | Over 250 MB |
+| 422 | `PDF_UNREADABLE` | Not a readable PDF, or too complex to inspect |
+| 422 | `PDF_ENCRYPTED` | Password-protected PDF |
+| 422 | `PDF_PAGE_SIZE` | A page is not 5.5 × 8.5 in; the error names the page |
+| 422 | `PDF_PAGE_COUNT` | Page total differs from `booklet_count × pages_per_booklet` |
+| 400 | `NO_PRICING` | Pricing is not configured for this account yet |
+| 402 | spending-limit and daily-cap codes (§10) | The job exceeds an account limit agreed at onboarding |
+| 403 | `ACCOUNT_INACTIVE` | The account is inactive |
+| 422 | list-shaped `detail` | Request body failed validation (missing field, wrong type, value out of range) |
+| 429 | `ACCOUNT_RPM_EXCEEDED` / `ACCOUNT_RPD_EXCEEDED` | Account request rate exceeded; retry after `Retry-After` |
+| 503 | `PRINT_JOBS_BUSY` | Another job is being validated; retry after `Retry-After` |
+
+**Billing.** Print jobs are invoiced weekly per booklet once Ballpoint completes the job. Postage for these booklets is handled by Ballpoint outside the API.
+
 ---
 
 ## 7. Status Updates via Webhooks
@@ -3223,6 +3324,8 @@ Before switching to your live key:
 | SSE stream | `GET` | `/v1/billing/orders/{id}/events` | *(cookie auth via sse-token)* |
 | Client-error telemetry (iframe, automatic — no partner action needed) | `POST` | `/v1/partner/client-errors` | `X-Partner-Key` |
 | Funnel analytics (iframe, automatic — no partner action needed) | `POST` | `/v1/partner/funnel-events` | `X-Partner-Key`, `X-External-User-ID` |
+| Request a print-job upload | `POST` | `/v1/print-jobs/upload-url` | `X-Partner-Key` — **`print_jobs:write`** |
+| Submit a print job | `POST` | `/v1/print-jobs` | `X-Partner-Key` — **`print_jobs:write`** |
 | Health check | `GET` | `/health` | *(none)* |
 
 ---
