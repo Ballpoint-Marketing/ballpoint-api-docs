@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.58 (2026-09-23 note: payment and recipient requests use {{backend_partner_key}}, a server key; the sandbox environment targets staging) (contract 1.7.58 extends the PropStream partner contract rules to every partner onboarded on it; no REST request change) and OpenAPI 3.1.0. Get/List Orders expose nullable retail_unit_price_tcents and retail_total_price_tcents snapshots alongside the existing wholesale fields; null means the historical retail quote is unknown and must not be reconstructed from current markup. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: staging-api host, same model as Staging; kept for setups that already import it.\n- Ballpoint Production: live host for a tenant provisioned with a pk_live key.\n\nSANDBOX MODEL: the sandbox is the staging environment (staging-api host + your pk_test key); nothing is printed or mailed on staging, and production has no test mode.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.59 (2026-09-23 note: payment and recipient requests use {{backend_partner_key}}, a server key; the sandbox environment targets staging) (contract 1.7.59 adds the print-job requests in Tier B for keys with print_jobs:write) and OpenAPI 3.1.0. Get/List Orders expose nullable retail_unit_price_tcents and retail_total_price_tcents snapshots alongside the existing wholesale fields; null means the historical retail quote is unknown and must not be reconstructed from current markup. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: staging-api host, same model as Staging; kept for setups that already import it.\n- Ballpoint Production: live host for a tenant provisioned with a pk_live key.\n\nSANDBOX MODEL: the sandbox is the staging environment (staging-api host + your pk_test key); nothing is printed or mailed on staging, and production has no test mode.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -31,6 +31,10 @@
       "key": "invoice_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "print_job_external_id",
+      "value": "2026-09-25"
     }
   ],
   "item": [
@@ -1668,6 +1672,98 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('SSE is a text/event-stream; open connect_url in a browser', function () { return true; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Print job - request upload (print-ready PDF)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_id\": \"{{print_job_external_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/print-jobs/upload-url",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "print-jobs",
+                "upload-url"
+              ]
+            },
+            "description": "Step 1 of a print job (API Kit 6t). Needs a key with print_jobs:write. Returns a presigned storage POST valid 30 minutes; upload the PDF there (form fields first, file last) outside Postman or with a form-data request, then run 'Print job - submit'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('upload has url and fields', function () {",
+                  "  var b = pm.response.json();",
+                  "  pm.expect(b.upload).to.have.property('url');",
+                  "  pm.expect(b.upload).to.have.property('fields');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Print job - submit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Partner-Key",
+                "value": "{{partner_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_id\": \"{{print_job_external_id}}\",\n  \"booklet_count\": 1,\n  \"pages_per_booklet\": 8\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/print-jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "print-jobs"
+              ]
+            },
+            "description": "Step 3 of a print job (API Kit 6t). Validates the uploaded PDF (5.5 x 8.5 in pages, page total = booklet_count x pages_per_booklet) and creates one order; 201 on acceptance, 200 when the same external_id and counts are replayed, 422 with a specific code when the file is rejected."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted, replayed or rejected with a specific code', function () {",
+                  "  pm.expect([200, 201, 409, 422]).to.include(pm.response.code);",
+                  "});"
                 ]
               }
             }

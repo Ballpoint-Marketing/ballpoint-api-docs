@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.58** (PropStream partner contract rules apply to every partner onboarded on it; staging candidate; production pending; iframe message envelope remains version `1`)
+Partner contract version: **v1.7.59** (REST-only addition: print jobs for print-ready PDFs and least-privilege partner keys; no iframe message change; staging candidate; production pending; iframe message envelope remains version `1`)
 
 Contract 1.7.58: **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices. Nothing changes for PropStream.
 
