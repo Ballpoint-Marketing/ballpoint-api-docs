@@ -56,7 +56,7 @@ components:
       name: X-Partner-Key
       description: 'Partner integration key.
 
-        Scoped to source + external_account_id. Issued in two classes: server keys (backend only) and embed keys (iframe in the end user''s browser). Each key carries scopes; `payments:write` (confirm-payment) and `recipients:write` (recipient upload, Edit Leads, campaign delta) are granted to server keys only and return 403 INSUFFICIENT_SCOPE otherwise. `dashboard:read` and `pricing:write` are unchanged.
+        Scoped to source + external_account_id. Issued in two classes: server keys (backend only) and embed keys (iframe in the end user''s browser). Each key carries scopes; `payments:write` (confirm-payment) and `recipients:write` (recipient upload, Edit Leads, campaign delta) are granted to server keys only and return 403 INSUFFICIENT_SCOPE otherwise. `dashboard:read` and `pricing:write` are unchanged. Least-privilege keys (such as print-job keys with `print_jobs:write`) reach only the routes their scopes open; any other route returns 403 INSUFFICIENT_SCOPE with a null `required_scope`.
 
         ```
 
@@ -117,7 +117,7 @@ components:
   schemas:
     InsufficientScopeError:
       type: object
-      description: 403 returned when a partner key lacks the scope a route requires (`payments:write`, `recipients:write`). FastAPI wire envelope - the error object sits under `detail`.
+      description: 403 returned when a partner key lacks the scope a route requires (`payments:write`, `recipients:write`, `print_jobs:write`), or when a least-privilege key calls a route outside its scopes (then `required_scope` is null). FastAPI wire envelope - the error object sits under `detail`.
       required:
       - detail
       properties:
@@ -150,10 +150,14 @@ components:
                   type: string
                   example: tr_9f2a1c7b4e6d0a13
                 required_scope:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   enum:
                   - payments:write
                   - recipients:write
+                  - print_jobs:write
+                  - null
                 granted_scopes:
                   type: array
                   items:
@@ -2936,7 +2940,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PrintJobUploadUrlResponse'
         '403':
-          description: '`INSUFFICIENT_SCOPE` (key lacks `print_jobs:write`) or `PRINT_JOBS_NOT_ENABLED`'
+          description: '`INSUFFICIENT_SCOPE` (key lacks `print_jobs:write`), `PRINT_JOBS_NOT_ENABLED` or `ACCOUNT_INACTIVE`'
           content:
             application/json:
               schema:
@@ -3002,6 +3006,18 @@ paths:
                 $ref: '#/components/schemas/Error'
         '422':
           description: '`PDF_NOT_UPLOADED`, `PDF_TOO_LARGE`, `PDF_UNREADABLE`, `PDF_ENCRYPTED`, `PDF_PAGE_SIZE` or `PDF_PAGE_COUNT`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '402':
+          description: The job exceeds an account spending limit or daily piece cap agreed at onboarding
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: '`ACCOUNT_RPM_EXCEEDED` or `ACCOUNT_RPD_EXCEEDED` — retry after `Retry-After`'
           content:
             application/json:
               schema:

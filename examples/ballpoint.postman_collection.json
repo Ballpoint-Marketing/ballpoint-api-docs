@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ballpoint API",
-    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.59 (2026-09-23 note: payment and recipient requests use {{backend_partner_key}}, a server key; the sandbox environment targets staging) (contract 1.7.59 adds the print-job requests in Tier B for keys with print_jobs:write) and OpenAPI 3.1.0. Get/List Orders expose nullable retail_unit_price_tcents and retail_total_price_tcents snapshots alongside the existing wholesale fields; null means the historical retail quote is unknown and must not be reconstructed from current markup. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: staging-api host, same model as Staging; kept for setups that already import it.\n- Ballpoint Production: live host for a tenant provisioned with a pk_live key.\n\nSANDBOX MODEL: the sandbox is the staging environment (staging-api host + your pk_test key); nothing is printed or mailed on staging, and production has no test mode.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
+    "description": "Pre-built requests for the Ballpoint Marketing direct mail API. Aligned to API_KIT v1.7.59 (2026-09-23 note: payment and recipient requests use {{backend_partner_key}}, a server key; the sandbox environment targets staging) (contract 1.7.59 adds the print-job requests in Tier B; they use {{print_jobs_partner_key}}, a least-privilege server key with print_jobs:write; the three environment files are unchanged) and OpenAPI 3.1.0. Get/List Orders expose nullable retail_unit_price_tcents and retail_total_price_tcents snapshots alongside the existing wholesale fields; null means the historical retail quote is unknown and must not be reconstructed from current markup. Import the matching environment to set base_url and partner_key. Three environments are provided:\n- Ballpoint Staging: PropStream integration testing (staging-api host; paste your staging pk_test key).\n- Ballpoint Sandbox: staging-api host, same model as Staging; kept for setups that already import it.\n- Ballpoint Production: live host for a tenant provisioned with a pk_live key.\n\nSANDBOX MODEL: the sandbox is the staging environment (staging-api host + your pk_test key); nothing is printed or mailed on staging, and production has no test mode.\n\nTIERS:\n- Tier A (Safe reads and preview): read-only + preview; A1 runs cold, A2 needs a seeded order_id/campaign_id (auto-skips if unseeded). Newman smoke target: folder 'A1 - No setup required'.\n- Tier B (Manual partner flows): creates data; run manually.\n- Tier C (Destructive and gated - manual only): cancel/reschedule/confirm-payment/recipient edits/opt-out toggles. Never bulk-run. Tolerant tests.\n\nCoverage is static/source-reviewed, not runtime-verified.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -35,6 +35,10 @@
     {
       "key": "print_job_external_id",
       "value": "2026-09-25"
+    },
+    {
+      "key": "print_jobs_partner_key",
+      "value": "pk_test_PARTNER_REPLACE_ME"
     }
   ],
   "item": [
@@ -1684,7 +1688,8 @@
             "header": [
               {
                 "key": "X-Partner-Key",
-                "value": "{{partner_key}}"
+                "value": "{{print_jobs_partner_key}}",
+                "description": "Least-privilege server key with print_jobs:write (not the embed key)"
               },
               {
                 "key": "Content-Type",
@@ -1732,7 +1737,8 @@
             "header": [
               {
                 "key": "X-Partner-Key",
-                "value": "{{partner_key}}"
+                "value": "{{print_jobs_partner_key}}",
+                "description": "Least-privilege server key with print_jobs:write (not the embed key)"
               },
               {
                 "key": "Content-Type",
@@ -1762,7 +1768,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('accepted, replayed or rejected with a specific code', function () {",
-                  "  pm.expect([200, 201, 409, 422]).to.include(pm.response.code);",
+                  "  pm.expect([200, 201, 403, 409, 422]).to.include(pm.response.code);",
                   "});"
                 ]
               }

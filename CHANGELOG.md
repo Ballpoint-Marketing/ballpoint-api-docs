@@ -7,7 +7,7 @@
 - **Least-privilege keys:** keys provisioned for this capability hold the new `print_jobs:write` scope and reach only the routes their scopes open; every other route answers `403 INSUFFICIENT_SCOPE`. Existing keys keep their current access.
 - **Partner action:** none for existing partners. Partners onboarded for print jobs follow API Kit section 6t; page layout rules are confirmed with each partner during onboarding.
 - **Unchanged:** existing routes, request and response shapes, webhook payloads, iframe messages, envelope version `1` and REST `3.1`.
-- **Artifacts:** API Kit header, section 6t and quick reference; Iframe Kit version header only; OpenAPI paths `/v1/print-jobs/upload-url` and `/v1/print-jobs` with their schemas and `x-partner-contract-version`; Postman Tier B print-job requests and version marker.
+- **Artifacts:** API Kit header, key classes and scopes (§1: `print_jobs:write` and least-privilege keys), section 6t and quick reference; Iframe Kit version header only; OpenAPI paths `/v1/print-jobs/upload-url` and `/v1/print-jobs` with their schemas and `x-partner-contract-version`; Postman Tier B print-job requests (new collection variable `print_jobs_partner_key`; the environment files are unchanged) and version marker.
 
 ## v1.7.58 — 2026-09-24 — PropStream partner contract applies to every partner on it
 

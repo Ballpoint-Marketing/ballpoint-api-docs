@@ -125,7 +125,10 @@ Ballpoint issues partner keys in two classes, and every key carries an explicit 
 | `recipients:write` | Uploading or replacing mailing lists | `POST /v1/billing/orders/{id}/recipients`, `PATCH /v1/billing/orders/{id}/recipients`, `PATCH /v1/billing/campaigns/{id}/recipients` |
 | `dashboard:read` | Account-wide operations portal reads | §6l operations portal |
 | `pricing:write` | Account-wide retail markup changes | `PUT /v1/billing/partner/pricing` and its removal counterpart (§6l) |
-| *(none required)* | Every other partner route | — |
+| `print_jobs:write` | Submitting print-ready PDF jobs (least-privilege keys, §6t) | `POST /v1/print-jobs/upload-url`, `POST /v1/print-jobs` |
+| *(none required)* | Every other partner route — except on least-privilege keys (below) | — |
+
+**Least-privilege keys.** Keys issued for a specific capability, such as print jobs (§6t), reach **only** the routes their scopes open; with `read`, they can also read their own orders (`GET /v1/billing/orders/{id}`). Every other route answers `403 INSUFFICIENT_SCOPE` with `required_scope: null` (the route is not available to the key at all) and the message "This partner key is not authorized for this route." Existing keys are not least-privilege and keep their current access.
 
 A key used on a route that requires `payments:write` or `recipients:write` without holding it receives `403 INSUFFICIENT_SCOPE`, with the required scope named in the error body (see §10). The `dashboard:read` and `pricing:write` checks predate this change and keep returning `403 FORBIDDEN`. **Rollout:** enforcement of `payments:write` and `recipients:write` is activated per partner on an agreed date, after that partner's backend has switched to its server key; your current integration is unaffected until then.
 
@@ -2348,7 +2351,7 @@ For partners that build the finished, print-ready file themselves (for example, 
 
 **Flow — once per daily batch:**
 
-**Step 1 — Request an upload.** `external_id` is your unique ID for this batch (1–128 characters: letters, digits, `.`, `_`, `:`, `-`).
+**Step 1 — Request an upload.** `external_id` is your unique ID for this batch (1–128 characters: letters, digits, `.`, `_`, `:`, `-`, starting with a letter or digit).
 
 ```bash
 curl -X POST https://staging-api.ballpointmarketing.com/v1/print-jobs/upload-url \
@@ -2370,7 +2373,7 @@ curl -X POST https://staging-api.ballpointmarketing.com/v1/print-jobs/upload-url
 }
 ```
 
-**Step 2 — Upload the PDF straight to storage.** Send a multipart form POST to `upload.url` with every entry of `upload.fields` first and the file last, before `expires_at` (30 minutes). The file never passes through the API.
+**Step 2 — Upload the PDF straight to storage.** Send a multipart form POST to `upload.url` with every entry of `upload.fields` first and the file last, before `expires_at` (30 minutes). The file never passes through the API. Storage itself refuses a file over 250 MB at this step (an XML `EntityTooLarge` error from the storage endpoint, not a Ballpoint JSON error).
 
 ```bash
 curl -X POST "<upload.url>" \
@@ -2419,6 +2422,10 @@ Follow progress with `GET /v1/billing/orders/{order_id}` (`production_status`).
 | 422 | `PDF_PAGE_SIZE` | A page is not 5.5 × 8.5 in; the error names the page |
 | 422 | `PDF_PAGE_COUNT` | Page total differs from `booklet_count × pages_per_booklet` |
 | 400 | `NO_PRICING` | Pricing is not configured for this account yet |
+| 402 | spending-limit and daily-cap codes (§10) | The job exceeds an account limit agreed at onboarding |
+| 403 | `ACCOUNT_INACTIVE` | The account is inactive |
+| 422 | list-shaped `detail` | Request body failed validation (missing field, wrong type, value out of range) |
+| 429 | `ACCOUNT_RPM_EXCEEDED` / `ACCOUNT_RPD_EXCEEDED` | Account request rate exceeded; retry after `Retry-After` |
 | 503 | `PRINT_JOBS_BUSY` | Another job is being validated; retry after `Retry-After` |
 
 **Billing.** Print jobs are invoiced weekly per booklet once Ballpoint completes the job. Postage for these booklets is handled by Ballpoint outside the API.
