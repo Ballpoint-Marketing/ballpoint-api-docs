@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.60 — 2026-09-26 — Handwritten message parts for Realtor/Agent postcards
+
+- **Availability:** staging candidate; production pending.
+- **What changed:** `POST /orders` accepts an optional `message_parts` object (`greeting`, required `body`, `signature`) for handwritten pieces whose writing robots place those parts separately. If `message` is also sent it must equal the parts joined by one blank line, otherwise `400 MESSAGE_PARTS_MISMATCH` before any write; a Cursive canvas that still prints the managed message returns `400 MESSAGE_PARTS_PRINTED`; each part holds at most 20 merge tags; the parts are not editable through `PATCH`. `GET /v1/billing/orders/{order_id}/recipients` returns `message_greeting`, `message_body` and `message_signature` per recipient, with message merge tags resolved, for orders that carry parts.
+- **Iframe:** the Realtor/Agent Just Listed and Just Sold postcards replace the single message box with Greeting, Message and Signature fields and a live back preview; their orders send `message_parts` alongside the unchanged composed `message`. Cursive print files leave the message blank because the robots write it; Printed pieces keep it on the card.
+- **Partner action:** none. PropStream sends no new message; the iframe fills the new field. Server-to-server callers may keep sending `message` only.
+- **Unchanged:** every other product, `message` semantics for requests without parts, recipient responses for orders without parts, webhooks, postMessage types and payloads, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit header and §6b; Iframe Kit version header; OpenAPI `PartnerOrderCreateRequest.message_parts`, the `PartnerMessageParts` schema and `x-partner-contract-version`; Postman version marker (no request change).
+
 ## v1.7.59 — 2026-09-25 — Print jobs for print-ready PDFs and least-privilege partner keys
 
 - **Availability:** staging candidate; production pending.
