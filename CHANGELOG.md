@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.61 — 2026-09-28 — Greeting Letter completion reports its mailed count
+
+- **Availability:** staging candidate; production pending.
+- **What changed:** Greeting Letter orders are produced outside Print Batch, so no AccuZIP output is ever linked to them. Their completion now works like First Class: the frozen billed count is the mailed quantity, and `order.drop_completed` is emitted with `actual_mailed` equal to `billed_count` and `rts_suppressed_count` `0`. Before this version a completed Greeting Letter emitted `order.status_changed` but no `order.drop_completed`.
+- **Invoicing:** Greeting Letter orders are billed for their frozen count on the weekly invoice once completed. If a Greeting Letter ever has AccuZIP-linked pieces that disagree with its billed count, Complete is refused instead (`409 DROP_EVIDENCE_REQUIRED`).
+- **Partner action:** none. Endpoints subscribed to all events start receiving `order.drop_completed` for Greeting Letter orders completed from now on. As a one-time operation, Ballpoint also sends a late `order.drop_completed` (same shape, original completion time) for six PropStream Greeting Letter orders completed before this version.
+- **Unchanged:** request and response shapes, webhook payload schemas, the completion evidence of 4x6 Standard/Presort orders, iframe messages, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit header, invoicing note and order status section; Iframe Kit version header; OpenAPI `x-partner-contract-version` and description; Postman version marker (no request change).
+
 ## v1.7.60 — 2026-09-26 — Handwritten message parts for Realtor/Agent postcards
 
 - **Availability:** staging candidate; production pending.

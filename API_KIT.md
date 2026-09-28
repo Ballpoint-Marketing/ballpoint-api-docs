@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.60 · September 2026** · Handwritten message parts (`message_parts`) for Realtor/Agent handwritten postcards (staging candidate; production pending); REST API remains `3.1`
+> **v1.7.61 · September 2026** · Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (staging candidate; production pending); v1.7.60 handwritten message parts (`message_parts`) for Realtor/Agent handwritten postcards; REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -222,7 +222,7 @@ For the full endpoint contract, see [§6k Confirm Payment](#6k-confirm-payment-p
 
 Cost = `unit_price_tcents × pieces mailed`. No minimums, no surcharges, no per-request fees. See [§5 Product Catalog & Pricing](#5-product-catalog--pricing) for the full price list.
 
-**You are invoiced for pieces actually mailed, never for the ordered quantity.** When addresses are suppressed the drop mails fewer pieces than were ordered, and only the mailed pieces are billed — the invoice line names the suppressed count. `order.drop_completed` reports the same figures per drop (`billed_count`, `actual_mailed`, `rts_suppressed_count`), so every invoice reconciles against events you already receive. An order whose mailed quantity cannot yet be established is held out of the invoice and billed on a later one, never estimated.
+**You are invoiced for pieces actually mailed, never for the ordered quantity.** When addresses are suppressed the drop mails fewer pieces than were ordered, and only the mailed pieces are billed — the invoice line names the suppressed count. `order.drop_completed` reports the same figures per drop (`billed_count`, `actual_mailed`, `rts_suppressed_count`), so every invoice reconciles against events you already receive. An order whose mailed quantity cannot yet be established is held out of the invoice and billed on a later one, never estimated. First Class and Greeting Letter orders have no AccuZIP output, so their frozen order count is the mailed quantity.
 
 ### Cancellations
 
@@ -901,7 +901,7 @@ fields replaces the authoritative charge-now preview or the settled ledger.
 
 `display_status` is the single field to show your users. `usps_status` is `null` until USPS scans arrive (1–2 days after production completes).
 
-For PropStream 4x6 Standard/Presort orders, Ballpoint keeps the order at its current production status until finalized AccuZIP evidence can be linked to that order. First Class orders continue to use the frozen order count. This changes neither the request shape nor the status vocabulary.
+For PropStream 4x6 Standard/Presort orders, Ballpoint keeps the order at its current production status until finalized AccuZIP evidence can be linked to that order. First Class orders and Greeting Letter orders (any postage) use the frozen order count: they have no AccuZIP output to link, so `order.drop_completed` reports `actual_mailed` equal to `billed_count`. This changes neither the request shape nor the status vocabulary.
 
 Tenant scoping: partners only see their own orders. Both cross-tenant and unknown `order_id` return `404` (never `403`) so existence cannot be probed across tenants.
 
@@ -2803,7 +2803,7 @@ An existing integration that handles terminal outcomes through `order.status_cha
 
 `order.drop_cancelled` fields are `type`, `order_id`, `campaign_id`, `cancelled_at`, `drop_index`, `total_drops`, `ballpoint_billed`, `ballpoint_billed_amount_tcents`, `reason`, plus the transport fields. `reason` is `user_cancel` or `staff_cancel`; an unbilled cancellation carries amount `0`.
 
-See the exact [completion fixture](contracts/webhooks/order.drop_completed/fixtures/wire.json), [cancellation fixture](contracts/webhooks/order.drop_cancelled/fixtures/wire.json), and their adjacent wire schemas. These events apply to transitions recorded after the runtime release; Ballpoint does not synthesize historical backfill for earlier terminal rows. A legacy transition whose terminal facts cannot be proved from persisted data can therefore remain represented only by `order.status_changed`.
+See the exact [completion fixture](contracts/webhooks/order.drop_completed/fixtures/wire.json), [cancellation fixture](contracts/webhooks/order.drop_cancelled/fixtures/wire.json), and their adjacent wire schemas. These events apply to transitions recorded after the runtime release; Ballpoint does not synthesize historical backfill for earlier terminal rows, except for one-time reconciliations announced in the CHANGELOG (v1.7.61: six Greeting Letter orders). A legacy transition whose terminal facts cannot be proved from persisted data can therefore remain represented only by `order.status_changed`.
 
 #### Example Payloads
 
