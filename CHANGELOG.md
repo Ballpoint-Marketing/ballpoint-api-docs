@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.62 — 2026-09-28 — Iframe checkout waits for accepted orders
+
+- **Availability:** iframe PR [#484](https://github.com/Ballpoint-Marketing/ballpoint-iframe/pull/484); staging validation pending, production pending.
+- **Visible failure:** a rejected submission stays on Order Summary with a persistent, accessible **Order not sent** message. The iframe shows a bounded API reason when safe, otherwise asks the user to review the order. Exhausted transient retries show **Retry** and explain that checkout did not open.
+- **Checkout guarantee:** `campaign_submitted` is emitted only after every order has a server-assigned `orders[].ballpointOrderId`. For compatibility, `pendingSubmissionCount` remains `0` and `pendingOrderIds` remains empty in its payload. `campaign_submission_pending` is no longer emitted. The iframe resumes unaccepted orders under their original idempotency keys after a partial multi-send or A/B submission, without posting accepted orders again.
+- **Partner action:** PropStream should stop waiting for `campaign_submission_pending` and treat a missing `ballpointOrderId` in `campaign_submitted` as an integration error. Begin payment only from an accepted `campaign_submitted`; a rejected order remains in the iframe. Joint staging verification is pending.
+- **Other contracts:** `order_submission_deferred` remains for deterministic rejections; its `reason` now uses the lower-cased error code. The iframe message envelope stays version `1`. No REST endpoint, request/response shape, or webhook change is introduced by this iframe release.
+
 ## v1.7.61 — 2026-09-28 — Greeting Letter completion reports its mailed count
 
 - **Availability:** live in production since 2026-09-29 (API v3.39.0).

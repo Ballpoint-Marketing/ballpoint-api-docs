@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.61** (server-side only: Greeting Letter completion now emits `order.drop_completed` with the billed count as mailed; no postMessage type or payload change. v1.7.60: Realtor/Agent handwritten postcards collect Greeting, Message and Signature separately and send them as `message_parts`. Live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0), except the v1.7.60 Realtor/Agent postcards, which remain a staging candidate; iframe message envelope remains version `1`)
+Partner contract version: **v1.7.62** (the iframe now blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired. Staging candidate; production pending. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`)
 
 Contract 1.7.58: **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices. Nothing changes for PropStream.
 
@@ -1578,11 +1578,13 @@ This Ballpoint state does **not** rewrite future partner recipient uploads or in
 
 > **Timing (v1.6.6).** In the review-before-pay checkout flow, `campaign_created` now fires when the user clicks **Continue to Payment** on the Order Summary, not per-piece during scheduling. Payload shape is unchanged. `orderIds` continue to be local pre-API ids — no Ballpoint order exists at this point. Key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
 >
-> **Do not poll `GET /v1/billing/orders` for individual drops mid-flow (Multi Send / A/B Split).** During scheduling and before `campaign_submitted` fires, the per-drop orders do **not** exist server-side — `campaign_created.orderIds` (and any `order_added.orderId`, see below) are local pre-API ids. Polling `GET /v1/billing/orders` or `GET /v1/billing/orders/{order_id}` for these ids will return nothing / 404 because there is no Ballpoint order yet. Wait for `campaign_submitted` and consume `orders[].ballpointOrderId` as the authoritative server-assigned id. If `orders[].ballpointOrderId` is `null` for a given entry, that drop's submission is pending retry — see the field note in the [`campaign_submitted` table](#campaign_submitted--campaign-submitted-to-ballpoint) below; in that case poll `GET /v1/billing/orders` only **after** `campaign_submitted`, scoped to the campaign / `external_user_id`.
+> **Do not poll `GET /v1/billing/orders` for individual drops mid-flow (Multi Send / A/B Split).** During scheduling, the per-drop orders do **not** exist server-side — `campaign_created.orderIds` (and any `order_added.orderId`, see below) are local pre-API ids. If submission stops partway through, the iframe stays on Order Summary and resumes the unaccepted orders under their original idempotency keys when the user retries. Wait for `campaign_submitted` and consume its `orders[].ballpointOrderId` values as the authoritative server-assigned ids.
 
 #### `campaign_submitted` — Campaign submitted to Ballpoint
 
 This is the most important event. It confirms the order(s) were sent to Ballpoint for processing. It fires from two paths — the campaigns flow (single / split / multi-send) and the canvas builder (single ad-hoc order). Both emit the same field shape; the canvas builder sets `campaignId: null` because it does not own a multi-order campaign concept on the iframe side.
+
+> **Accepted-order guarantee (v1.7.62).** The iframe emits this event only after every order in the submission batch has a server-assigned `ballpointOrderId`. A rejected submission stays on Order Summary with a persistent **Order not sent** message and never opens checkout. Exhausted transient retries leave a **Retry** action that resubmits unaccepted orders under the same idempotency keys; accepted multi-send and A/B orders are not sent again. The parent should treat any `campaign_submitted` entry without a `ballpointOrderId` as an integration error, not as an order pending background retry.
 
 > **Terminal in a partner embed (v1.6.6).** After this event is emitted, the iframe shows a neutral hand-off ("Opening secure checkout…") and defers final completion to the partner's billing flow — there is no internal "Campaign Submitted!" confirmation page in a partner embed. The campaign is not "submitted/complete" until billing succeeds on the partner side. Event semantics are unchanged: `campaign_submitted` remains the authoritative billing trigger, and partners should continue to key off `orders[].ballpointOrderId` as the server-assigned order id.
 
@@ -1666,18 +1668,18 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 | `externalUserId` | string or null | End-user id passed via `set_api_config`. |
 | `productIds` | string[] | Product ids selected for this submission. |
 | `orders[].orderId` | string | Local iframe order ID. |
-| `orders[].ballpointOrderId` | string or null | Server-assigned order ID (null if submission still pending retry). |
+| `orders[].ballpointOrderId` | string | Server-assigned order ID; present for every emitted order. |
 | `orders[].pieces` | number | Recipient count for this order. |
 | `orders[].mailDate` | string or null | ISO date this specific drop is scheduled for. Canonical scheduled-mail-date field for each submitted order. For `single` and `split` campaigns all entries carry the same date; for `multi` campaigns each entry carries its own per-drop date — partners reading multi-send schedules MUST iterate `orders[].mailDate`. |
 | `orders[].unit_price_tcents` | number | Marked-up unit price in tenth-cents. |
 | `orders[].total_tcents` | number | Marked-up total for this order in tenth-cents. UX/display only for payment-gated partner flows. |
-| `orders[].recipientsEndpoint` | string or null | API path to POST recipients (null if pending). |
+| `orders[].recipientsEndpoint` | string | API path to POST recipients for the accepted order. |
 | `orders[].campaignInstanceId` | string or null | Opaque submit/split instance key. `null` for `single` and `multi` campaigns (no cross-order dedup expected). For `split` campaigns, all sibling orders in the same `campaign_submitted` payload share the same opaque string value — Ballpoint uses this server-side as a guard-rail to enforce disjoint slices across A/B variants (see [Campaign Dedup (automatic)](#campaign-dedup-automatic)). Treat as opaque on the partner side; do not parse, mutate, or echo back. |
 | `total_tcents` | number | Marked-up total across all orders, in tenth-cents. UX/display only for payment-gated partner flows. |
 | `total_dollars` | string | Same total as a fixed-2 dollar string. **UX/display only.** After `campaign_submitted`, refetch the authoritative Ballpoint debit amount server-side with [`POST /v1/billing/campaigns/preview`](https://github.com/Ballpoint-Marketing/ballpoint-api-docs/blob/main/API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) (campaign-level, one call) and read `campaign_partner_debit_cents` (exact whole-cent ledger debit) plus the raw tcents fields for reconciliation. |
-| `pendingSubmissionCount` | number | Orders still waiting to submit (usually 0). |
-| `submittedNowCount` | number | Orders submitted in this batch. |
-| `pendingOrderIds` | string[] | Iframe order ids still waiting to submit (empty in the happy path). |
+| `pendingSubmissionCount` | number | Always `0` in emitted events; retained for payload compatibility. |
+| `submittedNowCount` | number | Number of accepted orders in this batch. |
+| `pendingOrderIds` | string[] | Always empty in emitted events; retained for payload compatibility. |
 | `recipient_selection` | object or omitted | Present only when the parent provided `piece_counts` on `set_list` / `set_lists[]`. Echoes the user's final selection from the iframe's Deliver To + Remove duplicates controls. See [Recipient selection contract](#recipient-selection-contract-piece-count--dedup). |
 | `recipient_selection.deliver_to` | string | One of `"property"`, `"mailing"`, `"both"` — the address type the user chose. |
 | `recipient_selection.remove_duplicate_addresses` | boolean | `true` when the user enabled the Remove duplicates checkbox. |
@@ -1702,7 +1704,7 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 
 > **Timing (v1.6.6).** `order_added` fires **only for multi-month campaigns** — once per drop, at the user's **Continue to Payment** click on the Order Summary (not per-piece during scheduling). For *all* campaign types `campaign_created` also fires at that same click; **Single Send and A/B Split create their orders via `campaign_created` only and never emit `order_added`.** Payload shape is unchanged. `orderId` is still a local pre-API id; key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
 >
-> **Do not poll `GET /v1/billing/orders` for these per-drop ids mid-flow.** As with `campaign_created.orderIds`, `order_added.orderId` is a **local pre-API id** — the drop does not exist server-side until `campaign_submitted` fires. Polling `GET /v1/billing/orders` (or `GET /v1/billing/orders/{order_id}`) against this id mid-flow will not find it. Wait for `campaign_submitted` and reconcile via the matching `orders[].ballpointOrderId`; if that field is `null` for a drop, see the pending-retry caveat in the [`campaign_submitted` field note](#campaign_submitted--campaign-submitted-to-ballpoint) and only poll `GET /v1/billing/orders` **after** submission.
+> **Do not poll `GET /v1/billing/orders` for these per-drop ids mid-flow.** As with `campaign_created.orderIds`, `order_added.orderId` is a **local pre-API id**. Wait for `campaign_submitted` and reconcile via the matching `orders[].ballpointOrderId`; the iframe withholds that event until all orders have been accepted.
 
 **How to Test.** Create a Multi-Month campaign with 2+ drops, schedule the drops, then click **Continue to Payment** on the Order Summary — you'll observe one `order_added` per drop. Single Send and A/B Split campaigns emit `campaign_created` + `campaign_submitted` but **never** `order_added`.
 
@@ -1807,9 +1809,9 @@ Sent right before the `done` event. `campaignId` matches the value emitted on th
 
 ### Error / Retry Events
 
-These events indicate submission issues. They are informational — the iframe handles retries automatically.
+These events indicate submission issues. A new deterministic rejection stays on Order Summary and blocks checkout. Background retry events apply only to orders already persisted as deferred by older iframe releases.
 
-#### `order_submission_deferred` — Order queued for retry
+#### `order_submission_deferred` — Order submission rejected
 
 ```json
 {
@@ -1818,7 +1820,7 @@ These events indicate submission issues. They are informational — the iframe h
   "type": "order_submission_deferred",
   "campaignId": "camp_abc123",
   "orderId": "ord_001",
-  "reason": "api_config_missing",
+  "reason": "invalid_product_config",
   "listId": "your_list_id",
   "listName": "Pre-Foreclosure Leads",
   "recipients": 847,
@@ -1826,19 +1828,11 @@ These events indicate submission issues. They are informational — the iframe h
 }
 ```
 
-#### `campaign_submission_pending` — Some orders still pending
+For new deterministic rejections, `reason` is the lower-cased error code, such as `invalid_product_config`, `feature_disabled`, or `customer_number_invalid`. The iframe shows a safe reason to the user and does not proceed to checkout. This event does not authorize billing.
 
-```json
-{
-  "source": "ballpoint-mailer",
-  "version": 1,
-  "type": "campaign_submission_pending",
-  "campaignId": "camp_abc123",
-  "orderIds": ["ord_002"],
-  "pendingSubmissionCount": 1,
-  "submittedNowCount": 1
-}
-```
+#### `campaign_submission_pending` — Retired in v1.7.62
+
+The iframe no longer emits this event. A failed submission stays on Order Summary and the user can review the order or select **Retry**. PropStream should not wait for this event or treat it as a checkout trigger.
 
 #### `order_submission_stalled` — Order failed after all retries
 
@@ -1869,7 +1863,7 @@ End-to-end timeline:
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /orders` on the API base URL with the selected `postage_type`. For PropStream `4x6_printed` and `6x9_printed` orders, the iframe also preserves the matching `postcard_size` and complete two-sided `canvas_json` across initial submission and retry. If either face is unavailable or the size does not match, the iframe stops on the existing design-load error and does not create an order; the API independently enforces the same rule before the idempotency claim, order creation, or billing. Correctly configured artwork follows the existing flow unchanged. Ballpoint persists the exact postage class and records a creation-time price **estimate** for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at `/confirm-payment`; refetch `POST /v1/billing/campaigns/preview` before charging); only legacy requests that omit the field default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated). No charge occurs yet.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX). This triggers the backend handoff; it is not authorization to collect payment yet.
-7. Parent backend waits until every `campaign_submitted.orders[].ballpointOrderId` is non-null, then uploads the matching recipients to every order with `POST /v1/billing/orders/{order_id}/recipients`. For A/B Split, upload a different recipient-disjoint slice to each variant. Verify every upload reports `ready === true` and `piece_count > 0`.
+7. Parent backend verifies every `campaign_submitted.orders[].ballpointOrderId` is present, then uploads the matching recipients to every order with `POST /v1/billing/orders/{order_id}/recipients`. For A/B Split, upload a different recipient-disjoint slice to each variant. Verify every upload reports `ready === true` and `piece_count > 0`.
 8. Parent backend calls [`POST /v1/billing/campaigns/preview`](https://github.com/Ballpoint-Marketing/ballpoint-api-docs/blob/main/API_KIT.md#6a-ii-preview-campaign-cost-payment-gate) **once** with the `ballpointOrderId`s it intends to charge in this payment event (the endpoint prices exactly the caller-selected set; it does not compute billing windows). Read `campaign_partner_debit_cents` as the exact whole-cent ledger amount recorded on successful confirmation, with the raw tcents fields available for reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`; do not confirm rows excluded from the quoted total. Re-preview after any order/recipient edit before collecting or confirming payment. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step. `total_dollars` from the iframe is UX/display only and must not be used as the billing source of truth.
 9. Parent shows the payment popup; end-user pays via the parent's payment provider. On an ordinary popup close without a final outcome, the parent sends no `payment_result`; the iframe's enabled **Continue to Payment** replays the exact cached `campaign_submitted` payload on the next click so the parent can reopen or resume checkout idempotently.
 10. Once the popup has a known outcome, the parent sends [`payment_result`](#payment_result--payment-popup-outcome-parent--iframe) for iframe UX. `status: success` immediately renders **Payment Successful**; the optional campaign/order identifiers may only reject a positive mismatch and are not required. Any supplied known foreign id rejects the message, including an active+foreign mixed array.
@@ -2069,11 +2063,9 @@ Cross-tenant scoping is preserved by `campaign_id`'s `acct_{account_id}` prefix.
 
 Recipient upload is accepted while the order is in any pre-production state: `scheduled`, `pending_payment`, `accepted`, or `prep`. You can attach recipients as soon as `campaign_submitted` carries the `ballpointOrderId` — no need to wait for the order to advance to `accepted`. Once the order moves into production (`printing`/`writing`/`inserting`/`stamping`/`shipping`/`complete`), the recipient list is locked.
 
-### Pending Orders
+### Interrupted Submission
 
-For orders where `ballpointOrderId` is null in the `campaign_submitted` event (still pending server-side creation):
-- Wait for the retry flow to complete, or
-- Poll `GET /v1/billing/orders?external_user_id=...` to find the order once created
+If an order is rejected or all inline retries fail, the iframe stays on Order Summary and does not emit `campaign_submitted`. The user can review the order or select **Retry**. The retry retains the original order identity for an unaccepted order that may have reached the API, and it skips orders already accepted in a multi-send or A/B batch. Do not begin payment from `campaign_created` or `order_submission_deferred` while the user is in this state.
 
 ---
 
