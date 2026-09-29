@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.62** (the iframe now blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed. Staging candidate; production pending; iframe message envelope remains version `1`)
+Partner contract version: **v1.7.62** (the iframe now blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired. Staging candidate; production pending. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`)
 
 Contract 1.7.58: **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices. Nothing changes for PropStream.
 
@@ -488,7 +488,7 @@ Optional boolean on singular `set_list` and on `set_sender`. It controls the emb
 
 | Effective value | Iframe behavior |
 |-----------------|-----------------|
-| `true` | An incomplete profile shows **Set up now** or **Complete in Marketing Profile**. Customize exposes the same sender-setup recovery action while its sender prerequisite is incomplete. On the Dashboard, only a **complete** profile shows the sender summary and **Edit**; an incomplete profile (empty or partial) keeps the illustrated **Set Up Your Sender Information** card with **Set Up Now**. Clicking any of these actions may emit `sender_setup_requested`. |
+| `true` | An incomplete profile shows **Set up now** or **Complete in Marketing Profile**. Customize exposes the same sender-setup recovery action while its sender prerequisite is incomplete; with a complete, parent-owned sender, Customize shows **Edit** for postcards, which may emit `sender_setup_requested` like the other setup actions. On the Dashboard, only a **complete** profile shows the sender summary and **Edit**; an incomplete profile (empty or partial) keeps the illustrated **Set Up Your Sender Information** card with **Set Up Now**. Clicking any of these actions may emit `sender_setup_requested`. |
 | `false`, missing, or any non-`true` value | Setup/edit actions are hidden. On the Sender Information step and in Customize, an incomplete profile shows the blocked-state message ("Please contact your account owner to set up sender info"). On the Direct Mail Dashboard, the Sender Information card is hidden entirely whether the sender profile is empty, partial, or complete. `sender_setup_requested` is suppressed. |
 
 Rules:
@@ -1241,7 +1241,7 @@ Sent when an account owner clicks **Set up now** or **Complete in Marketing Prof
 | `version` | number | Always `1`. |
 | `type` | string | Always `sender_setup_requested`. |
 | `reason` | string | V1 enum: `"sender_info_missing"`. Future values are additive — partners should treat unknown values as "open the sender modal" and not hard-fail. |
-| `page` | string | V1 enum: `"setup"` \| `"campaigns"`. `"setup"` identifies the sender-setup context, including the Sender Information step and the Customize sender prerequisite; `"campaigns"` identifies the Direct Mail Dashboard. |
+| `page` | string | V1 enum: `"setup"` \| `"campaigns"`. `"setup"` identifies the sender-setup context, including the Sender Information step, the Customize sender prerequisite and the Customize sender **Edit**; `"campaigns"` identifies the Direct Mail Dashboard. |
 | `externalAccountId` | string | Partner account identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** if the user reaches "Set up now" before any `set_list` or `set_tenant` has arrived (e.g., very first session before list selection). |
 | `externalUserId` | string | Partner user identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** under the same condition as `externalAccountId`. |
 
@@ -1251,7 +1251,7 @@ No sender PII (`fullName`, `firstName`, `lastName`, `businessName`, `address`, `
 
 - **Gated by the effective `externalUserIsAccountOwner === true`.** The value may be bootstrapped by `set_sender` before list context exists; an accepted singular `set_list` is authoritative afterward. When the effective value is `false`, missing, or non-`true`, setup/edit actions are hidden and `sender_setup_requested` is not emitted. See [Sender-info setup gate](#sender-info-setup-gate-externaluserisaccountowner).
 - On the Sender Information step, an empty profile renders **Set up now** and a partial profile renders its available fields plus **Complete in Marketing Profile**. A complete profile may advance the active create flow.
-- In Customize, incomplete sender information blocks editing and exposes the same sender-setup recovery action. Account-owner clicks emit `page: "setup"`; a complete sender snapshot removes the prerequisite.
+- In Customize, incomplete sender information blocks editing and exposes the same sender-setup recovery action. Account-owner clicks emit `page: "setup"`; a complete sender snapshot removes the prerequisite. With a complete, parent-owned sender, an account owner also sees **Edit** on the Customize sender summary for postcards; clicking it emits `sender_setup_requested` with `page: "setup"` (the existing payload, no sender PII), and the parent opens its sender profile editor. Letter products keep their logo-upload action. Non-owners never see it. Available in production since 2026-09-29 (iframe v1.21.0).
 - On the Direct Mail Dashboard, an account owner sees **Set Up Now** for an empty or partial profile (the illustrated Set Up card) and the sender summary plus **Edit** only for a complete profile. A non-owner sees no Sender Information card in any sender state. Dashboard clicks use `page: "campaigns"`.
 - In standalone (non-embed) mode the iframe falls back to its built-in inline sender form. The CTA is suppressed.
 - **Pre-lock behavior:** queued by the iframe until the parent origin lock completes, then delivered only to the locked parent origin. Not broadcast to all allowlisted origins. Identical treatment to `edit_leads_requested`.
