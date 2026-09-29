@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.64 — 2026-09-29 — Keep recipient selection on same-list count refresh
+
+- **Availability:** release candidate; not yet in production.
+- **What changed:** an accepted same-`listId` `set_list` refresh carrying a replacement `piece_counts` table retains the active Deliver To and Remove duplicate addresses choices. The iframe resolves the new count and price from that same combination. If the new table makes it missing or zero, the selection remains and submission stays blocked until the user picks an available combination.
+- **Partner action:** none. PropStream continues sending the same `set_list` refresh after Edit Leads; use the emitted `recipient_selection` and `orders[].pieces` for billing and upload sizing.
+- **Unchanged:** first-receipt and new-list defaults, omitted-table refreshes, message and payload shapes, iframe envelope version `1`, and REST `3.1`.
+- **Artifacts:** Iframe Kit refresh, default-selection and fail-closed sections; API Kit header; OpenAPI and Postman version markers; iframe build/deploy metadata and PropStream one-pager.
+
 ## v1.7.63 — 2026-09-29 — Catalog postcards print with the compact recipient box
 
 - **Availability:** staging candidate; production pending.
