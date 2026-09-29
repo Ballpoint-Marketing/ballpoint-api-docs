@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-29 — First Class addresses are mailed as provided
+
+- **Documentation clarification only:** the API Kit now states that PropStream-contract `first_class` pieces are not presorted or barcoded, so their addresses get no CASS standardization, NCOA move update or undeliverable-address suppression, and every piece is billed. `standard`/`presort` keep the AccuZIP workflow that suppresses undeliverable addresses before billing.
+- **Unchanged:** runtime behavior (shipped in API #224 on 2026-08-26), request and response shapes, webhooks, pricing and the partner contract version.
+- **Partner action:** none required. Send validated addresses for First Class, or choose `standard`/`presort` where the product offers it.
+
 ## v1.7.61 — 2026-09-28 — Greeting Letter completion reports its mailed count
 
 - **Availability:** live in production since 2026-09-29 (API v3.39.0).
