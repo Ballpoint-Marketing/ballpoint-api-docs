@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.62 · September 2026** · Iframe checkout now waits for every order to be accepted and shows rejected submissions on Order Summary (staging candidate; production pending); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
+> **v1.7.63 · September 2026** · New catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (the compact recipient box Create Your Own already prints; staging candidate; production pending); v1.7.62 Iframe checkout now waits for every order to be accepted and shows rejected submissions on Order Summary (staging candidate; production pending); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -729,12 +729,17 @@ claims. This release validated the 4x6 and 6x9 postcard paths;
 request field or partner-side action changed.
 
 For every PropStream printed postcard, the current Ballpoint-hosted iframe also
-sends the exact `postal_layout_profile` it displayed: `standard_v10` for a
-new standard proof, or `cyo_compact_white_v2` when the exact Create Your Own
-rollout is enabled. `standard_v10` preserves the approved `standard_v9`
-geometry while omitting the renderer's legacy indicia-cleanup mask for clean
-catalog artwork. Ballpoint freezes that value on the accepted order.
-`standard_v7`, `standard_v8`, `standard_v9`, `cyo_unified_white_v1`, and
+sends the exact `postal_layout_profile` it displayed: `standard_v11` for a
+new catalog or Classic proof (contract 1.7.63), `standard_v10` for a
+Realtor/Agent proof, or `cyo_compact_white_v2` (4x6) / `cyo_compact_white_v3`
+(6x9) when the exact Create Your Own rollout is enabled. `standard_v11` prints
+the same compact recipient box as those Create Your Own profiles. `standard_v10`
+preserves the approved `standard_v9` geometry; both standard profiles cover
+old indicia still drawn inside known saved Home Services artwork. Ballpoint freezes
+that value on the accepted order and still accepts `standard_v10` for catalog
+proofs from older iframe bundles. `standard_v11` with a back that carries the
+Realtor divider returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before any write.
+`standard_v7`, `standard_v8`, `standard_v9`, `standard_v10`, `cyo_unified_white_v1`, and
 profile-less historical orders retain their frozen geometry and are never
 silently upgraded or rerendered. An omitted
 profile remains backward-compatible as `standard_v7` for old iframe bundles. A
