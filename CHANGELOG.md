@@ -2,7 +2,7 @@
 
 ## v1.7.61 — 2026-09-28 — Greeting Letter completion reports its mailed count
 
-- **Availability:** staging candidate; production pending.
+- **Availability:** live in production since 2026-09-29 (API v3.39.0).
 - **What changed:** Greeting Letter orders are produced outside Print Batch, so no AccuZIP output is ever linked to them. Their completion now works like First Class: the frozen billed count is the mailed quantity, and `order.drop_completed` is emitted with `actual_mailed` equal to `billed_count` and `rts_suppressed_count` `0`. Before this version a completed Greeting Letter emitted `order.status_changed` but no `order.drop_completed`.
 - **Invoicing:** Greeting Letter orders are billed for their frozen count on the weekly invoice once completed. If a Greeting Letter ever has AccuZIP-linked pieces that disagree with its billed count, Complete is refused instead (`409 DROP_EVIDENCE_REQUIRED`).
 - **Partner action:** none. Endpoints subscribed to all events start receiving `order.drop_completed` for Greeting Letter orders completed from now on. As a one-time operation, Ballpoint also sends a late `order.drop_completed` (same shape, original completion time) for six PropStream Greeting Letter orders completed before this version.
@@ -11,7 +11,7 @@
 
 ## v1.7.60 — 2026-09-26 — Handwritten message parts for Realtor/Agent postcards
 
-- **Availability:** staging candidate; production pending.
+- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.21.0); they remain a staging candidate.
 - **What changed:** `POST /orders` accepts an optional `message_parts` object (`greeting`, required `body`, `signature`) for handwritten pieces whose writing robots place those parts separately. If `message` is also sent it must equal the parts joined by one blank line, otherwise `400 MESSAGE_PARTS_MISMATCH` before any write; a Cursive canvas that still prints the managed message returns `400 MESSAGE_PARTS_PRINTED`; each part holds at most 20 merge tags; the parts are not editable through `PATCH`. `GET /v1/billing/orders/{order_id}/recipients` returns `message_greeting`, `message_body` and `message_signature` per recipient, with message merge tags resolved, for orders that carry parts.
 - **Iframe:** the Realtor/Agent Just Listed and Just Sold postcards replace the single message box with Greeting, Message and Signature fields and a live back preview; their orders send `message_parts` alongside the unchanged composed `message`. Cursive print files leave the message blank because the robots write it; Printed pieces keep it on the card.
 - **Partner action:** none. PropStream sends no new message; the iframe fills the new field. Server-to-server callers may keep sending `message` only.
@@ -20,7 +20,7 @@
 
 ## v1.7.59 — 2026-09-25 — Print jobs for print-ready PDFs and least-privilege partner keys
 
-- **Availability:** staging candidate; production pending.
+- **Availability:** live in production since 2026-09-29 (API v3.39.0). Print jobs are enabled per partner account; no partner is provisioned for them in production yet.
 - **What changed:** partners that build a finished, print-ready PDF can submit it as a print job: `POST /v1/print-jobs/upload-url` returns a presigned upload, the PDF goes straight to storage, and `POST /v1/print-jobs` validates it (5.5 × 8.5 in pages, no bleed, page total equal to `booklet_count × pages_per_booklet`) and creates one order followed with Get Order. Resubmitting the same `external_id` never duplicates a job.
 - **Least-privilege keys:** keys provisioned for this capability hold the new `print_jobs:write` scope and reach only the routes their scopes open; every other route answers `403 INSUFFICIENT_SCOPE`. Existing keys keep their current access.
 - **Partner action:** none for existing partners. Partners onboarded for print jobs follow API Kit section 6t; page layout rules are confirmed with each partner during onboarding.
@@ -29,7 +29,7 @@
 
 ## v1.7.58 — 2026-09-24 — PropStream partner contract applies to every partner on it
 
-- **Availability:** staging candidate; production pending.
+- **Availability:** live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0).
 - **What changed:** the rules documented for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, presort suppression and RTS webhooks, auto-suppress) now apply to every partner onboarded on the PropStream partner contract, each with its own source identifier, account, keys, orders and invoices.
 - **Partner action:** PropStream, none: nothing changes for PropStream. Other partners on the contract follow the PropStream integration: send `contactId` and `contactType` on recipients (RTS webhooks require them), and handle `order.presort_suppressed` and the `drop_*` events on endpoints subscribed to all events.
 - **Unchanged:** request and response shapes, flag names, message types, payloads, envelope version `1` and REST `3.1`.
@@ -37,7 +37,7 @@
 
 ## v1.7.57 — 2026-09-23 — Partner-bound envelope `source`
 
-- **Availability:** staging candidate; production pending. Until the production iframe release, the production mailer still accepts only `"propstream"`.
+- **Availability:** live in production since 2026-09-29 (iframe v1.21.0).
 - **What changed:** the postMessage envelope `source` now identifies the partner and is bound to that partner's registered parent origins. PropStream origins keep sending `"propstream"`; other partners send the identifier assigned at onboarding. A parent → iframe message whose `source` does not belong to the partner of its origin is ignored, exactly as a message with an unknown `source` was ignored before.
 - **Why:** each partner integration is identified separately; an embed can no longer use another partner's identifier. Tenant, orders and billing remain bound to your API key, as before.
 - **Partner action:** PropStream, none: every message it sends today is unchanged. New partners use the identifier assigned at onboarding. On the staging mailer, local development parents (`http://localhost` or `http://127.0.0.1` on the documented dev ports) may use any assigned identifier.
@@ -63,6 +63,13 @@
 - **Error envelope corrected.** §10 documents the shape the API actually returns — `{"detail": {"error": {"type", "code", "message", "trace_id", …}}}` — and the FastAPI list shape used for request-validation failures. A few responses (`confirm-payment` `404`/`409`, `GET /orders/{id}/status` `404`) carry the same `error` object at the top level; read `body.detail?.error ?? body.error`. The previous `error_code` top-level shape was never emitted.
 - **Partner action:** none today. Before enforcement is switched on for your account, point your backend at its server key for payment confirmation and recipient uploads; the embed needs no change. Postman: the collection's payment and recipient requests now read `{{backend_partner_key}}`, present in all three environments.
 - **Artifacts:** API Kit §1, §6k, §6n–§6p, §10, §11, §12; START_HERE; OpenAPI (`INSUFFICIENT_SCOPE` code, `403` on the campaign delta route, error-envelope and security descriptions); Postman collection and the three environments.
+
+## Unreleased — Customize sender Edit for account owners
+
+- **Availability:** live in production since 2026-09-29 (iframe v1.21.0).
+- **What changed:** with a complete, parent-owned sender, an account owner now sees **Edit** on the Customize sender summary for postcards. Clicking it emits the existing `sender_setup_requested` with `page: "setup"` and `reason: "sender_info_missing"`, as the other sender-setup actions do. Letter products keep their logo-upload action, and non-owners never see it.
+- **Unchanged:** message types, payloads, the envelope version `1` and the partner contract version. No sender PII is sent.
+- **Artifacts:** Iframe Kit (sender-setup gate table, Customize behavior and the `page` enum).
 
 ## Unreleased — Color Letter order size limit removed
 
