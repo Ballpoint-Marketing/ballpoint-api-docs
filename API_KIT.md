@@ -724,7 +724,12 @@ For a PropStream partner request whose canonical `product_type` is `4x6_printed`
 For new PropStream orders, `postage_type: "first_class"` uses the direct
 fulfillment path from the frozen recipient list. It does not pass through
 AccuZIP and therefore does not expose fabricated IMb, container, or tracking
-claims. This release validated the 4x6 and 6x9 postcard paths;
+claims. First Class pieces are not presorted or barcoded, so their addresses
+are mailed exactly as provided: no CASS standardization, no NCOA move update
+and no undeliverable-address suppression, and every piece is billed. Send
+addresses you have already validated, or use `standard`/`presort` where the
+product offers it to have undeliverable addresses suppressed and not billed.
+This release validated the 4x6 and 6x9 postcard paths;
 `standard` and `presort` continue to use the existing AccuZIP workflow. No
 request field or partner-side action changed.
 
