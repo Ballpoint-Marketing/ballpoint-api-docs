@@ -1,12 +1,29 @@
 # Changelog
 
-## v1.7.63 — 2026-09-29 — Keep recipient selection on same-list count refresh
+## v1.7.64 — 2026-09-29 — Keep recipient selection on same-list count refresh
 
 - **Availability:** release candidate; not yet in production.
 - **What changed:** an accepted same-`listId` `set_list` refresh carrying a replacement `piece_counts` table retains the active Deliver To and Remove duplicate addresses choices. The iframe resolves the new count and price from that same combination. If the new table makes it missing or zero, the selection remains and submission stays blocked until the user picks an available combination.
 - **Partner action:** none. PropStream continues sending the same `set_list` refresh after Edit Leads; use the emitted `recipient_selection` and `orders[].pieces` for billing and upload sizing.
 - **Unchanged:** first-receipt and new-list defaults, omitted-table refreshes, message and payload shapes, iframe envelope version `1`, and REST `3.1`.
 - **Artifacts:** Iframe Kit refresh, default-selection and fail-closed sections; API Kit header; OpenAPI and Postman version markers; iframe build/deploy metadata and PropStream one-pager.
+
+## v1.7.63 — 2026-09-29 — Catalog postcards print with the compact recipient box
+
+- **Availability:** staging candidate; production pending.
+- **What changed:** `postal_layout_profile` accepts a new immutable value, `standard_v11`. New catalog and Classic 4x6/6x9 proofs from the Ballpoint-hosted iframe send it: the same compact recipient box Create Your Own already prints (`cyo_compact_white_v2` on 4x6, `cyo_compact_white_v3` on 6x9), instead of the wider `standard_v10` area. Like `standard_v10`, it covers the old indicia still drawn inside known saved Home Services artwork. Realtor/Agent postcards keep `standard_v10`: `standard_v11` with a back that carries the Realtor divider returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before any write, because the compact box would print over it.
+- **Editor preview:** the postage indicia in the iframe preview now uses the same four lines, sizes and positions as the printed piece. The print itself is unchanged.
+- **Partner action:** none. PropStream does not send this field; the iframe fills it. `standard_v10` stays accepted for catalog proofs from older iframe bundles.
+- **Unchanged:** orders created before this version keep their frozen profile and are never rerendered; Create Your Own profiles and their `409 POSTAL_LAYOUT_PROFILE_MISMATCH` rule; request and response shapes other than the new enum value; webhooks; iframe messages; envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit header and postal profile note; Iframe Kit header and postal profile note; OpenAPI `postal_layout_profile` enum and description, `x-partner-contract-version`; Postman version marker (no request change).
+
+## v1.7.62 — 2026-09-28 — Iframe checkout waits for accepted orders
+
+- **Availability:** iframe PR [#484](https://github.com/Ballpoint-Marketing/ballpoint-iframe/pull/484); staging validation pending, production pending.
+- **Visible failure:** a rejected submission stays on Order Summary with a persistent, accessible **Order not sent** message. The iframe shows a bounded API reason when safe, otherwise asks the user to review the order. Exhausted transient retries show **Retry** and explain that checkout did not open.
+- **Checkout guarantee:** `campaign_submitted` is emitted only after every order has a server-assigned `orders[].ballpointOrderId`. For compatibility, `pendingSubmissionCount` remains `0` and `pendingOrderIds` remains empty in its payload. `campaign_submission_pending` is no longer emitted. The iframe resumes unaccepted orders under their original idempotency keys after a partial multi-send or A/B submission, without posting accepted orders again.
+- **Partner action:** PropStream should stop waiting for `campaign_submission_pending` and treat a missing `ballpointOrderId` in `campaign_submitted` as an integration error. Begin payment only from an accepted `campaign_submitted`; a rejected order remains in the iframe. Joint staging verification is pending.
+- **Other contracts:** `order_submission_deferred` remains for deterministic rejections; its `reason` now uses the lower-cased error code. The iframe message envelope stays version `1`. No REST endpoint, request/response shape, or webhook change is introduced by this iframe release.
 
 ## v1.7.61 — 2026-09-28 — Greeting Letter completion reports its mailed count
 

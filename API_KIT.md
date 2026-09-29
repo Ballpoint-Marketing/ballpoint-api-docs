@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.63 · September 2026** · Same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (release candidate); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); v1.7.60 handwritten `message_parts` for Realtor/Agent postcards remain a staging candidate; REST API remains `3.1`
+> **v1.7.64 · September 2026** · Same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (release candidate); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (staging candidate; production pending); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -520,7 +520,7 @@ Content-Type: application/json
 
 **Auth.** Partner-only. `X-Partner-Key` required; non-partner keys (e.g. `X-API-Key`) get `401 Unauthorized`.
 
-**When to call.** Server-to-server, after the iframe emits `campaign_submitted` and every selected order has a non-null `ballpointOrderId`. Recipient upload must be complete for each order selected for this payment event; for every selected [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload) response, verify `ready === true` and `piece_count > 0` before previewing. For A/B Split, upload a different recipient slice to each selected variant; do not reuse the full list for both orders. Pass the **subset you intend to charge in this payment event** (any subset of one campaign is accepted — from a single drop to the full submission). If any selected id is still `null` or any selected order's recipient upload is incomplete/zeroed, do not open the payment step or call this endpoint yet.
+**When to call.** Server-to-server, after the iframe emits `campaign_submitted`; that event now carries a `ballpointOrderId` for every order. Recipient upload must be complete for each order selected for this payment event; for every selected [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload) response, verify `ready === true` and `piece_count > 0` before previewing. For A/B Split, upload a different recipient slice to each selected variant; do not reuse the full list for both orders. Pass the **subset you intend to charge in this payment event** (any subset of one campaign is accepted — from a single drop to the full submission). If any selected id is missing or any selected order's recipient upload is incomplete/zeroed, do not open the payment step or call this endpoint yet.
 
 **Request body**
 
@@ -729,12 +729,17 @@ claims. This release validated the 4x6 and 6x9 postcard paths;
 request field or partner-side action changed.
 
 For every PropStream printed postcard, the current Ballpoint-hosted iframe also
-sends the exact `postal_layout_profile` it displayed: `standard_v10` for a
-new standard proof, or `cyo_compact_white_v2` when the exact Create Your Own
-rollout is enabled. `standard_v10` preserves the approved `standard_v9`
-geometry while omitting the renderer's legacy indicia-cleanup mask for clean
-catalog artwork. Ballpoint freezes that value on the accepted order.
-`standard_v7`, `standard_v8`, `standard_v9`, `cyo_unified_white_v1`, and
+sends the exact `postal_layout_profile` it displayed: `standard_v11` for a
+new catalog or Classic proof (contract 1.7.63), `standard_v10` for a
+Realtor/Agent proof, or `cyo_compact_white_v2` (4x6) / `cyo_compact_white_v3`
+(6x9) when the exact Create Your Own rollout is enabled. `standard_v11` prints
+the same compact recipient box as those Create Your Own profiles. `standard_v10`
+preserves the approved `standard_v9` geometry; both standard profiles cover
+old indicia still drawn inside known saved Home Services artwork. Ballpoint freezes
+that value on the accepted order and still accepts `standard_v10` for catalog
+proofs from older iframe bundles. `standard_v11` with a back that carries the
+Realtor divider returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before any write.
+`standard_v7`, `standard_v8`, `standard_v9`, `standard_v10`, `cyo_unified_white_v1`, and
 profile-less historical orders retain their frozen geometry and are never
 silently upgraded or rerendered. An omitted
 profile remains backward-compatible as `standard_v7` for old iframe bundles. A
@@ -919,7 +924,7 @@ Tenant scoping: partners only see their own orders. Both cross-tenant and unknow
 
 **ID reconciliation.** The `campaign_id` returned here (and on `GET /v1/billing/orders`, §6d) is Ballpoint's backend **grouping key**, derived from your account + `list_id` — one Ballpoint campaign per `list_id`. It is the identifier accepted by `PATCH /v1/billing/campaigns/{campaign_id}/recipients`. The separate `external_campaign_id` is the persisted cross-system Direct Mail campaign id originally emitted as `campaign_created.campaignId` and later surfaced as `edit_leads_requested.ballpointCampaignId`; it is for partner correlation and is **not accepted** in that campaign-delta route. For **per-order** reconciliation, use **`campaign_submitted.orders[].ballpointOrderId`**, which equals the `id` on this response. Note: Get Orders does not return a standalone `list_id` field — it is encoded in `campaign_id`.
 
-> **Reminder — `campaign_submitted` is the discovery trigger, not a poll loop.** For Multi Send and A/B Split, do not call `GET /v1/billing/orders` or `GET /v1/billing/orders/{order_id}` per drop during the scheduling step looking for orders to appear — they won't, because no Ballpoint order is created until the end-user clicks **Continue to Payment**. Consume `campaign_submitted.orders[].ballpointOrderId` for each drop's authoritative id (one event covers all drops in the submission). If `orders[].ballpointOrderId` is `null` on an entry, that single drop is pending retry — only then is it appropriate to poll `GET /v1/billing/orders` (scoped to the same `external_user_id` / campaign) to discover the server-assigned id once the retry succeeds. See [IFRAME_KIT.md `campaign_submitted` field notes](IFRAME_KIT.md#campaign_submitted--campaign-submitted-to-ballpoint).
+> **Reminder — `campaign_submitted` is the discovery trigger, not a poll loop.** For Multi Send and A/B Split, do not call `GET /v1/billing/orders` or `GET /v1/billing/orders/{order_id}` per drop during the scheduling step looking for orders to appear — they won't, because no Ballpoint order is created until the end-user clicks **Continue to Payment**. Consume `campaign_submitted.orders[].ballpointOrderId` for each drop's authoritative id (one event covers all drops in the submission). The iframe withholds the event if any order is rejected or still unaccepted; a missing id in an emitted event is an integration error. See [IFRAME_KIT.md `campaign_submitted` field notes](IFRAME_KIT.md#campaign_submitted--campaign-submitted-to-ballpoint).
 
 ---
 
@@ -1238,7 +1243,7 @@ Where this call sits in the end-user journey for an iframe-driven order:
 4. End-user customizes the campaign and clicks Submit.
 5. iframe calls `POST /orders` on the API base URL and sends the selected `postage_type` (`first_class`, `standard`, or `presort`). Ballpoint validates and persists that value, then records a creation-time price **estimate** on the order for payment-gated accounts (the wholesale debit is resolved against the current pricing tier at [`/confirm-payment`](#6k-confirm-payment-partner-payment-gate) — refetch [§6a-ii](#6a-ii-preview-campaign-cost-payment-gate) before charging). Only legacy requests that omit `postage_type` default to `first_class`. The order is created in `pending_payment` (send-now) or `scheduled` with `payment_confirmed=false` (future-dated); no charge occurs yet.
 6. iframe emits `campaign_submitted` to the parent (carries `orders[].ballpointOrderId` and `total_dollars` for UX/display). Use this as the trigger for the backend handoff, not as authorization to collect payment yet. For partners that sent `piece_counts` on `set_list`, this event also carries `recipient_selection.piece_count`; for A/B Split, each `orders[].pieces` is the size of that variant's slice. See [IFRAME_KIT.md](IFRAME_KIT.md#recipient-selection-contract-piece-count--dedup) for the full input/output contract.
-7. Partner backend selects the orders due in the current payment event, waits until each selected `ballpointOrderId` is non-null, uploads the matching recipient slice with [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload), and verifies every selected response has `ready === true` and `piece_count > 0`. For A/B Split, the slices must be recipient-disjoint (full name + mailing address).
+7. Partner backend selects the orders due in the current payment event, verifies each selected `ballpointOrderId` is present, uploads the matching recipient slice with [`POST /v1/billing/orders/{order_id}/recipients`](#6n-upload-recipients-initial-upload), and verifies every selected response has `ready === true` and `piece_count > 0`. For A/B Split, the slices must be recipient-disjoint (full name + mailing address).
 8. Partner backend calls [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) **once** with that selected order-id set. Read `campaign_partner_debit_cents` as the exact successful-confirmation ledger amount; the `partner_cost_*_tcents` fields remain the raw wholesale math for reconciliation. Call `/confirm-payment` only for response rows where `excluded_from_totals=false`; do not confirm rows excluded from the quoted total. The legacy per-order `POST /v1/billing/orders/preview` loop is no longer required for this step.
 9. Partner shows the payment popup; end-user pays via the partner's payment provider. If the user ordinarily closes the popup without a final outcome, the parent sends no `payment_result`. The iframe leaves **Continue to Payment** enabled; a repeat click re-emits the exact cached `campaign_submitted` payload without another `POST /orders`. Treat that repeat idempotently and only reopen or resume the existing checkout.
 10. Once the popup has a known outcome, the parent sends the iframe [`payment_result`](IFRAME_KIT.md#payment_result--payment-popup-outcome-parent--iframe) for UX. `status: success` immediately renders **Payment Successful**. Its `campaignId` / order-id fields remain optional and, when present, are defensive mismatch checks only; any known foreign id rejects the message, including an active+foreign mixed array. No new parent field is required.
