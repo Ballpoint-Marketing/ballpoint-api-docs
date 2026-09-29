@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.62** (the iframe now blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired. Staging candidate; production pending. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`)
+Partner contract version: **v1.7.63** (new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; staging candidate; production pending. v1.7.62: the iframe now blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired. Staging candidate; production pending. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`)
 
 Contract 1.7.58: **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices. Nothing changes for PropStream.
 
@@ -271,13 +271,14 @@ fail-closed coordinated deployment; the PropStream default state is enabled in
 Ballpoint production as of partner contract `1.7.51`.
 
 Every current PropStream 4x6/6x9 proof also records its postal profile. The
-Ballpoint-hosted iframe declares `standard_v10` for new standard proofs. It
-preserves the approved `standard_v9` 4x6 and 6x9 geometry while telling the
-renderer not to add the legacy indicia-cleanup mask to clean catalog artwork.
-When the Create Your Own rollout flag is enabled, the iframe declares
-`cyo_compact_white_v2` and displays the approved compact 4x6/6x9 recipient box.
+Ballpoint-hosted iframe declares `standard_v11` for new catalog and Classic
+proofs (contract 1.7.63): the compact recipient box Create Your Own prints.
+Realtor/Agent proofs declare `standard_v10`, which preserves the approved
+`standard_v9` 4x6 and 6x9 geometry. When the Create Your Own rollout flag is
+enabled, the iframe declares `cyo_compact_white_v2` (4x6) or
+`cyo_compact_white_v3` (6x9) and displays the same compact recipient box.
 The API freezes the declared value on the order. Historical `standard_v7`,
-`standard_v8`, `standard_v9`, `cyo_unified_white_v1`, and profile-less orders retain their
+`standard_v8`, `standard_v9`, `standard_v10`, `cyo_unified_white_v1`, and profile-less orders retain their
 prior geometry and are never upgraded by a renderer deploy. A visible/exported
 text object still set to the exact default `Enter Text` blocks Save and final
 submission. This handoff is automatic and requires no PropStream-side message

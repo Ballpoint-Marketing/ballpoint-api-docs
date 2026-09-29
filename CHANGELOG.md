@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.63 — 2026-09-29 — Catalog postcards print with the compact recipient box
+
+- **Availability:** staging candidate; production pending.
+- **What changed:** `postal_layout_profile` accepts a new immutable value, `standard_v11`. New catalog and Classic 4x6/6x9 proofs from the Ballpoint-hosted iframe send it: the same compact recipient box Create Your Own already prints (`cyo_compact_white_v2` on 4x6, `cyo_compact_white_v3` on 6x9), instead of the wider `standard_v10` area. Like `standard_v10`, it covers the old indicia still drawn inside known saved Home Services artwork. Realtor/Agent postcards keep `standard_v10`: `standard_v11` with a back that carries the Realtor divider returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before any write, because the compact box would print over it.
+- **Editor preview:** the postage indicia in the iframe preview now uses the same four lines, sizes and positions as the printed piece. The print itself is unchanged.
+- **Partner action:** none. PropStream does not send this field; the iframe fills it. `standard_v10` stays accepted for catalog proofs from older iframe bundles.
+- **Unchanged:** orders created before this version keep their frozen profile and are never rerendered; Create Your Own profiles and their `409 POSTAL_LAYOUT_PROFILE_MISMATCH` rule; request and response shapes other than the new enum value; webhooks; iframe messages; envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit header and postal profile note; Iframe Kit header and postal profile note; OpenAPI `postal_layout_profile` enum and description, `x-partner-contract-version`; Postman version marker (no request change).
+
 ## v1.7.62 — 2026-09-28 — Iframe checkout waits for accepted orders
 
 - **Availability:** iframe PR [#484](https://github.com/Ballpoint-Marketing/ballpoint-iframe/pull/484); staging validation pending, production pending.
