@@ -7,6 +7,7 @@
 - **Partner action:** none. PropStream continues sending the same `set_list` refresh after Edit Leads; use the emitted `recipient_selection` and `orders[].pieces` for billing and upload sizing.
 - **Unchanged:** first-receipt and new-list defaults, omitted-table refreshes, message and payload shapes, iframe envelope version `1`, and REST `3.1`.
 - **Artifacts:** Iframe Kit refresh, default-selection and fail-closed sections; API Kit header; OpenAPI and Postman version markers; iframe build/deploy metadata and PropStream one-pager.
+- **PROPS-3693 metric correction (API deployment pending):** `total_pieces_mailed` in account-summary and `total_pieces` in partner stats exclude orders whose `production_status` is `cancelled` or `payment_failed`, including failed drops in an otherwise purchased Multi-Send. `total_orders` and `orders_by_status` stay raw; other `failed` orders retain their prior treatment. This supersedes the cancelled-order inclusion stated in the v1.7.34 entry. Response shapes and partner contract version are unchanged.
 
 ## v1.7.63 — 2026-09-29 — Catalog postcards print with the compact recipient box
 

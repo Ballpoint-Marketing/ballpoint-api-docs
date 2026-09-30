@@ -841,7 +841,7 @@ components:
         total_pieces:
           type: integer
           minimum: 0
-          description: Raw piece_count sum across scoped orders. Existing payment and status inclusion behavior is unchanged.
+          description: Sum of piece_count across scoped orders except those with production_status cancelled or payment_failed. total_orders and orders_by_status still count those orders. Other payment and status inclusion behavior is unchanged.
         completed_orders:
           type: integer
           minimum: 0
@@ -850,7 +850,7 @@ components:
         scheduled_drops:
           type: integer
           minimum: 0
-          description: Canonical Scheduled KPI. An A/B sibling pair counts as one logical drop, each Multi-Send drop counts once, and accepted drops are included. Ordinary unconfirmed orders are excluded. A purchased Multi-Send includes all committed drops only when its group has one consistent non-empty external_campaign_id, a complete unique 1..N drop_index sequence matching total_drops=N, and a confirmed first drop; incomplete or malformed groups fail closed.
+          description: Canonical Scheduled KPI. An A/B sibling pair counts as one logical drop, each Multi-Send drop counts once, and accepted drops are included. Ordinary unconfirmed orders are excluded. A purchased Multi-Send includes eligible committed drops only when its group has one consistent non-empty external_campaign_id, a complete unique 1..N drop_index sequence matching total_drops=N, and a confirmed first drop; incomplete or malformed groups fail closed.
           example: 5
         orders_by_status:
           $ref: '#/components/schemas/PartnerOrderStatusCounts'
@@ -875,7 +875,7 @@ components:
         total_pieces_mailed:
           type: integer
           minimum: 0
-          description: Pieces ordered in the authorized campaign scope, using the legacy campaign created_at date basis and the converted half-open instant bounds. Ordinary unconfirmed orders are excluded. A purchased Multi-Send includes all committed drops only when its group has one consistent non-empty external_campaign_id, a complete unique 1..N drop_index sequence matching total_drops=N, and a confirmed first drop; incomplete or malformed groups fail closed. Cancelled and failed orders in scope remain included.
+          description: Pieces ordered in the authorized campaign scope, using the legacy campaign created_at date basis and the converted half-open instant bounds. Ordinary unconfirmed orders are excluded. A purchased Multi-Send includes committed drops only when its group has one consistent non-empty external_campaign_id, a complete unique 1..N drop_index sequence matching total_drops=N, and a confirmed first drop; incomplete or malformed groups fail closed. Orders with production_status cancelled or payment_failed are excluded even in a purchased Multi-Send. Other failed orders retain their existing inclusion behavior.
         scheduled_drops:
           type: integer
           minimum: 0
@@ -2341,8 +2341,9 @@ paths:
         GET /v1/billing/partner/stats: an A/B sibling pair counts once, every
         Multi-Send drop counts once, and accepted drops are included. For
         scheduled_drops and total_pieces_mailed, ordinary unconfirmed orders
-        are excluded; a complete canonical purchased Multi-Send includes every
-        committed drop even while future drops remain unconfirmed. Active,
+        are excluded; a complete canonical purchased Multi-Send includes eligible
+        committed drops even while future drops remain unconfirmed. Orders with
+        production_status cancelled or payment_failed are excluded from total_pieces_mailed. Active,
         Completed, and RTS visibility is unchanged. Optional from/to values are
         inclusive local calendar dates in time_zone. The server converts local
         midnight at from and local midnight on the day after to independently
@@ -3493,8 +3494,8 @@ paths:
       - Partner Dashboard
       summary: Get partner dashboard statistics
       description: >-
-        Returns partner-scoped raw order totals, the canonical Completed order
-        KPI, the canonical Scheduled logical-drop KPI, SLA buckets, and RTS
+        Returns partner-scoped raw order counts, status-filtered total_pieces,
+        the canonical Completed order KPI, the canonical Scheduled logical-drop KPI, SLA buckets, and RTS
         totals. completed_orders counts each eligible order once when display
         status is complete or delivered; A/B siblings remain separate and
         explicitly unconfirmed orders are excluded. scheduled_drops is not a
