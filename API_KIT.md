@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.64 · September 2026** · Same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (release candidate); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (staging candidate; production pending); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
+> **v1.7.65 · September 2026** · Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (staging candidate; production pending; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (release candidate); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (staging candidate; production pending); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -75,6 +75,7 @@ You should get back `202 Accepted` with an `order_id`. This ran against **stagin
    - [6r. Partner Feature Configuration](#6r-partner-feature-configuration)
    - [6s. Search Recipients Across Direct Mail](#6s-search-recipients-across-direct-mail)
    - [6t. Print Jobs (Print-Ready PDFs)](#6t-print-jobs-print-ready-pdfs)
+   - [6u. Embed Token (Short-Lived, Per User)](#6u-embed-token-short-lived-per-user)
 7. [Status Updates via Webhooks](#7-status-updates-via-webhooks)
    - [Per-piece RTS Push-Back (V1)](#per-piece-rts-push-back-v1)
 8. [Real-Time UI via SSE (Optional)](#8-real-time-ui-via-sse-optional)
@@ -118,6 +119,7 @@ Ballpoint issues partner keys in two classes, and every key carries an explicit 
 |---|---|---|
 | **Server key** | On your backend only. Never sent to a browser, an embed or a mobile app. | Payment confirmation, recipient uploads and edits, operations dashboard reads |
 | **Embed key** | Delivered to the Ballpoint iframe running in your end user's browser | Everything the embedded experience does: quotes, order creation, cancel/reschedule, tracking reads, templates |
+| **Embed token** *(optional, v1.7.65)* | Issued by your backend with its server key for one signed-in user; delivered to the iframe in place of the embed key; expires after 60 minutes | The same as the embed key, attributed to that user (§6u) |
 
 | Scope | Grants | Routes |
 |---|---|---|
@@ -2439,6 +2441,49 @@ Follow progress with `GET /v1/billing/orders/{order_id}` (`production_status`).
 
 ---
 
+### 6u. Embed Token (Short-Lived, Per User)
+
+An optional replacement for the embed key in the browser. Your backend exchanges its **server key** for a token bound to one of your signed-in users, and passes that token to the iframe instead of a partner key. A copied token works for **60 minutes**, is attributed to **that user**, and only does what the embedded experience does; it cannot confirm payment or change recipients.
+
+**Who can issue.** A server key (one holding `payments:write` or `recipients:write`) sent as `X-Partner-Key`. An embed key receives `403 INSUFFICIENT_SCOPE`; a request carrying a bearer token instead of a partner key receives `401 PARTNER_KEY_REQUIRED` (a token cannot issue another token). Least-privilege keys (§1) cannot issue.
+
+**Request.** The body names the user and nothing else. Account, partner source and tenant come from the key. Take `external_user_id` from your backend's authenticated session, never from the browser.
+
+```bash
+curl -X POST https://staging-api.ballpointmarketing.com/v1/auth/embed-token \
+  -H "X-Partner-Key: $SERVER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"external_user_id": "user-123"}'
+```
+
+`200 OK`:
+
+```json
+{ "token": "eyJhbGciOi…", "token_type": "Bearer", "expires_in": 3600 }
+```
+
+Send `token` to the iframe as `apiToken` in `set_api_config` (see the Iframe Kit, *Embed token*). The iframe calls the API with `Authorization: Bearer <token>`. When the token is about to expire, the iframe sends `request_config`; answer it with a newly issued token. Treat the token as opaque: do not parse or store it.
+
+**What a token can do.** Everything the embed key does in the iframe (quotes, order creation, cancel/reschedule, tracking, templates, feature configuration), attributed to the user it was issued for; an `X-External-User-ID` header cannot change that user. Reads stay scoped to your tenant, exactly as with the embed key. The token takes the **issuing key's PII level**, so give the server key that issues tokens the same PII level as your embed key. It **never** confirms payment, uploads or edits recipients, or submits print jobs (`403 INSUFFICIENT_SCOPE`), even for accounts where scope enforcement is not yet active. Those stay on your server key.
+
+**Validity.** Every request re-checks the issuing key: revoking, expiring or disabling it, removing both issuing scopes from it, or making it least-privilege invalidates its tokens immediately. Staging tokens never work in production. An expired or invalidated token receives `401 INVALID_TOKEN`.
+
+| Status | Code | Meaning |
+|---|---|---|
+| 401 | `MISSING_CREDENTIALS` / `INVALID_PARTNER_KEY` | No credential, or an unknown key |
+| 401 | `INVALID_TOKEN` | The request carried an invalid or expired bearer token |
+| 401 | `PARTNER_KEY_REQUIRED` | The request carried a valid bearer token, or a credential that is not a partner key (a token cannot issue another token) |
+| 403 | `INSUFFICIENT_SCOPE` | The key is not a server key (`required_scope`: `payments:write or recipients:write`); least-privilege keys get `required_scope: null` |
+| 403 | `ACCOUNT_SUSPENDED` | The account is suspended |
+| 422 | `INVALID_EXTERNAL_USER_ID` | `external_user_id` is empty, longer than 100 characters, has leading/trailing spaces or contains control characters |
+| 422 | list-shaped `detail` | The body has a field other than `external_user_id` |
+| 429 | rate limit (§10) | Per-key or per-account request rate exceeded (issuance shares the server key's budget); retry after `Retry-After` |
+| 503 | `JWT_DISABLED` | Embed tokens are not configured on this server |
+
+**Adoption.** Optional. The embed key keeps working unchanged; PropStream needs no action.
+
+---
+
 ## 7. Status Updates via Webhooks
 
 > **Ballpoint delivers webhooks at least once. Your integration must handle duplicates, delays, and out-of-order delivery.**
@@ -3333,6 +3378,7 @@ Before switching to your live key:
 | Funnel analytics (iframe, automatic — no partner action needed) | `POST` | `/v1/partner/funnel-events` | `X-Partner-Key`, `X-External-User-ID` |
 | Request a print-job upload | `POST` | `/v1/print-jobs/upload-url` | `X-Partner-Key` — **`print_jobs:write`** |
 | Submit a print job | `POST` | `/v1/print-jobs` | `X-Partner-Key` — **`print_jobs:write`** |
+| Issue an embed token (optional) | `POST` | `/v1/auth/embed-token` | `X-Partner-Key` — **server key** |
 | Health check | `GET` | `/health` | *(none)* |
 
 ---

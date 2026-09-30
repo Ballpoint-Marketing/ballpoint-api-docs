@@ -2,8 +2,8 @@ openapi: 3.1.0
 info:
   title: Ballpoint Marketing API (v1, staging)
   version: 3.1.0
-  x-partner-contract-version: 1.7.64
-  description: "This spec documents the v1 API contract using staging as its default server and examples. Partner contract 1.7.64 is a release candidate for same-list `set_list` refreshes retaining the active Deliver To / Remove duplicates selection with replacement `piece_counts`; contract 1.7.61 is live in production since 2026-09-29 (API v3.39.0); the Realtor/Agent handwritten postcards that send the 1.7.60 `message_parts` are not yet offered by the production iframe. A future v2 remains out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Test-mode account principal; not a partner credential |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nErrors raised by the API sit under `detail` (FastAPI wire envelope) and carry a trace ID:\n\n```json\n{\n  \"detail\": {\n    \"error\": {\n      \"type\": \"validation_error\",\n      \"code\": \"INVALID_ADDRESS\",\n      \"message\": \"Address could not be verified\",\n      \"trace_id\": \"tr_abc123\"\n    }\n  }\n}\n```\n\nA key used on a route whose scope it does not hold receives `403` with code `INSUFFICIENT_SCOPE`, `required_scope` and `granted_scopes`. Request-validation failures use FastAPI's list-shaped `detail` with status 422.\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.64`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on all responses:\n    - `X-RateLimit-Remaining`: requests remaining in window\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
+  x-partner-contract-version: 1.7.65
+  description: "This spec documents the v1 API contract using staging as its default server and examples. Partner contract 1.7.65 is a staging candidate adding `POST /v1/auth/embed-token`, an optional short-lived per-user token for the iframe; partner contract 1.7.64 is a release candidate for same-list `set_list` refreshes retaining the active Deliver To / Remove duplicates selection with replacement `piece_counts`; contract 1.7.61 is live in production since 2026-09-29 (API v3.39.0); the Realtor/Agent handwritten postcards that send the 1.7.60 `message_parts` are not yet offered by the production iframe. A future v2 remains out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Test-mode account principal; not a partner credential |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nErrors raised by the API sit under `detail` (FastAPI wire envelope) and carry a trace ID:\n\n```json\n{\n  \"detail\": {\n    \"error\": {\n      \"type\": \"validation_error\",\n      \"code\": \"INVALID_ADDRESS\",\n      \"message\": \"Address could not be verified\",\n      \"trace_id\": \"tr_abc123\"\n    }\n  }\n}\n```\n\nA key used on a route whose scope it does not hold receives `403` with code `INSUFFICIENT_SCOPE`, `required_scope` and `granted_scopes`. Request-validation failures use FastAPI's list-shaped `detail` with status 422.\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.65`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on all responses:\n    - `X-RateLimit-Remaining`: requests remaining in window\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
   contact:
     name: Ballpoint API Support
     email: api-support@ballpointmarketing.com
@@ -247,6 +247,36 @@ components:
           type: integer
         production_status:
           type: string
+    EmbedTokenRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - external_user_id
+      properties:
+        external_user_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: The signed-in end user, from the partner backend's authenticated session.
+          example: user-123
+    EmbedTokenResponse:
+      type: object
+      required:
+      - token
+      - token_type
+      - expires_in
+      properties:
+        token:
+          type: string
+          description: Opaque token for `set_api_config.apiToken`. Do not parse or store it.
+        token_type:
+          type: string
+          enum:
+          - Bearer
+        expires_in:
+          type: integer
+          description: Lifetime in seconds.
+          example: 3600
     Error:
       type: object
       required:
@@ -2942,6 +2972,70 @@ paths:
           description: Order not found
         '429':
           description: Subscriber cap exceeded. Either per-order (MAX_SSE_SUBSCRIBERS_PER_ORDER) or per-account (MAX_SSE_SUBSCRIBERS_PER_ACCOUNT) limit reached.
+  /v1/auth/embed-token:
+    post:
+      tags:
+      - Partner Configuration
+      summary: Issue a short-lived embed token for one user
+      operationId: issue_embed_token
+      description: |
+        Optional (contract 1.7.65). A partner server key (holding
+        `payments:write` or `recipients:write`) sent as `X-Partner-Key`
+        exchanges itself for a token bound to one user, valid 60 minutes.
+        Account, source and tenant come from the key; the body names only
+        the user, taken from the partner backend's authenticated session.
+        Reads stay scoped to the partner tenant, as with the embed key, and
+        the token takes the issuing key's PII level.
+        The iframe sends the token as `Authorization: Bearer`. Every request
+        re-checks the issuing key, so revoking it invalidates its tokens;
+        a token never confirms payment, writes recipients or submits print
+        jobs, and an `X-External-User-ID` header cannot change its user.
+        See API Kit section 6u.
+      security:
+      - partnerKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbedTokenRequest'
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedTokenResponse'
+        '401':
+          description: '`MISSING_CREDENTIALS` or `INVALID_PARTNER_KEY`; `INVALID_TOKEN` for an invalid or expired bearer; `PARTNER_KEY_REQUIRED` for a valid bearer token or a non-partner credential'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '`INSUFFICIENT_SCOPE` — the key is not a server key (a least-privilege key gets a null `required_scope`); `ACCOUNT_SUSPENDED`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: '`INVALID_EXTERNAL_USER_ID` (empty, over 100 characters, surrounding spaces or control characters), or a body field other than `external_user_id`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Per-key or per-account rate limit — retry after `Retry-After`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: '`JWT_DISABLED` — embed tokens are not configured on this server'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/print-jobs/upload-url:
     post:
       tags:

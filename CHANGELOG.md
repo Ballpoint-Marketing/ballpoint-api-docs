@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.65 — 2026-09-30 — Optional short-lived embed token for the iframe
+
+- **Availability:** staging candidate; production pending.
+- **What changed:** `POST /v1/auth/embed-token` lets a partner backend exchange its server key (holding `payments:write` or `recipients:write`) for a 60-minute token bound to one user. The body carries only `external_user_id`; account, source and tenant come from the key. The iframe accepts the token as `apiToken` in `set_api_config`, sends it as `Authorization: Bearer`, and sends `request_config` about 5 minutes before it expires so the parent can answer with a new token.
+- **Limits:** a token acts only as the embedded experience, attributed to its own user; an `X-External-User-ID` header cannot change that user, and reads stay scoped to the tenant as with the embed key. It takes the issuing key's PII level. It never confirms payment, writes recipients or submits print jobs. Every request re-checks the issuing key, so revoking it (or making it least-privilege) invalidates its tokens. A token cannot issue another token.
+- **Partner action:** none. PropStream keeps its embed key unchanged; the iframe still sends a `pk_` value as `X-Partner-Key` and sends no renewal `request_config` for it. Adopting the token is optional.
+- **Unchanged:** every existing route, request and response shape, webhook, postMessage type and payload, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit header, key classes (§1), new §6u and quick reference; Iframe Kit header, `set_api_config` *Embed token*, `request_config` and funnel telemetry notes; OpenAPI path `/v1/auth/embed-token` with `EmbedTokenRequest`/`EmbedTokenResponse` and `x-partner-contract-version`; Postman Tier B request (uses the existing `{{backend_partner_key}}`; new collection variable `embed_external_user_id`) and version marker.
+
 ## v1.7.64 — 2026-09-29 — Keep recipient selection on same-list count refresh
 
 - **Availability:** release candidate; not yet in production.

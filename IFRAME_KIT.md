@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.64** (same-list `set_list` refreshes with a replacement `piece_counts` table retain the active Deliver To / Remove duplicates selection and reprice that combination; release candidate, not yet in production. v1.7.63: new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; staging candidate, production pending. v1.7.62: the iframe blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired; staging candidate, production pending. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`.)
+Partner contract version: **v1.7.65** (optional short-lived embed token: `apiToken` may carry a per-user token issued by your backend, renewed through `request_config`; the embed key keeps working unchanged; staging candidate, production pending. v1.7.64: same-list `set_list` refreshes with a replacement `piece_counts` table retain the active Deliver To / Remove duplicates selection and reprice that combination; release candidate, not yet in production. v1.7.63: new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; staging candidate, production pending. v1.7.62: the iframe blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired; staging candidate, production pending. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`.)
 
 Contract 1.7.58: **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices. Nothing changes for PropStream.
 
@@ -226,10 +226,22 @@ All messages must include these base fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `apiBaseUrl` | string | Ballpoint API base URL |
-| `apiToken` | string | Partner **embed** key (`pk_...`). Never the server key that holds `payments:write` / `recipients:write` (API Kit §1) |
+| `apiToken` | string | Partner **embed** key (`pk_...`), or an embed token issued by your backend (v1.7.65, see *Embed token* below). Never the server key that holds `payments:write` / `recipients:write` (API Kit §1) |
 | `tenantKey` | string | Optional. Tenant scope key for storage isolation |
 
 `set_api_config` can be sent more than once to refresh tokens. The separately documented `set_preview_recipient` message is also re-applicable because list edits can replace or remove the representative lead; other bootstrap context remains governed by its per-message rules.
+
+#### Embed token (optional, v1.7.65)
+
+Instead of the embed key, `apiToken` may carry a short-lived token that your backend issues for the signed-in user with its server key (`POST /v1/auth/embed-token`, API Kit §6u). The iframe sends it as `Authorization: Bearer <token>` instead of `X-Partner-Key`, and keeps it in memory only.
+
+- **Issue it on your backend.** The server key never reaches the browser. Take `external_user_id` from your backend's authenticated session, never from the browser, and pass the same user as `externalUserId` in `set_list` (a different user makes the API refuse the iframe's analytics events).
+- **Send it only to the iframe's exact origin.** Post `set_api_config` with the iframe's origin as `targetOrigin` (for example `https://staging-mailer.ballpointmarketing.com`), never `'*'`.
+- **Renewal.** About 5 minutes before the token expires (60-minute lifetime), and when the tab becomes visible after that point, the iframe sends `request_config`. Answer it with `set_api_config` carrying a newly issued token and the same `apiBaseUrl` and `tenantKey`. The campaign in progress is kept.
+- **Always send a freshly issued token.** Do not cache or reuse a token across page loads: the iframe schedules renewal from the token's full lifetime.
+- **Size.** Pass the token whole; the iframe rejects a value over 2,048 characters instead of truncating it.
+
+Nothing changes when `apiToken` is an embed key: it is still sent as `X-Partner-Key`, and the iframe sends no renewal `request_config`.
 
 For a PropStream embed, the iframe uses this configuration plus the
 `externalUserId` from `set_list` to fetch `GET /v1/config`. The response is
@@ -291,8 +303,8 @@ prepared to send one best-effort `POST /v1/partner/funnel-events` request per
 observed milestone:
 `campaign_started`, `product_selected`, `copy_edited`, `proof_viewed`,
 `submit_clicked`, and `campaign_submitted_confirmed`. These requests use the
-`apiToken` from `set_api_config` as `X-Partner-Key` and the active
-`externalUserId` as `X-External-User-ID`.
+`apiToken` from `set_api_config` as `X-Partner-Key` (or, for an embed token, as
+`Authorization: Bearer`) and the active `externalUserId` as `X-External-User-ID`.
 
 This is Ballpoint-owned, log-only product telemetry. Partners do not need to
 call the endpoint, handle a response, add a listener, or change their
@@ -938,6 +950,8 @@ if (msg.type === 'resize') {
 #### `request_config` — Iframe is requesting configuration
 
 Sent right after `ready` as a handshake. If you already sent config on `ready`, just ignore this one.
+
+When `apiToken` is an embed token (v1.7.65), the iframe also sends `request_config` shortly before the token expires; answer it with `set_api_config` carrying a newly issued token (see *Embed token* under `set_api_config`).
 
 ```json
 {
@@ -2115,7 +2129,7 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 
 **Cause:** `set_api_config` was not sent, or the `apiToken` value is empty/invalid.
 
-**Fix:** Ensure the parent sends `set_api_config` with a valid `apiBaseUrl` and `apiToken` before the user reaches the product selection page. The iframe queues actions until config arrives, but the Classic tab requires a configured API client to fetch templates. Verify the token is a valid `pk_...` key and that `apiBaseUrl` points to the correct [environment](#3-environments).
+**Fix:** Ensure the parent sends `set_api_config` with a valid `apiBaseUrl` and `apiToken` before the user reaches the product selection page. The iframe queues actions until config arrives, but the Classic tab requires a configured API client to fetch templates. Verify the token is a valid `pk_...` key (or an unexpired embed token) and that `apiBaseUrl` points to the correct [environment](#3-environments).
 
 ### "Please contact your account owner to set up sender information"
 
