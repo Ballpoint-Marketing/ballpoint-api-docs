@@ -235,7 +235,7 @@ All messages must include these base fields:
 
 Instead of the embed key, `apiToken` may carry a short-lived token that your backend issues for the signed-in user with its server key (`POST /v1/auth/embed-token`, API Kit §6u). The iframe sends it as `Authorization: Bearer <token>` instead of `X-Partner-Key`, and keeps it in memory only.
 
-- **Issue it on your backend.** The server key never reaches the browser. Take `external_user_id` from your backend's authenticated session, never from the browser, and pass the same user as `externalUserId` in `set_list` (a different user makes the API refuse the iframe's analytics events).
+- **Issue it on your backend.** The server key never reaches the browser. Take `external_user_id` from your backend's authenticated session, never from the browser, and pass the same user as `externalUserId` in `set_list` (a different user makes the API refuse the iframe's analytics events and its orders, `403 EXTERNAL_USER_MISMATCH`).
 - **Send it only to the iframe's exact origin.** Post `set_api_config` with the iframe's origin as `targetOrigin` (for example `https://staging-mailer.ballpointmarketing.com`), never `'*'`.
 - **Renewal.** About 5 minutes before the token expires (60-minute lifetime), and when the tab becomes visible after that point, the iframe sends `request_config`. Answer it with `set_api_config` carrying a newly issued token and the same `apiBaseUrl` and `tenantKey`. The campaign in progress is kept.
 - **Always send a freshly issued token.** Do not cache or reuse a token across page loads: the iframe schedules renewal from the token's full lifetime.
