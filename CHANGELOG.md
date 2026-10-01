@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Embed token orders stay with the token user
+
+- **Availability:** staging candidate; production pending (next API release). No contract version change (`1.7.65`).
+- **What changed:** with an embed token, `POST /orders` and `POST /v1/billing/orders` refuse a body `external_user_id` that differs from the token's user with `403 EXTERNAL_USER_MISMATCH`, before any campaign, order or charge is created. Omitting the field, or repeating the token's user, behaves as before. This enforces the existing 1.7.65 rule that a token acts only as the user it was issued for.
+- **Unchanged:** requests with an embed or server key (`X-Partner-Key`), every response shape, webhooks, iframe messages, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit §6u (what a token can do); Iframe Kit embed-token section (`set_list` user); OpenAPI `info.description` error note.
+
 ## v1.7.65 — 2026-09-30 — Optional short-lived embed token for the iframe
 
 - **Availability:** live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0). Adopting the token is optional; the PropStream embed key is unchanged.
