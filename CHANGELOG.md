@@ -2,7 +2,7 @@
 
 ## v1.7.65 — 2026-09-30 — Optional short-lived embed token for the iframe
 
-- **Availability:** staging candidate; production pending.
+- **Availability:** live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0). Adopting the token is optional; the PropStream embed key is unchanged.
 - **What changed:** `POST /v1/auth/embed-token` lets a partner backend exchange its server key (holding `payments:write` or `recipients:write`) for a 60-minute token bound to one user. The body carries only `external_user_id`; account, source and tenant come from the key. The iframe accepts the token as `apiToken` in `set_api_config`, sends it as `Authorization: Bearer`, and sends `request_config` about 5 minutes before it expires so the parent can answer with a new token.
 - **Limits:** a token acts only as the embedded experience, attributed to its own user; an `X-External-User-ID` header cannot change that user, and reads stay scoped to the tenant as with the embed key. It takes the issuing key's PII level. It never confirms payment, writes recipients or submits print jobs. Every request re-checks the issuing key, so revoking it (or making it least-privilege) invalidates its tokens. A token cannot issue another token.
 - **Partner action:** none. PropStream keeps its embed key unchanged; the iframe still sends a `pk_` value as `X-Partner-Key` and sends no renewal `request_config` for it. Adopting the token is optional.
@@ -11,7 +11,7 @@
 
 ## v1.7.64 — 2026-09-29 — Keep recipient selection on same-list count refresh
 
-- **Availability:** release candidate; not yet in production.
+- **Availability:** live in production since 2026-10-01 (iframe v1.22.0).
 - **What changed:** an accepted same-`listId` `set_list` refresh carrying a replacement `piece_counts` table retains the active Deliver To and Remove duplicate addresses choices. The iframe resolves the new count and price from that same combination. If the new table makes it missing or zero, the selection remains and submission stays blocked until the user picks an available combination.
 - **Partner action:** none. PropStream continues sending the same `set_list` refresh after Edit Leads; use the emitted `recipient_selection` and `orders[].pieces` for billing and upload sizing.
 - **Unchanged:** first-receipt and new-list defaults, omitted-table refreshes, message and payload shapes, iframe envelope version `1`, and REST `3.1`.
@@ -19,7 +19,7 @@
 
 ## v1.7.63 — 2026-09-29 — Catalog postcards print with the compact recipient box
 
-- **Availability:** staging candidate; production pending.
+- **Availability:** staging candidate; production pending. Contract versions 1.7.62, 1.7.64 and 1.7.65 shipped to production on 2026-10-01 without this item: production keeps sending and printing `standard_v10` for catalog and Classic proofs.
 - **What changed:** `postal_layout_profile` accepts a new immutable value, `standard_v11`. New catalog and Classic 4x6/6x9 proofs from the Ballpoint-hosted iframe send it: the same compact recipient box Create Your Own already prints (`cyo_compact_white_v2` on 4x6, `cyo_compact_white_v3` on 6x9), instead of the wider `standard_v10` area. Like `standard_v10`, it covers the old indicia still drawn inside known saved Home Services artwork. Realtor/Agent postcards keep `standard_v10`: `standard_v11` with a back that carries the Realtor divider returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before any write, because the compact box would print over it.
 - **Editor preview:** the postage indicia in the iframe preview now uses the same four lines, sizes and positions as the printed piece. The print itself is unchanged.
 - **Partner action:** none. PropStream does not send this field; the iframe fills it. `standard_v10` stays accepted for catalog proofs from older iframe bundles.
@@ -28,10 +28,10 @@
 
 ## v1.7.62 — 2026-09-28 — Iframe checkout waits for accepted orders
 
-- **Availability:** iframe PR [#484](https://github.com/Ballpoint-Marketing/ballpoint-iframe/pull/484); staging validation pending, production pending.
+- **Availability:** iframe PR [#484](https://github.com/Ballpoint-Marketing/ballpoint-iframe/pull/484); live in production since 2026-10-01 (iframe v1.22.0). Verified jointly with PropStream in staging on 2026-09-30.
 - **Visible failure:** a rejected submission stays on Order Summary with a persistent, accessible **Order not sent** message. The iframe shows a bounded API reason when safe, otherwise asks the user to review the order. Exhausted transient retries show **Retry** and explain that checkout did not open.
 - **Checkout guarantee:** `campaign_submitted` is emitted only after every order has a server-assigned `orders[].ballpointOrderId`. For compatibility, `pendingSubmissionCount` remains `0` and `pendingOrderIds` remains empty in its payload. `campaign_submission_pending` is no longer emitted. The iframe resumes unaccepted orders under their original idempotency keys after a partial multi-send or A/B submission, without posting accepted orders again.
-- **Partner action:** PropStream should stop waiting for `campaign_submission_pending` and treat a missing `ballpointOrderId` in `campaign_submitted` as an integration error. Begin payment only from an accepted `campaign_submitted`; a rejected order remains in the iframe. Joint staging verification is pending.
+- **Partner action:** PropStream should stop waiting for `campaign_submission_pending` and treat a missing `ballpointOrderId` in `campaign_submitted` as an integration error. Begin payment only from an accepted `campaign_submitted`; a rejected order remains in the iframe.
 - **Other contracts:** `order_submission_deferred` remains for deterministic rejections; its `reason` now uses the lower-cased error code. The iframe message envelope stays version `1`. No REST endpoint, request/response shape, or webhook change is introduced by this iframe release.
 
 ## v1.7.61 — 2026-09-28 — Greeting Letter completion reports its mailed count
@@ -45,7 +45,7 @@
 
 ## v1.7.60 — 2026-09-26 — Handwritten message parts for Realtor/Agent postcards
 
-- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.21.0); they remain a staging candidate.
+- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.22.0); they remain a staging candidate.
 - **What changed:** `POST /orders` accepts an optional `message_parts` object (`greeting`, required `body`, `signature`) for handwritten pieces whose writing robots place those parts separately. If `message` is also sent it must equal the parts joined by one blank line, otherwise `400 MESSAGE_PARTS_MISMATCH` before any write; a Cursive canvas that still prints the managed message returns `400 MESSAGE_PARTS_PRINTED`; each part holds at most 20 merge tags; the parts are not editable through `PATCH`. `GET /v1/billing/orders/{order_id}/recipients` returns `message_greeting`, `message_body` and `message_signature` per recipient, with message merge tags resolved, for orders that carry parts.
 - **Iframe:** the Realtor/Agent Just Listed and Just Sold postcards replace the single message box with Greeting, Message and Signature fields and a live back preview; their orders send `message_parts` alongside the unchanged composed `message`. Cursive print files leave the message blank because the robots write it; Printed pieces keep it on the card.
 - **Partner action:** none. PropStream sends no new message; the iframe fills the new field. Server-to-server callers may keep sending `message` only.

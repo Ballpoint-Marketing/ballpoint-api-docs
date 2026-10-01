@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.65** (optional short-lived embed token: `apiToken` may carry a per-user token issued by your backend, renewed through `request_config`; the embed key keeps working unchanged; staging candidate, production pending. v1.7.64: same-list `set_list` refreshes with a replacement `piece_counts` table retain the active Deliver To / Remove duplicates selection and reprice that combination; release candidate, not yet in production. v1.7.63: new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; staging candidate, production pending. v1.7.62: the iframe blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired; staging candidate, production pending. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`.)
+Partner contract version: **v1.7.65** (optional short-lived embed token: `apiToken` may carry a per-user token issued by your backend, renewed through `request_config`; the embed key keeps working unchanged; live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0). v1.7.64: same-list `set_list` refreshes with a replacement `piece_counts` table retain the active Deliver To / Remove duplicates selection and reprice that combination; live in production since 2026-10-01 (iframe v1.22.0). v1.7.63: new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; staging candidate, production pending (production still sends `standard_v10`). v1.7.62: the iframe blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired; live in production since 2026-10-01 (iframe v1.22.0). v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`.)
 
 Contract 1.7.58: **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices. Nothing changes for PropStream.
 
@@ -284,7 +284,8 @@ Ballpoint production as of partner contract `1.7.51`.
 
 Every current PropStream 4x6/6x9 proof also records its postal profile. The
 Ballpoint-hosted iframe declares `standard_v11` for new catalog and Classic
-proofs (contract 1.7.63): the compact recipient box Create Your Own prints.
+proofs (contract 1.7.63; staging candidate, production still declares
+`standard_v10`): the compact recipient box Create Your Own prints.
 Realtor/Agent proofs declare `standard_v10`, which preserves the approved
 `standard_v9` 4x6 and 6x9 geometry. When the Create Your Own rollout flag is
 enabled, the iframe declares `cyo_compact_white_v2` (4x6) or

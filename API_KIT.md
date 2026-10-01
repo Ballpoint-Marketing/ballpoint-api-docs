@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.65 · September 2026** · Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (staging candidate; production pending; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (release candidate); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (staging candidate; production pending); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
+> **v1.7.65 · September 2026** · Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -732,7 +732,8 @@ request field or partner-side action changed.
 
 For every PropStream printed postcard, the current Ballpoint-hosted iframe also
 sends the exact `postal_layout_profile` it displayed: `standard_v11` for a
-new catalog or Classic proof (contract 1.7.63), `standard_v10` for a
+new catalog or Classic proof (contract 1.7.63; staging candidate, production
+still sends `standard_v10`), `standard_v10` for a
 Realtor/Agent proof, or `cyo_compact_white_v2` (4x6) / `cyo_compact_white_v3`
 (6x9) when the exact Create Your Own rollout is enabled. `standard_v11` prints
 the same compact recipient box as those Create Your Own profiles. `standard_v10`
