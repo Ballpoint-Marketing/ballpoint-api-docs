@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.66 — 2026-10-02 — Print-job booklets up to 32 pages, billed per page plus postage
+
+- **Availability:** page rules live in Ballpoint production since API `v3.40.0`; per-page billing is a staging candidate, production pending.
+- **What changed:** `POST /v1/print-jobs` accepts `pages_per_booklet` as any multiple of 4 from 4 to 32 (previously documented as 4 or 8). A job holds at most 40,000 pages (`booklet_count × pages_per_booklet`); a larger batch is split into several jobs and an oversized request is refused with 422 before any upload is read. Print jobs are billed per page plus First Class postage per booklet, with the price fixed when the job is accepted.
+- **Partner action:** print-job partners pad each booklet with blank pages to a multiple of 4 and print the mailing address and postage indicia on the last page.
+- **Unchanged:** routes, response shapes, error codes, webhook payloads, iframe messages, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit header and §6t PDF requirements and billing; OpenAPI `PrintJobRequest.pages_per_booklet` and `x-partner-contract-version`; Iframe Kit version header only; Postman version marker (no request change).
+
 ## Unreleased — Embed token orders stay with the token user
 
 - **Availability:** staging candidate; production pending (next API release). No contract version change (`1.7.65`).
