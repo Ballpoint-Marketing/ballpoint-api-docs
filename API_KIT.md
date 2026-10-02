@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.66 · October 2026** · print-job booklets accept a multiple of 4 pages from 4 to 32 (up to 40,000 pages per job) and are billed per page plus postage per booklet (staging candidate; production pending); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
+> **v1.7.66 · October 2026** · print-job booklets accept a multiple of 4 pages from 4 to 32, up to 40,000 pages per job (live in production since API v3.40.0); billed per page plus postage per booklet (staging candidate; production pending); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -2356,7 +2356,7 @@ For partners that build the finished, print-ready file themselves (for example, 
 | Page size | Every page 5.5 × 8.5 in (396 × 612 pt), no bleed |
 | Booklet | Saddle-stitched, `pages_per_booklet` a multiple of `4` from `4` to `32` (for example `28`); pad with blank pages to reach it |
 | Page count | Exactly `booklet_count × pages_per_booklet`, booklets in page order |
-| Mailing address | Printed on each booklet in the PDF itself; no separate recipient list |
+| Mailing address | Printed on the booklet's last page with the First Class postage indicia; no separate recipient list |
 | File | Not encrypted, at most 250 MB, at most 10,000 booklets and 40,000 pages (`booklet_count × pages_per_booklet`) per job; split larger batches into several jobs |
 
 **Flow — once per daily batch:**
@@ -2431,14 +2431,14 @@ Follow progress with `GET /v1/billing/orders/{order_id}` (`production_status`).
 | 422 | `PDF_ENCRYPTED` | Password-protected PDF |
 | 422 | `PDF_PAGE_SIZE` | A page is not 5.5 × 8.5 in; the error names the page |
 | 422 | `PDF_PAGE_COUNT` | Page total differs from `booklet_count × pages_per_booklet` |
-| 400 | `NO_PRICING` | Pricing is not configured for this account yet |
+| 400 | `NO_PRICING` | Print-job pricing is not configured yet |
 | 402 | spending-limit and daily-cap codes (§10) | The job exceeds an account limit agreed at onboarding |
 | 403 | `ACCOUNT_INACTIVE` | The account is inactive |
 | 422 | list-shaped `detail` | Request body failed validation (missing field, wrong type, value out of range) |
 | 429 | `ACCOUNT_RPM_EXCEEDED` / `ACCOUNT_RPD_EXCEEDED` | Account request rate exceeded; retry after `Retry-After` |
 | 503 | `PRINT_JOBS_BUSY` | Another job is being validated; retry after `Retry-After` |
 
-**Billing.** Print jobs are invoiced weekly once Ballpoint completes the job: price per page × pages, plus First Class postage per booklet. The price is fixed when the job is accepted. The mailing address and postage indicia are printed on the booklet's last page; Ballpoint mails the booklets.
+**Billing.** Print jobs are invoiced weekly once Ballpoint completes the job: price per page × pages, plus First Class postage per booklet. The price is fixed when the job is accepted. (Staging candidate; production pending — production still bills a flat price per booklet.) The mailing address and postage indicia are printed on the booklet's last page; Ballpoint mails the booklets.
 
 ---
 
