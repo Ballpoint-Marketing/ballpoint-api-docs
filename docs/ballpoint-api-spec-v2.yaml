@@ -2,8 +2,8 @@ openapi: 3.1.0
 info:
   title: Ballpoint Marketing API (v1, staging)
   version: 3.1.0
-  x-partner-contract-version: 1.7.66
-  description: "This spec documents the v1 API contract using staging as its default server and examples. Partner contract 1.7.65 adds `POST /v1/auth/embed-token`, an optional short-lived per-user token for the iframe; 1.7.62, 1.7.64 and 1.7.65 are live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0); the 1.7.63 `standard_v11` catalog/Classic postal profile is a staging candidate, and production still sends `standard_v10` for those proofs; the Realtor/Agent handwritten postcards that send the 1.7.60 `message_parts` are not yet offered by the production iframe. A future v2 remains out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Test-mode account principal; not a partner credential |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nErrors raised by the API sit under `detail` (FastAPI wire envelope) and carry a trace ID:\n\n```json\n{\n  \"detail\": {\n    \"error\": {\n      \"type\": \"validation_error\",\n      \"code\": \"INVALID_ADDRESS\",\n      \"message\": \"Address could not be verified\",\n      \"trace_id\": \"tr_abc123\"\n    }\n  }\n}\n```\n\nA key used on a route whose scope it does not hold receives `403` with code `INSUFFICIENT_SCOPE`, `required_scope` and `granted_scopes`. An embed token whose order body names a different `external_user_id` receives `403 EXTERNAL_USER_MISMATCH`. Request-validation failures use FastAPI's list-shaped `detail` with status 422.\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.66`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on all responses:\n    - `X-RateLimit-Remaining`: requests remaining in window\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
+  x-partner-contract-version: 1.7.67
+  description: "This spec documents the v1 API contract using staging as its default server and examples. Partner contract 1.7.65 adds `POST /v1/auth/embed-token`, an optional short-lived per-user token for the iframe; 1.7.62, 1.7.64 and 1.7.65 are live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0); the 1.7.63 `standard_v11` catalog/Classic postal profile is a staging candidate, and production still sends `standard_v10` for those proofs; the Realtor/Agent handwritten postcards that send the 1.7.60 `message_parts` are not yet offered by the production iframe. A future v2 remains out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Test-mode account principal; not a partner credential |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nErrors raised by the API sit under `detail` (FastAPI wire envelope) and carry a trace ID:\n\n```json\n{\n  \"detail\": {\n    \"error\": {\n      \"type\": \"validation_error\",\n      \"code\": \"INVALID_ADDRESS\",\n      \"message\": \"Address could not be verified\",\n      \"trace_id\": \"tr_abc123\"\n    }\n  }\n}\n```\n\nA key used on a route whose scope it does not hold receives `403` with code `INSUFFICIENT_SCOPE`, `required_scope` and `granted_scopes`. An embed token whose order body names a different `external_user_id` receives `403 EXTERNAL_USER_MISMATCH`. Request-validation failures use FastAPI's list-shaped `detail` with status 422.\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.67`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on all responses:\n    - `X-RateLimit-Remaining`: requests remaining in window\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
   contact:
     name: Ballpoint API Support
     email: api-support@ballpointmarketing.com
@@ -115,6 +115,148 @@ components:
         type: string
         format: uuid
   schemas:
+    UploadRecipient:
+      properties:
+        first_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: First Name
+        last_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Last Name
+        company:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Company
+        address:
+          description: Street address line 1
+          title: Address
+          type: string
+        address2:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Address2
+        city:
+          title: City
+          type: string
+        state:
+          description: 2-letter state code
+          maxLength: 2
+          minLength: 2
+          title: State
+          type: string
+        zip:
+          description: 5 or 5+4 digit ZIP code
+          title: Zip
+          type: string
+        contact_id:
+          anyOf:
+          - maxLength: 64
+            type: string
+          - type: 'null'
+          default: null
+          description: Optional partner-side recipient identifier (e.g. PropStream contact_id). Stored verbatim and
+            round-tripped in GET responses and RTS webhooks; never interpreted by Ballpoint.
+          title: Contact Id
+        address_type:
+          anyOf:
+          - maxLength: 16
+            type: string
+          - type: 'null'
+          default: null
+          description: 'Address type: PROPERTY or MAILING. Optional for order-level endpoints.'
+          title: Address Type
+        placeHolders:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          default: null
+          description: Partner-supplied per-recipient merge values (PropStream placeHolders). Object of scalar values
+            keyed by a canonical Owner/Property merge name; PropertyValue additionally supplies the handwritten {property_value}
+            message tag. Used for render personalization only; never used as the delivery address (see INTEGRATION.md).
+          title: Placeholders
+      required:
+      - address
+      - city
+      - state
+      - zip
+      title: Recipient
+      type: object
+    RecipientUploadRequest:
+      properties:
+        recipients:
+          items:
+            $ref: '#/components/schemas/UploadRecipient'
+          maxItems: 10000
+          title: Recipients
+          type: array
+        append:
+          default: false
+          description: If true, append to existing recipients; if false (default), replace all
+          title: Append
+          type: boolean
+      required:
+      - recipients
+      title: RecipientUploadRequest
+      type: object
+    UploadRejectedDetail:
+      properties:
+        index:
+          title: Index
+          type: integer
+        reason:
+          title: Reason
+          type: string
+      required:
+      - index
+      - reason
+      title: RejectedDetail
+      type: object
+    RecipientUploadResponse:
+      properties:
+        order_id:
+          title: Order Id
+          type: string
+        accepted:
+          title: Accepted
+          type: integer
+        rejected:
+          title: Rejected
+          type: integer
+        rejected_details:
+          default: []
+          items:
+            $ref: '#/components/schemas/UploadRejectedDetail'
+          title: Rejected Details
+          type: array
+        total_recipients:
+          title: Total Recipients
+          type: integer
+        piece_count:
+          title: Piece Count
+          type: integer
+        ready:
+          title: Ready
+          type: boolean
+      required:
+      - order_id
+      - accepted
+      - rejected
+      - total_recipients
+      - piece_count
+      - ready
+      title: RecipientUploadResponse
+      type: object
     InsufficientScopeError:
       type: object
       description: 403 returned when a partner key lacks the scope a route requires (`payments:write`, `recipients:write`, `print_jobs:write`), or when a least-privilege key calls a route outside its scopes (then `required_scope` is null). FastAPI wire envelope - the error object sits under `detail`.
@@ -1791,6 +1933,64 @@ security:
 - bearerAuth: []
 - partnerKeyAuth: []
 paths:
+  /v1/billing/orders/{order_id}/recipients:
+    post:
+      tags:
+      - Recipients
+      summary: Upload recipient addresses in replace or append mode
+      operationId: uploadOrderRecipients
+      description: 'Contract 1.7.67: staging candidate; production pending. Requires a server key with recipients:write
+        when account scope enforcement is active. At most 10,000 recipients per request. New uploads require scheduled,
+        pending_payment, accepted or prep status. Optional Idempotency-Key is stable per logical block: same key and
+        validated body replay the original response, even after status advances, without another mutation. Body/mode/recipient
+        order changes with the same key return 422 IDEMPOTENCY_KEY_REUSE. A durable outstanding claim returns 409
+        IDEMPOTENCY_KEY_IN_PROGRESS and Retry-After: 3; concurrent requests may wait for the order lock and replay.
+        Receipts default to 48-hour retention (configurable); reconcile after expiration. Missing/empty key keeps
+        legacy behavior. See API_KIT.md section 6n.'
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Persist one opaque key and body per logical block; reuse the pair on retries. A new block gets
+          a new key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipientUploadRequest'
+      responses:
+        '200':
+          description: Original upload receipt (also returned on replay). Rows missing both names are soft-rejected.
+            ready is true when the total equals piece_count; require a positive count before payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipientUploadResponse'
+        '400':
+          description: Recipient count exceeds piece_count.
+        '401':
+          description: Authentication required.
+        '403':
+          description: Caller lacks required scope.
+        '404':
+          description: Order not found within the authorized tenant.
+        '409':
+          description: RECIPIENTS_LOCKED for a new upload or IDEMPOTENCY_KEY_IN_PROGRESS for an outstanding receipt.
+          headers:
+            Retry-After:
+              description: 3 seconds for IDEMPOTENCY_KEY_IN_PROGRESS.
+              schema:
+                type: integer
+        '422':
+          description: Malformed recipient fields or IDEMPOTENCY_KEY_REUSE for changed content.
   /v1/billing/pricing:
     get:
       tags:

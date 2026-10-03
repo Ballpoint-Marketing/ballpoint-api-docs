@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.67 — 2026-10-02 — Retry-safe recipient upload blocks
+
+- **Availability:** staging candidate; production pending. No production activation is included in this change.
+- **Behavior:** `POST /v1/billing/orders/{order_id}/recipients` accepts an optional `Idempotency-Key`. The same key and validated body replay the committed response, including after status advances, without repeating recipient or render-generation mutations. Different content returns `422 IDEMPOTENCY_KEY_REUSE`; an outstanding claim returns `409 IDEMPOTENCY_KEY_IN_PROGRESS` with `Retry-After: 3`.
+- **Partner action:** persist a separate key and body for every logical block (maximum 10,000 recipients per request), reuse them on retries and reconcile after receipt retention expires (48 hours by default, configurable). Without a key, legacy behavior remains. Distinct keys preserve intended repeated recipients subject to existing campaign-instance deduplication.
+- **Artifacts:** API Kit §6n, backend guidance in Iframe Kit, verified upload operation in OpenAPI, Postman stable upload-key variable and matching API/iframe contract markers. No iframe message or webhook payload changes.
+
+
 ## v1.7.66 — 2026-10-02 — Print-job booklets up to 32 pages, billed per page plus postage
 
 - **Availability:** page rules live in Ballpoint production since API `v3.40.0`; per-page billing is a staging candidate, production pending.

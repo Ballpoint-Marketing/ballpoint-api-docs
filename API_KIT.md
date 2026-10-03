@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.66 · October 2026** · print-job booklets accept a multiple of 4 pages from 4 to 32, up to 40,000 pages per job (live in production since API v3.40.0); billed per page plus postage per booklet (staging candidate; production pending); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
+> **v1.7.67 · October 2026** · optional Idempotency-Key on recipient uploads (staging candidate; production pending; §6n); v1.7.66 print-job booklets accept a multiple of 4 pages from 4 to 32, up to 40,000 pages per job (live in production since API v3.40.0); billed per page plus postage per booklet (staging candidate; production pending); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -1745,6 +1745,16 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/res
 
 ### 6n. Upload Recipients (Initial Upload)
 
+**Upload retries (1.7.67 — staging candidate, production pending).** Send an optional `Idempotency-Key` header with a stable opaque key for each logical block. Save that key and the exact body before sending; use the same key and body if the response is lost or the request times out. Use a new key for a new block. The receipt is scoped to the order and its account, and commits in the same transaction as recipients and render readiness.
+
+- A matching retry returns the original response, without appending again, resetting the render generation, repeating campaign deduplication or deleting later blocks. This includes a final block retried after the order has advanced.
+- The body includes `append`, recipient order and duplicates. Reusing a key for different validated content returns `422 IDEMPOTENCY_KEY_REUSE` without mutation.
+- An outstanding receipt returns `409 IDEMPOTENCY_KEY_IN_PROGRESS` and `Retry-After: 3`. Simultaneous uploads may wait for the order lock, then replay the completed response. Old outstanding receipts are never taken over by this route.
+- Receipts use the existing retention policy, 48 hours by default (configurable). After that window, reconcile the order's recipients and readiness before sending; a retired receipt cannot prevent another write.
+- Missing or empty headers keep legacy replace/append behavior. Repeating a legacy append can duplicate rows; replacing again can start another render generation. Distinct keys do not deduplicate repeated addresses. The existing opt-in campaign-instance deduplication still applies to new writes.
+- A replay is the original upload receipt, not a fresh order-status read. For a 40,000-recipient order, persist four separate block keys, upload at most 10,000 per call and retry a failed block with its original key. This upload limit is separate from the production batch limit.
+
+
 ```
 POST /v1/billing/orders/{order_id}/recipients
 X-Partner-Key: pk_test_...
@@ -1788,7 +1798,7 @@ The PropStream flow is create the order first (with `piece_count`, via `POST /or
 - At least one of `first_name` / `last_name` (enforced per-row — see partial acceptance below).
 - Optional: `company`, `address2`, `contact_id` (<=64; partner-side recipient id, stored verbatim and round-tripped, never interpreted by Ballpoint), `address_type` (`PROPERTY` | `MAILING`; optional for order-level upload), `placeHolders` (camelCase; PropStream V1 Owner/Property merge values plus optional message-only `PropertyValue`; used for render personalization only, never as the delivery address).
 
-- `append` (default `false`): `false` REPLACES all existing recipients on the order (idempotent re-upload); `true` APPENDS to existing recipients (for chunked uploads of large orders).
+- `append` (default `false`): `false` REPLACES all existing recipients on the order; `true` APPENDS to existing recipients (for chunked uploads of large orders).
 
 The standard handwritten editor on the 37 approved canvas-backed printed postcard products uses this exact mapping at render time:
 
@@ -1823,7 +1833,7 @@ Before opening the payment step, require both `ready === true` **and** `piece_co
 
 If an initial A/B upload has already reduced an order to `piece_count: 0`, retrying this POST with a non-empty list cannot repair it because the new list would exceed the order's current piece count. For an eligible gated, unconfirmed order, use the [Edit Leads PATCH](#6o-edit-leads--replace--resize--reprice-recipients-patch) with a verified recipient-disjoint slice so the order is resized and repriced; otherwise cancel and recreate the order. If you cancel, drop the cancelled order's id from subsequent [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) calls — a cancelled order that still has `piece_count: 0` keeps returning `409 INVALID_PIECE_COUNT` and blocks the preview for its healthy siblings. The PATCH is a replacement operation and does not construct or validate the A/B split for the partner.
 
-**Allowed order statuses:** `scheduled`, `pending_payment`, `accepted`, `prep`. Any other status → `409 RECIPIENTS_LOCKED`.
+**Allowed order statuses for a new upload:** `scheduled`, `pending_payment`, `accepted`, `prep`. Any other status → `409 RECIPIENTS_LOCKED`. A matching committed idempotency receipt replays before this status gate.
 
 **Partial acceptance:** rows missing BOTH `first_name` and `last_name` are rejected per-row into `rejected_details`, and the request still succeeds with the valid rows. (Malformed REQUIRED fields — bad zip, non-2-letter state, missing address/city/state/zip — fail validation for the whole request: `422`.)
 
