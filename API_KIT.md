@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.67 · October 2026** · optional Idempotency-Key on recipient uploads (staging candidate; production pending; §6n); v1.7.66 print-job booklets accept a multiple of 4 pages from 4 to 32, up to 40,000 pages per job (live in production since API v3.40.0); billed per page plus postage per booklet (staging candidate; production pending); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
+> **v1.7.68 · October 2026** · read-only `presort_suppressed_count` on order list/detail (staging candidate; production pending); v1.7.67 optional Idempotency-Key on recipient uploads (staging candidate; production pending; §6n); v1.7.66 print-job booklets accept a multiple of 4 pages from 4 to 32, up to 40,000 pages per job (live in production since API v3.40.0); billed per page plus postage per booklet (staging candidate; production pending); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -906,6 +906,15 @@ customer-facing quote captured with the partner markup. The retail pair is
 `null` on legacy orders when the checkout-time markup cannot be proven; do not
 fill those gaps with the account's current markup. None of these display/read
 fields replaces the authoritative charge-now preview or the settled ledger.
+
+`presort_suppressed_count` (1.7.68, staging candidate; production pending) is
+the number of pieces AccuZIP removed from that order at presort. It is read
+from the same `order.presort_suppressed` event Ballpoint sent for the order, so
+it always equals that event's `suppressedCount`, and it is `null` when no such
+event exists (no piece removed, production not started yet, or an order mailed
+before the event was enabled). `piece_count` keeps the ordered quantity; the pieces that go
+to mail are `piece_count - presort_suppressed_count`. Read-only and additive: no
+request or webhook changes.
 
 `display_status` is the single field to show your users. `usps_status` is `null` until USPS scans arrive (1–2 days after production completes).
 
@@ -2569,6 +2578,8 @@ removed still emits normally; no printable PDF is manufactured for that case.
 - Ballpoint does not send `creditTotalTCents`. PropStream calculates prepaid
   wallet credit as the order's saved `unitPriceTCents` from
   `POST /v1/billing/campaigns/preview` multiplied by `suppressedCount`.
+- Since 1.7.68 the same count is also readable on `GET /v1/billing/orders` and
+  `GET /v1/billing/orders/{order_id}` as `presort_suppressed_count`.
 - Delivery is at least once. Deduplicate the wallet credit on
   `X-Ballpoint-Event-Id` / top-level `event_id`, not on the wrapped `id`.
 - Activation is coordinated receiver-first and applies from the enabled

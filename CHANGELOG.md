@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.7.68 — 2026-10-03 — Presort suppression count on orders
+
+- **Availability:** staging candidate; production pending.
+- **What changed:** `GET /v1/billing/orders` and `GET /v1/billing/orders/{order_id}` return a read-only `presort_suppressed_count`: the pieces AccuZIP removed from the order at presort. It is read from the `order.presort_suppressed` event Ballpoint already sent for that order, so it always equals that event's `suppressedCount`, and it is `null` when no such event exists. `piece_count` keeps the ordered quantity.
+- **Partner action:** none. The field is additive; existing requests, responses and webhooks are unchanged. The iframe uses it to show the adjusted mailer count in the Direct Mail dashboard.
+- **Artifacts:** API Kit order fields and presort section, OpenAPI `OrderDetail`, Iframe Kit version marker, Postman collection description and matching API/iframe contract markers.
+
 ## v1.7.67 — 2026-10-02 — Retry-safe recipient upload blocks
 
 - **Availability:** staging candidate; production pending. No production activation is included in this change.
