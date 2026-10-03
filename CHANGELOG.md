@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.69 — 2026-10-03 — 24 dynamic fields in the design editor
+
+- **Availability:** staging candidate; production pending (next API and iframe release; the API ships first).
+- **What changed:** the design editor offers 13 more dynamic fields, for 24 in total: `#MyBusinessEmail#`, `#MyAddress#`, `#MyCity#`, `#MyState#`, `#MyZip#`, `#RecipientFirstName#`, `#RecipientLastName#`, `#MailingFullAddress#`, `#MailingStreet#`, `#MailingCity#`, `#MailingState#`, `#MailingZip#` and `#PropertyFullAddress#`. Sender fields come from `set_sender`; recipient and mailing fields from the structured recipient address, with `address2` on the same line as `address`; `#PropertyFullAddress#` only from the property `placeHolders`. A field with no data prints blank and never falls back to another field. The dropdown now groups fields as Sender, Recipient, Mailing Address and Property.
+- **Partner action:** none required. To print a second address line for the sender or the property, send both lines together in `set_sender.address` and in `placeHolders.PropertyStreet`; there is no separate line 2 field.
+- **Existing artwork:** designs that use the older `{{sender_email}}` field printed the sender website, because orders did not carry an email. They now print the email when the order has one and still fall back to the website when it does not.
+- **Request change (additive):** the order `sender` object on `POST /orders` accepts an optional `email` (maximum 254 characters). The iframe fills it from `set_sender.email`; older clients that omit it are unaffected.
+- **Unchanged:** the 11 existing fields and their sources, every other request and response shape, `set_sender` and recipient upload payloads, webhooks, postMessage types, envelope version `1` and REST `3.1`.
+- **Artifacts:** Iframe Kit header and new [Dynamic fields](IFRAME_KIT.md#dynamic-fields-in-the-design-editor) section; API Kit header, sender field table and Color Letter note; OpenAPI `SenderInfo.email`, `canvas_json` description and `x-partner-contract-version`; Postman version marker (no request change).
+
 ## v1.7.68 — 2026-10-03 — Presort suppression count on orders
 
 - **Availability:** staging candidate; production pending.
