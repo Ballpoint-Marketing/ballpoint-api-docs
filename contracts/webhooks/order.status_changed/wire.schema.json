@@ -7,7 +7,8 @@
     { "allOf": [{ "$ref": "logical.schema.json#/$defs/worker_failed" }, { "$ref": "#/$defs/transport" }] },
     { "allOf": [{ "$ref": "logical.schema.json#/$defs/staff_transition" }, { "$ref": "#/$defs/transport" }] },
     { "allOf": [{ "$ref": "logical.schema.json#/$defs/partner_cancelled" }, { "$ref": "#/$defs/transport" }] },
-    { "allOf": [{ "$ref": "logical.schema.json#/$defs/payment_expired" }, { "$ref": "#/$defs/transport" }] }
+    { "allOf": [{ "$ref": "logical.schema.json#/$defs/payment_expired" }, { "$ref": "#/$defs/transport" }] },
+    { "allOf": [{ "$ref": "logical.schema.json#/$defs/replaced_by_edit" }, { "$ref": "#/$defs/transport" }] }
   ],
   "unevaluatedProperties": false,
   "$defs": {

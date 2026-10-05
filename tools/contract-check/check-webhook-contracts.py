@@ -104,7 +104,7 @@ def main() -> int:
                 headers["X-Ballpoint-Signature"], f"sha256={digest}"
             )
 
-    assert fixture_count == 10
+    assert fixture_count == 11
     unsigned = load_json(CONTRACTS / "headers" / "unsigned.fixture.json")
     validate(unsigned, header_schema)
     assert unsigned["X-Ballpoint-Insecure"] == "true"

@@ -54,7 +54,8 @@
         "worker_failed",
         "staff_transition",
         "partner_cancelled",
-        "payment_expired"
+        "payment_expired",
+        "replaced_by_edit"
       ],
       "fixtures": [
         {
@@ -84,6 +85,13 @@
           "wire": "order.status_changed/fixtures/payment_expired.wire.json",
           "raw_body": "order.status_changed/fixtures/payment_expired.wire.body.json",
           "headers": "order.status_changed/fixtures/payment_expired.headers.json"
+        },
+        {
+          "variant": "replaced_by_edit",
+          "logical": "order.status_changed/fixtures/replaced_by_edit.logical.json",
+          "wire": "order.status_changed/fixtures/replaced_by_edit.wire.json",
+          "raw_body": "order.status_changed/fixtures/replaced_by_edit.wire.body.json",
+          "headers": "order.status_changed/fixtures/replaced_by_edit.headers.json"
         }
       ]
     },

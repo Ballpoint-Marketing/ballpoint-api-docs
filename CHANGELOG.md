@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.7.70 — 2026-10-05 — Edit after checkout: replace unpaid orders under the same campaign
+
+- **Availability:** staging candidate behind the `propstream_checkout_edit_reissue_enabled` flag, disabled until PropStream confirms its handler. Not in production.
+- **What changed:** after the `campaign_submitted` handoff, **Previous** on the Order Summary (while the payment popup has no final result) reopens editing. On the next **Continue to Payment** the iframe calls `POST /orders/void` for the previous unpaid orders, creates new orders, and emits `campaign_created` and `campaign_submitted` again with the **same `campaignId`** and `listId`, the current `listName`, `campaignType` and `recipient_selection`, and the new `orders[]`. The user may change any step, including the mailer type. A plain popup reopen that never left the Order Summary still replays the exact cached payload with no new order (v1.7.36).
+- **New endpoint:** `POST /orders/void` with `{ "order_ids": [...] }` moves unpaid `scheduled` or `pending_payment` orders to `payment_failed`, all or nothing. A paid order, or one past those states, rejects the whole call with `409 ORDER_NOT_VOIDABLE` and nothing changes. Repeating the call is a no-op. An embed token can only void its own user's orders. The route returns `403 FEATURE_DISABLED` while the flag is off for the user.
+- **Webhook:** each replaced order emits `order.status_changed` with `new_status: payment_failed`, `trigger: replaced_by_edit` and `failure_reason: replaced_by_edit` (a fifth as-shipped variant). No `order.drop_cancelled` is sent. A replaced order can no longer be paid (`confirm-payment` returns `409`) or cancelled.
+- **Reads:** replaced orders are left out of `GET /v1/billing/orders` and `GET /v1/billing/partner/orders` for partner keys, `GET /v1/billing/partner/stats` (every count), `/v1/billing/partner/alerts`, `/v1/billing/partner/ops/summary`, `/v1/billing/partner/ops/orders`, `GET /v1/mail-tracking/account-summary` and the purchased Multi-Send rule. `GET /v1/billing/orders/{order_id}` still returns them.
+- **A/B:** a resubmitted split carries a new `campaignInstanceId`, opaque as before.
+- **Partner action:** PropStream updates its `campaign_submitted` and `confirm-submission` handling to accept the same `campaignId` several times and use only the latest `orders[]`; applies `order.status_changed` by `order_id`, since the replaced orders' events can arrive after the new `campaign_submitted`; and sends `ballpointOrderIds` in `payment_result`, so a late result from the replaced checkout cannot match the new one.
+- **Unchanged:** message types and envelope version `1`, every other request and response shape, REST `3.1`.
+- **Artifacts:** Iframe Kit header, `campaign_created` timing and `campaign_submitted` handoff notes, `payment_result` identifiers; API Kit header, §6g-ii void, order list and metrics notes, `order.status_changed` trigger table; OpenAPI `POST /orders/void`; Postman request; webhook JSON Schemas, catalog and fixtures for `replaced_by_edit`.
+
 ## v1.7.69 — 2026-10-03 — 24 dynamic fields in the design editor
 
 - **Availability:** the API part is live in production since 2026-10-05 (API v3.41.0): the renderer resolves the 13 new fields and orders accept the optional sender `email`. The design-editor dropdown with the new fields is not in production yet: production iframe v1.23.0 declares contract 1.7.69 without it (staging candidate).
