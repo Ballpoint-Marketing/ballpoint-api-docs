@@ -2,7 +2,7 @@
 
 ## v1.7.69 — 2026-10-03 — 24 dynamic fields in the design editor
 
-- **Availability:** staging candidate; production pending (next API and iframe release; the API ships first).
+- **Availability:** the API part is live in production since 2026-10-05 (API v3.41.0): the renderer resolves the 13 new fields and orders accept the optional sender `email`. The design-editor dropdown with the new fields is not in production yet: production iframe v1.23.0 declares contract 1.7.69 without it (staging candidate).
 - **What changed:** the design editor offers 13 more dynamic fields, for 24 in total: `#MyBusinessEmail#`, `#MyAddress#`, `#MyCity#`, `#MyState#`, `#MyZip#`, `#RecipientFirstName#`, `#RecipientLastName#`, `#MailingFullAddress#`, `#MailingStreet#`, `#MailingCity#`, `#MailingState#`, `#MailingZip#` and `#PropertyFullAddress#`. Sender fields come from `set_sender`; recipient and mailing fields from the structured recipient address, with `address2` on the same line as `address`; `#PropertyFullAddress#` only from the property `placeHolders`. A field with no data prints blank and never falls back to another field. The dropdown now groups fields as Sender, Recipient, Mailing Address and Property.
 - **Partner action:** none required. To print a second address line for the sender or the property, send both lines together in `set_sender.address` and in `placeHolders.PropertyStreet`; there is no separate line 2 field.
 - **Existing artwork:** designs that use the older `{{sender_email}}` field printed the sender website, because orders did not carry an email. They now print the email when the order has one and still fall back to the website when it does not.
@@ -12,14 +12,14 @@
 
 ## v1.7.68 — 2026-10-03 — Presort suppression count on orders
 
-- **Availability:** staging candidate; production pending.
+- **Availability:** `presort_suppressed_count` is live in production since 2026-10-05 (API v3.41.0). The Direct Mail dashboard's Mailer Count Change display is not in production yet (staging candidate).
 - **What changed:** `GET /v1/billing/orders` and `GET /v1/billing/orders/{order_id}` return a read-only `presort_suppressed_count`: the pieces AccuZIP removed from the order at presort. It is read from the `order.presort_suppressed` event Ballpoint already sent for that order, so it always equals that event's `suppressedCount`, and it is `null` when no such event exists. `piece_count` keeps the ordered quantity.
-- **Partner action:** none. The field is additive; existing requests, responses and webhooks are unchanged. The iframe uses it to show the adjusted mailer count in the Direct Mail dashboard.
+- **Partner action:** none. The field is additive; existing requests, responses and webhooks are unchanged. The Direct Mail dashboard uses it to show the adjusted mailer count (staging candidate; not yet in the production iframe).
 - **Artifacts:** API Kit order fields and presort section, OpenAPI `OrderDetail`, Iframe Kit version marker, Postman collection description and matching API/iframe contract markers.
 
 ## v1.7.67 — 2026-10-02 — Retry-safe recipient upload blocks
 
-- **Availability:** staging candidate; production pending. No production activation is included in this change.
+- **Availability:** live in production since 2026-10-05 (API v3.41.0). Sending the header stays optional; without it, uploads behave as before.
 - **Behavior:** `POST /v1/billing/orders/{order_id}/recipients` accepts an optional `Idempotency-Key`. The same key and validated body replay the committed response, including after status advances, without repeating recipient or render-generation mutations. Different content returns `422 IDEMPOTENCY_KEY_REUSE`; an outstanding claim returns `409 IDEMPOTENCY_KEY_IN_PROGRESS` with `Retry-After: 3`.
 - **Partner action:** persist a separate key and body for every logical block (maximum 10,000 recipients per request), reuse them on retries and reconcile after receipt retention expires (48 hours by default, configurable). Without a key, legacy behavior remains. Distinct keys preserve intended repeated recipients subject to existing campaign-instance deduplication.
 - **Artifacts:** API Kit §6n, backend guidance in Iframe Kit, verified upload operation in OpenAPI, Postman stable upload-key variable and matching API/iframe contract markers. No iframe message or webhook payload changes.
@@ -27,7 +27,7 @@
 
 ## v1.7.66 — 2026-10-02 — Print-job booklets up to 32 pages, billed per page plus postage
 
-- **Availability:** page rules live in Ballpoint production since API `v3.40.0`; per-page billing is a staging candidate, production pending.
+- **Availability:** page rules live in Ballpoint production since API `v3.40.0`; per-page billing live since 2026-10-05 (API v3.41.0). Booklet prices are not set in production yet, so a booklet submission there returns `400 NO_PRICING` until they are.
 - **What changed:** `POST /v1/print-jobs` accepts `pages_per_booklet` as any multiple of 4 from 4 to 32 (previously documented as 4 or 8). A job holds at most 40,000 pages (`booklet_count × pages_per_booklet`); a larger batch is split into several jobs and an oversized request is refused with 422 before any upload is read. Print jobs are billed per page plus First Class postage per booklet, with the price fixed when the job is accepted.
 - **Partner action:** print-job partners pad each booklet with blank pages to a multiple of 4 and print the mailing address and postage indicia on the last page.
 - **Unchanged:** routes, response shapes, error codes, webhook payloads, iframe messages, envelope version `1` and REST `3.1`.
@@ -35,7 +35,7 @@
 
 ## Unreleased — Embed token orders stay with the token user
 
-- **Availability:** staging candidate; production pending (next API release). No contract version change (`1.7.65`).
+- **Availability:** live in production since 2026-10-05 (API v3.41.0). No contract version change (`1.7.65`).
 - **What changed:** with an embed token, `POST /orders` and `POST /v1/billing/orders` refuse a body `external_user_id` that differs from the token's user with `403 EXTERNAL_USER_MISMATCH`, before any campaign, order or charge is created. Omitting the field, or repeating the token's user, behaves as before. This enforces the existing 1.7.65 rule that a token acts only as the user it was issued for.
 - **Unchanged:** requests with an embed or server key (`X-Partner-Key`), every response shape, webhooks, iframe messages, envelope version `1` and REST `3.1`.
 - **Artifacts:** API Kit §6u (what a token can do); Iframe Kit embed-token section (`set_list` user); OpenAPI `info.description` error note.
@@ -59,7 +59,7 @@
 
 ## v1.7.63 — 2026-09-29 — Catalog postcards print with the compact recipient box
 
-- **Availability:** staging candidate; production pending. Contract versions 1.7.62, 1.7.64 and 1.7.65 shipped to production on 2026-10-01 without this item: production keeps sending and printing `standard_v10` for catalog and Classic proofs.
+- **Availability:** staging candidate; production pending. The production releases of 2026-10-01 (1.7.62, 1.7.64, 1.7.65) and 2026-10-05 (1.7.66 to 1.7.69) shipped without this item: production keeps sending and printing `standard_v10` for catalog and Classic proofs.
 - **What changed:** `postal_layout_profile` accepts a new immutable value, `standard_v11`. New catalog and Classic 4x6/6x9 proofs from the Ballpoint-hosted iframe send it: the same compact recipient box Create Your Own already prints (`cyo_compact_white_v2` on 4x6, `cyo_compact_white_v3` on 6x9), instead of the wider `standard_v10` area. Like `standard_v10`, it covers the old indicia still drawn inside known saved Home Services artwork. Realtor/Agent postcards keep `standard_v10`: `standard_v11` with a back that carries the Realtor divider returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before any write, because the compact box would print over it.
 - **Editor preview:** the postage indicia in the iframe preview now uses the same four lines, sizes and positions as the printed piece. The print itself is unchanged.
 - **Partner action:** none. PropStream does not send this field; the iframe fills it. `standard_v10` stays accepted for catalog proofs from older iframe bundles.
@@ -85,7 +85,7 @@
 
 ## v1.7.60 — 2026-09-26 — Handwritten message parts for Realtor/Agent postcards
 
-- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.22.0); they remain a staging candidate.
+- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.23.0); they remain a staging candidate.
 - **What changed:** `POST /orders` accepts an optional `message_parts` object (`greeting`, required `body`, `signature`) for handwritten pieces whose writing robots place those parts separately. If `message` is also sent it must equal the parts joined by one blank line, otherwise `400 MESSAGE_PARTS_MISMATCH` before any write; a Cursive canvas that still prints the managed message returns `400 MESSAGE_PARTS_PRINTED`; each part holds at most 20 merge tags; the parts are not editable through `PATCH`. `GET /v1/billing/orders/{order_id}/recipients` returns `message_greeting`, `message_body` and `message_signature` per recipient, with message merge tags resolved, for orders that carry parts.
 - **Iframe:** the Realtor/Agent Just Listed and Just Sold postcards replace the single message box with Greeting, Message and Signature fields and a live back preview; their orders send `message_parts` alongside the unchanged composed `message`. Cursive print files leave the message blank because the robots write it; Printed pieces keep it on the card.
 - **Partner action:** none. PropStream sends no new message; the iframe fills the new field. Server-to-server callers may keep sending `message` only.
