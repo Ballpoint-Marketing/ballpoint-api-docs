@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.69 · October 2026** · the design editor offers 24 dynamic fields, 13 more than before (sender email and address, recipient name, mailing address, property full address); the order `sender` object accepts an optional `email`; the API part is live in production since 2026-10-05 (API v3.41.0), the editor dropdown is a staging candidate; see [IFRAME_KIT.md](IFRAME_KIT.md#dynamic-fields-in-the-design-editor) · **v1.7.68** · read-only `presort_suppressed_count` on order list/detail (live in production since 2026-10-05, API v3.41.0); v1.7.67 optional Idempotency-Key on recipient uploads (live in production since 2026-10-05, API v3.41.0; §6n); v1.7.66 print-job booklets accept a multiple of 4 pages from 4 to 32, up to 40,000 pages per job (live in production since API v3.40.0); billed per page plus postage per booklet (live in production since 2026-10-05, API v3.41.0; booklet prices not set in production yet); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
+> **v1.7.70 · October 2026** · after the payment handoff the user can go back and edit; the next Continue to Payment voids the previous unpaid orders with the new `POST /orders/void` ([§6g-ii](#6g-ii-void-orders-replaced-after-a-checkout-edit)), creates new orders and re-emits the iframe events under the same `campaignId`; replaced orders emit `order.status_changed` (`payment_failed`, `trigger: replaced_by_edit`) and leave partner lists and metrics; staging candidate behind a flag · **v1.7.69** · the design editor offers 24 dynamic fields, 13 more than before (sender email and address, recipient name, mailing address, property full address); the order `sender` object accepts an optional `email`; the API part is live in production since 2026-10-05 (API v3.41.0), the editor dropdown is a staging candidate; see [IFRAME_KIT.md](IFRAME_KIT.md#dynamic-fields-in-the-design-editor) · **v1.7.68** · read-only `presort_suppressed_count` on order list/detail (live in production since 2026-10-05, API v3.41.0); v1.7.67 optional Idempotency-Key on recipient uploads (live in production since 2026-10-05, API v3.41.0; §6n); v1.7.66 print-job booklets accept a multiple of 4 pages from 4 to 32, up to 40,000 pages per job (live in production since API v3.40.0); billed per page plus postage per booklet (live in production since 2026-10-05, API v3.41.0; booklet prices not set in production yet); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -961,6 +961,8 @@ GET /v1/billing/orders
 
 > **`total_pieces_mailed` is the canonical "Pieces Mailed" parity total.** `GET /v1/mail-tracking/account-summary` sums `piece_count` for orders in the authorized account/tenant, repeated `list_id`, and legacy campaign Creation Date scope. Ordinary orders with `payment_confirmed=false` are excluded. Once a canonical Multi-Send is purchased, however, every committed drop is included even when a future drop still has `payment_confirmed=false`: the group must have one consistent, non-empty external campaign identity, one complete and unique `drop_index` sequence `1..N` matching `total_drops=N`, and a confirmed first drop. Incomplete or malformed groups fail closed. Cancelled and failed orders remain included in Pieces Mailed. `active_campaigns`, `completed_campaigns`, and `total_rts` are unchanged and keep their existing definitions.
 
+> **Replaced orders (v1.7.70).** Orders voided after a checkout edit ([§6g-ii](#6g-ii-void-orders-replaced-after-a-checkout-edit)) are left out of partner order lists, every `/v1/billing/partner/stats` count, `account-summary` and the purchased Multi-Send rule above. Their replacements carry the same external campaign identity.
+
 **Example:**
 
 ```bash
@@ -1119,6 +1121,36 @@ curl -X POST https://api.ballpointmarketing.com/orders/ord_7f3a2b/cancel \
 **Note:** Cancellation behavior depends on the account's billing model. For invoiced partners (`billing_mode: none`), there is no charge to reverse and the cancelled order will not appear on the next invoice. For payment-gated partners, cancelling from `pending_payment` or `payment_failed` is free (no debit happened); cancelling from `accepted` after payment confirmation auto-refunds the partner-balance debit. The dedicated `order.drop_cancelled` webhook carries `ballpoint_billed` and `ballpoint_billed_amount_tcents` for reconciliation.
 
 Once an order moves to `prep` or beyond, it cannot be cancelled — staff time and (later) materials are being spent on the order. Contact Ballpoint support for production-stage issues.
+
+A replaced order (see §6g-ii) cannot be cancelled: the call returns `409`.
+
+#### 6g-ii. Void orders replaced after a checkout edit
+
+v1.7.70. Used by the iframe when the user goes back from the partner payment step to edit the mailer: before it creates the new orders, it voids the unpaid orders of the previous checkout. Partners do not need to call it.
+
+```
+POST /orders/void
+Content-Type: application/json
+
+{ "order_ids": ["ord_7f3a2b", "ord_7f3a2c"] }
+```
+
+- **All or nothing.** Every id must be an unpaid order in `scheduled` or `pending_payment` (or already `payment_failed`). If any order is paid or past those states, the call returns `409 ORDER_NOT_VOIDABLE` with an `orders` list of the blocking ids and statuses, and nothing changes.
+- **Effect.** Each order moves to `payment_failed` and is marked replaced; pending production jobs stop. Each order that changes emits `order.status_changed` with `new_status: payment_failed` and `trigger: replaced_by_edit`. An order that already failed or expired is only marked, with no new event. No `order.drop_cancelled` is sent.
+- **Idempotent.** Repeating the call returns `200` with `status_changed: false` for orders already replaced.
+- **Scope.** Same tenant rules as cancel (`404 ORDER_NOT_FOUND` across tenants). With an embed token, only orders of the token's user. Until the `propstream_checkout_edit_reissue_enabled` flag is enabled for the user, the call returns `403 FEATURE_DISABLED`.
+- **Afterwards.** A replaced order cannot be paid (`confirm-payment` returns `409`) or cancelled, is left out of the partner order lists, `/v1/billing/partner/stats`, `/v1/billing/partner/alerts`, `/v1/billing/partner/ops/summary`, `/v1/billing/partner/ops/orders` and `account-summary`, and still answers `GET /v1/billing/orders/{order_id}`.
+
+**Response (`200`):**
+
+```json
+{
+  "orders": [
+    { "id": "ord_7f3a2b", "status": "payment_failed", "replaced": true, "status_changed": true },
+    { "id": "ord_7f3a2c", "status": "payment_failed", "replaced": true, "status_changed": true }
+  ]
+}
+```
 
 ---
 
@@ -2624,9 +2656,10 @@ When an order's status changes, we send an `order.status_changed` event. **Flat 
 | Scheduler promotes a paid, due order (pending deployment) | `previous_production_status` → `production_status` (values `scheduled` → `accepted`) | `usps_status`, `display_status`, `note` (`null`); same production-transition variant, no refund |
 | Partner-initiated cancel | `previous_status` → `new_status` (values `scheduled`/`accepted` → `cancelled`) | — |
 | Scheduler expires an unconfirmed payment | `previous_status` → `new_status` (values `scheduled` → `payment_failed`) | `trigger` (`payment_confirmation_expired`), `failure_reason` (`expired_no_payment_confirmation`) |
+| Order replaced after a checkout edit (v1.7.70) | `previous_status` → `new_status` (values `scheduled`/`pending_payment` → `payment_failed`) | `trigger` (`replaced_by_edit`), `failure_reason` (`replaced_by_edit`) |
 | Order-job dead-letter (terminal failure) | `previous_production_status` → `production_status` (`failed` terminal) | `error_message` |
 
-**A robust consumer reads either field-name pair.** The `production_status` / `new_status` value string set is identical across paths (`scheduled | accepted | prep | printing | writing | inserting | stamping | shipping | complete | cancelled | failed | payment_failed`); only the field name carrying the value changes. Fields present on every trigger: `order_id`, `campaign_id`, `external_user_id`. Fields present on staff transitions, scheduler promotion, partner cancellation, and scheduler expiry (not dead-letter): `list_id`, `external_user_metadata`. Fields present on staff transitions, scheduler promotion, and dead-letter — not on partner cancellation or scheduler expiry, which use these fields only for outbox routing: `source`, `external_account_id`.
+**A robust consumer reads either field-name pair.** The `production_status` / `new_status` value string set is identical across paths (`scheduled | accepted | prep | printing | writing | inserting | stamping | shipping | complete | cancelled | failed | payment_failed`); only the field name carrying the value changes. Fields present on every trigger: `order_id`, `campaign_id`, `external_user_id`. Fields present on staff transitions, scheduler promotion, partner cancellation, scheduler expiry and checkout replacement (not dead-letter): `list_id`, `external_user_metadata`. Fields present on staff transitions, scheduler promotion, and dead-letter — not on partner cancellation, scheduler expiry or checkout replacement, which use these fields only for outbox routing: `source`, `external_account_id`.
 
 Promotion and its notification are committed together. Reprocessing an already-promoted order does not create another acceptance event; a later legitimate reschedule and promotion is a distinct transition. The correction does not replay historical acceptance events or mark previously accepted orders as mailed.
 
@@ -3385,6 +3418,7 @@ Before switching to your live key:
 | Get order | `GET` | `/v1/billing/orders/{id}` | `X-Partner-Key` |
 | List orders | `GET` | `/v1/billing/orders?external_user_id=...&status=...&limit=20&offset=0` | `X-Partner-Key` |
 | Cancel order | `POST` | `/orders/{id}/cancel` | `X-Partner-Key` |
+| Void replaced orders | `POST` | `/orders/void` | `X-Partner-Key` or embed token |
 | Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` — **server key, `payments:write`** |
 | Partner dashboard stats | `GET` | `/v1/billing/partner/stats?days=30&list_id=...&external_user_id=...` | `X-Partner-Key` |
 | Account insights summary (iframe automatic) | `GET` | `/v1/mail-tracking/account-summary?from=...&to=...&time_zone=...&list_id=...` | `X-Partner-Key` |
