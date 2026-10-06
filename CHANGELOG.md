@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.71 — 2026-10-06 — Partner stats Pieces Mailed matches the Dashboard
+
+- **Availability:** staging candidate. Not in production.
+- **What changed:** `total_pieces` in `GET /v1/billing/partner/stats` is now the Dashboard's Pieces Mailed: the same value as `total_pieces_mailed` in `GET /v1/mail-tracking/account-summary` for the same `list_id`, all time, which is the Dashboard's default range. `external_user_id`, when sent, narrows it further; the Dashboard has no equivalent. Unpaid orders no longer count, while every committed drop of a purchased Multi-Send does, exactly as on the Dashboard. `days` keeps narrowing the other fields but not `total_pieces`.
+- **Partner action:** none to keep the numbers equal. The parent Marketing Campaign Stats panel and the iframe Dashboard now show the same Pieces Mailed for the same list ids.
+- **Unchanged:** every other `/stats` field, its `days` window and the response shape; message types, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit `/stats` section, OpenAPI `PartnerDashboardStats.total_pieces`, Iframe Kit version header, Postman version marker.
+
 ## v1.7.70 — 2026-10-05 — Edit after checkout: replace unpaid orders under the same campaign
 
 - **Availability:** staging candidate behind the `propstream_checkout_edit_reissue_enabled` flag, disabled until PropStream confirms its handler. Not in production.
