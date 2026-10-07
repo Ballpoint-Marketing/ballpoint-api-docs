@@ -1,6 +1,8 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.64** (same-list `set_list` refreshes with a replacement `piece_counts` table retain the active Deliver To / Remove duplicates selection and reprice that combination; release candidate, not yet in production. v1.7.63: new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; staging candidate, production pending. v1.7.62: the iframe blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired; staging candidate, production pending. v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`.)
+Partner contract version: **v1.7.71** (`GET /v1/billing/partner/stats` `total_pieces` now equals the Dashboard Pieces Mailed for the same lists; REST-only, no postMessage change; staging candidate. v1.7.70: after the payment handoff, **Previous** reopens editing and the next **Continue to Payment** replaces the unpaid orders: the iframe voids them with `POST /orders/void` and emits `campaign_created` and `campaign_submitted` again with the same `campaignId` and the new `orders[]`; replaced orders emit `order.status_changed` with `payment_failed` and `trigger: replaced_by_edit`; staging candidate behind the `propstream_checkout_edit_reissue_enabled` flag, see [Edit after checkout](#edit-after-checkout-v1770). v1.7.69: the design editor offers 24 dynamic fields, 13 more than before, for sender, recipient, mailing and property data; see [Dynamic fields](#dynamic-fields-in-the-design-editor); the renderer and the optional sender email are live in production since 2026-10-05 (API v3.41.0); the editor dropdown is a staging candidate: production iframe v1.23.0 declares 1.7.69 without it. v1.7.68: read-only `presort_suppressed_count` on order list/detail, live in production since 2026-10-05 (API v3.41.0); the Direct Mail dashboard shows the adjusted mailer count in red with a Mailer Count Change info popover (staging candidate; not in production iframe v1.23.0); no postMessage type or payload change. v1.7.67: REST-only: optional Idempotency-Key for recipient uploads, live in production since 2026-10-05 (API v3.41.0). v1.7.66: REST-only: print-job booklets up to 32 pages and billed per page plus postage; page rules live since API v3.40.0, per-page billing live since 2026-10-05 (API v3.41.0); no postMessage type or payload change. v1.7.65: optional short-lived embed token: `apiToken` may carry a per-user token issued by your backend, renewed through `request_config`; the embed key keeps working unchanged; live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0). v1.7.64: same-list `set_list` refreshes with a replacement `piece_counts` table retain the active Deliver To / Remove duplicates selection and reprice that combination; live in production since 2026-10-01 (iframe v1.22.0). v1.7.63: new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; staging candidate, production pending (production still sends `standard_v10`). v1.7.62: the iframe blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired; live in production since 2026-10-01 (iframe v1.22.0). v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`.)
+
+**Backend recipient retries (1.7.67, live in production since 2026-10-05).** For the initial recipient upload after order submission, your backend should persist one `Idempotency-Key` and body per block of up to 10,000 recipients. Retry a lost response using the same pair; allocate a new key for the next block. This is a backend integration change, with no iframe message change. See [API Kit §6n](API_KIT.md#6n-upload-recipients-initial-upload) for the retention window, conflict responses and reconciliation after expiration.
 
 Contract 1.7.58: **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices. Nothing changes for PropStream.
 
@@ -226,10 +228,22 @@ All messages must include these base fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `apiBaseUrl` | string | Ballpoint API base URL |
-| `apiToken` | string | Partner **embed** key (`pk_...`). Never the server key that holds `payments:write` / `recipients:write` (API Kit §1) |
+| `apiToken` | string | Partner **embed** key (`pk_...`), or an embed token issued by your backend (v1.7.65, see *Embed token* below). Never the server key that holds `payments:write` / `recipients:write` (API Kit §1) |
 | `tenantKey` | string | Optional. Tenant scope key for storage isolation |
 
 `set_api_config` can be sent more than once to refresh tokens. The separately documented `set_preview_recipient` message is also re-applicable because list edits can replace or remove the representative lead; other bootstrap context remains governed by its per-message rules.
+
+#### Embed token (optional, v1.7.65)
+
+Instead of the embed key, `apiToken` may carry a short-lived token that your backend issues for the signed-in user with its server key (`POST /v1/auth/embed-token`, API Kit §6u). The iframe sends it as `Authorization: Bearer <token>` instead of `X-Partner-Key`, and keeps it in memory only.
+
+- **Issue it on your backend.** The server key never reaches the browser. Take `external_user_id` from your backend's authenticated session, never from the browser, and pass the same user as `externalUserId` in `set_list` (a different user makes the API refuse the iframe's analytics events and its orders, `403 EXTERNAL_USER_MISMATCH`).
+- **Send it only to the iframe's exact origin.** Post `set_api_config` with the iframe's origin as `targetOrigin` (for example `https://staging-mailer.ballpointmarketing.com`), never `'*'`.
+- **Renewal.** About 5 minutes before the token expires (60-minute lifetime), and when the tab becomes visible after that point, the iframe sends `request_config`. Answer it with `set_api_config` carrying a newly issued token and the same `apiBaseUrl` and `tenantKey`. The campaign in progress is kept.
+- **Always send a freshly issued token.** Do not cache or reuse a token across page loads: the iframe schedules renewal from the token's full lifetime.
+- **Size.** Pass the token whole; the iframe rejects a value over 2,048 characters instead of truncating it.
+
+Nothing changes when `apiToken` is an embed key: it is still sent as `X-Partner-Key`, and the iframe sends no renewal `request_config`.
 
 For a PropStream embed, the iframe uses this configuration plus the
 `externalUserId` from `set_list` to fetch `GET /v1/config`. The response is
@@ -272,7 +286,8 @@ Ballpoint production as of partner contract `1.7.51`.
 
 Every current PropStream 4x6/6x9 proof also records its postal profile. The
 Ballpoint-hosted iframe declares `standard_v11` for new catalog and Classic
-proofs (contract 1.7.63): the compact recipient box Create Your Own prints.
+proofs (contract 1.7.63; staging candidate, production still declares
+`standard_v10`): the compact recipient box Create Your Own prints.
 Realtor/Agent proofs declare `standard_v10`, which preserves the approved
 `standard_v9` 4x6 and 6x9 geometry. When the Create Your Own rollout flag is
 enabled, the iframe declares `cyo_compact_white_v2` (4x6) or
@@ -291,8 +306,8 @@ prepared to send one best-effort `POST /v1/partner/funnel-events` request per
 observed milestone:
 `campaign_started`, `product_selected`, `copy_edited`, `proof_viewed`,
 `submit_clicked`, and `campaign_submitted_confirmed`. These requests use the
-`apiToken` from `set_api_config` as `X-Partner-Key` and the active
-`externalUserId` as `X-External-User-ID`.
+`apiToken` from `set_api_config` as `X-Partner-Key` (or, for an embed token, as
+`Authorization: Bearer`) and the active `externalUserId` as `X-External-User-ID`.
 
 This is Ballpoint-owned, log-only product telemetry. Partners do not need to
 call the endpoint, handle a response, add a listener, or change their
@@ -626,7 +641,7 @@ Explicit navigation command. Sends the iframe to its **My Campaigns / Direct Mai
 
 This message has **no payload fields** beyond the standard envelope (`source`, `version`, `type`). Send it once during bootstrap to land the iframe on the Dashboard.
 
-**Checkout/result exception (v1.7.36).** After `campaign_submitted` hands checkout to the parent, this host command is held while the iframe awaits a result and remains held while a rendered success/failure result awaits user acknowledgement. This preserves the v1.7.31 protection against a host-navigation race without retaining its payment-state reconciliation. Iframe-owned exits remain available: **Previous** / the Order Summary's dashboard-back path still work, an ordinary payment-popup close leaves **Continue to Payment** enabled, and the result-screen CTA remains the explicit navigation path after a reported outcome. Bootstrap behavior outside an active checkout/result is unchanged.
+**Checkout/result exception (v1.7.36).** After `campaign_submitted` hands checkout to the parent, this host command is held while the iframe awaits a result and remains held while a rendered success/failure result awaits user acknowledgement. This preserves the v1.7.31 protection against a host-navigation race without retaining its payment-state reconciliation. Iframe-owned exits remain available: **Previous** / the Order Summary's dashboard-back path still work (from v1.7.70, Previous reopens editing; see [Edit after checkout](#edit-after-checkout-v1770)), an ordinary payment-popup close leaves **Continue to Payment** enabled, and the result-screen CTA remains the explicit navigation path after a reported outcome. Bootstrap behavior outside an active checkout/result is unchanged.
 
 **This is the explicit general-purpose Dashboard navigation command.** Sibling context messages do not navigate:
 
@@ -716,7 +731,7 @@ The iframe does **not** observe the partner-owned payment popup directly. After 
 | `campaignId` | string | Optional | Iframe-local campaign handle (the same `campaignId` previously emitted on `campaign_created` / `campaign_submitted`). Defensive correlation hint only: if present and it positively mismatches the active checkout, the message is ignored. Echoed back on `payment_retry_requested` if accepted. |
 | `ballpointCampaignId` | string | Optional | Server-side campaign context, when the parent already has it. The iframe does not receive or fetch a comparable server campaign id during `campaign_submitted`, so this field is retained only as accepted retry context and is echoed back on `payment_retry_requested`; it is not used to match the active checkout. |
 | `orderIds` | array of strings | Optional | Iframe-local order ids (e.g. those returned in `campaign_created.orderIds`). Defensive correlation hint only: any supplied id known to belong to another checkout — including one foreign id mixed with active ids — rejects the message. Omission never delays the result UX. Echoed back on `payment_retry_requested` if accepted. |
-| `ballpointOrderIds` | array of strings | Optional | Server-side `ballpointOrderId` values (from `campaign_submitted.orders[].ballpointOrderId`). Defensive correlation hint only: any supplied id known to belong to another checkout — including one foreign id mixed with active ids — rejects the message. Omission never delays the result UX. Echoed back on `payment_retry_requested` if accepted. |
+| `ballpointOrderIds` | array of strings | Optional (recommended from v1.7.70) | Server-side `ballpointOrderId` values (from `campaign_submitted.orders[].ballpointOrderId`). Send them: after an edit the `campaignId` repeats, so only these ids tell a late result for the replaced checkout from one for the current checkout. Defensive correlation hint: any supplied id known to belong to another checkout — including one foreign id mixed with active ids — rejects the message. Omission never delays the result UX. Echoed back on `payment_retry_requested` if accepted. |
 | `reason` | string | Optional | Decline context for an actual **failure** (e.g. card-decline reason), surfaced inline on the **Payment Failed** screen (plain text, ~300-char cap). Ignored on `status: "success"` **and on `"cancelled"`** (a cancellation has no failure reason). |
 
 #### Status normalization and ignore behavior
@@ -938,6 +953,8 @@ if (msg.type === 'resize') {
 #### `request_config` — Iframe is requesting configuration
 
 Sent right after `ready` as a handshake. If you already sent config on `ready`, just ignore this one.
+
+When `apiToken` is an embed token (v1.7.65), the iframe also sends `request_config` shortly before the token expires; answer it with `set_api_config` carrying a newly issued token (see *Embed token* under `set_api_config`).
 
 ```json
 {
@@ -1579,7 +1596,23 @@ This Ballpoint state does **not** rewrite future partner recipient uploads or in
 
 > **Timing (v1.6.6).** In the review-before-pay checkout flow, `campaign_created` now fires when the user clicks **Continue to Payment** on the Order Summary, not per-piece during scheduling. Payload shape is unchanged. `orderIds` continue to be local pre-API ids — no Ballpoint order exists at this point. Key off `campaign_submitted.orders[].ballpointOrderId` for the authoritative server-assigned id.
 >
+> **Repeated after an edit (v1.7.70).** When the user goes back from checkout and continues to payment again, `campaign_created` fires again with the **same `campaignId` and `listId`**, the current `listName` and `campaignType` (the user may switch type), and new local `orderIds`. Update your existing record by `campaignId`. See [Edit after checkout](#edit-after-checkout-v1770).
+>
 > **Do not poll `GET /v1/billing/orders` for individual drops mid-flow (Multi Send / A/B Split).** During scheduling, the per-drop orders do **not** exist server-side — `campaign_created.orderIds` (and any `order_added.orderId`, see below) are local pre-API ids. If submission stops partway through, the iframe stays on Order Summary and resumes the unaccepted orders under their original idempotency keys when the user retries. Wait for `campaign_submitted` and consume its `orders[].ballpointOrderId` values as the authoritative server-assigned ids.
+
+#### Edit after checkout (v1.7.70)
+
+Staging candidate behind the `propstream_checkout_edit_reissue_enabled` flag (off until PropStream confirms its handler); with the flag off, Previous after checkout keeps the v1.7.36 recovery behavior.
+
+1. The user reaches the Order Summary and clicks **Continue to Payment**: orders are created, then `campaign_created` and `campaign_submitted` are emitted (unchanged).
+2. The user closes your payment popup without a final result (send nothing, as before) and clicks **Previous**. The iframe reopens the editing steps with everything the user built. Nothing is sent and no order changes at this point.
+3. The user edits anything, including the mailer type, or nothing at all, and clicks **Continue to Payment** again. In this order:
+   - `POST /orders/void` moves the previous unpaid orders to `payment_failed`; you receive `order.status_changed` with `new_status: payment_failed` and `trigger: replaced_by_edit` for each. If one of them was already paid, nothing is replaced and the user sees a message.
+   - New orders are created.
+   - `campaign_created` and `campaign_submitted` are emitted with the **same `campaignId`** and `listId`, the current `listName`, `campaignType` and `recipient_selection`, and the new `orders[]`. A/B orders carry a new `campaignInstanceId`.
+4. Clicking **Continue to Payment** again without going back is still the exact replay of step 3's payload.
+
+**What the parent handles:** accept `campaign_submitted` several times for one `campaignId` and use only the latest `orders[]`; match `order.status_changed` by `order_id`, since the replaced orders' events can arrive after the new `campaign_submitted`; send `ballpointOrderIds` in `payment_result`. Replaced orders cannot be paid (`confirm-payment` returns `409`) and are left out of partner lists and dashboard totals ([API Kit §6g-ii](API_KIT.md#6g-ii-void-orders-replaced-after-a-checkout-edit)).
 
 #### `campaign_submitted` — Campaign submitted to Ballpoint
 
@@ -1590,6 +1623,8 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 > **Terminal in a partner embed (v1.6.6).** After this event is emitted, the iframe shows a neutral hand-off ("Opening secure checkout…") and defers final completion to the partner's billing flow — there is no internal "Campaign Submitted!" confirmation page in a partner embed. The campaign is not "submitted/complete" until billing succeeds on the partner side. Event semantics are unchanged: `campaign_submitted` remains the authoritative billing trigger, and partners should continue to key off `orders[].ballpointOrderId` as the server-assigned order id.
 
 > **Reopenable checkout handoff (v1.7.36; restores v1.7.8 and supersedes the v1.7.31 checkout lock).** In a partner embed, `campaign_submitted` MAY be emitted more than once during the same checkout. The first emit follows the successful `POST /orders` call. After that handoff, **Continue to Payment** remains enabled; if the user closes the partner payment popup without a final outcome and clicks the CTA again, the iframe re-emits the **exact cached first payload** — including the same `campaignId`, top-level `orderIds`, totals, and `orders[]` entries with their `ballpointOrderId` values. A replay does **not** call `POST /orders`, create another order, or alter the cached payload. The cache is cleared when the user leaves that campaign flow, preventing cross-campaign replay.
+>
+> **Exception: edit after checkout (v1.7.70).** If the user went back to the editing steps (Previous) before clicking **Continue to Payment** again, the new event is not a replay: it carries the **same `campaignId`** with **new** `orders[].ballpointOrderId` values, the current `recipient_selection` and totals. Treat it as replacing the previous submission for that `campaignId`: use only the latest `orders[]` for checkout. The previous orders were moved to `payment_failed` before the new ones were created. Rule of thumb: same `ballpointOrderId`s = replay; different ones = replacement. See [Edit after checkout](#edit-after-checkout-v1770).
 >
 > **Partner MUST treat repeats idempotently.** The first event begins the normal backend handoff. A repeat for the same checkout is a resume signal only: reopen or resume the existing payment flow. Do not re-upload recipients, duplicate database writes or analytics, create duplicate checkout/charge records, or charge again merely because the cached event was replayed. Reconcile on the existing `orders[].ballpointOrderId` / `campaignId` values.
 >
@@ -1944,9 +1979,31 @@ Content-Type: application/json
 | `address_type` | No | `PROPERTY` or `MAILING`. Optional for order-level upload; pair with `contact_id` when you need to distinguish a contact's property vs mailing address records. On the campaign-level Edit Leads / delta endpoint it is **required** and, together with `contact_id`, forms the upsert/remove key. |
 | `placeHolders` | No | Per-recipient render values. For handwritten-message chips, send `PropertyStreet` for `{property_address}`, `PropertyCity` for `{city}`, and optional `PropertyValue` for `{property_value}`. `{first_name}` uses the structured `first_name` field. Missing property values print blank and never fall back to the mailing address. |
 
-For the 37 approved canvas-backed printed postcard products, the standard handwritten editor submits the four message tags literally in the order message and Fabric artwork. Ballpoint resolves those aliases per recipient before both ordinary and batched raster/PDF generation. `PropertyValue` is message-only; the existing 11 canonical Color Letter `#Token#` fields are unchanged. Classic, Build Your Own, Home Services, letters, unsupported products, and message-only designs do not gain this editor surface or synthesized artwork.
+For the 37 approved canvas-backed printed postcard products, the standard handwritten editor submits the four message tags literally in the order message and Fabric artwork. Ballpoint resolves those aliases per recipient before both ordinary and batched raster/PDF generation. `PropertyValue` is message-only and is not one of the canonical `#Token#` [dynamic fields](#dynamic-fields-in-the-design-editor). Classic, Build Your Own, Home Services, letters, unsupported products, and message-only designs do not gain this editor surface or synthesized artwork.
 
 > For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6p`](API_KIT.md#6p-campaign-delta-recipients--addremove-across-editable-drops).
+
+### Dynamic fields in the design editor
+
+The design editor (Create Your Own, Color Letter and the editable catalog artwork) offers these dynamic fields. The artwork stores the literal `#Token#`; Ballpoint replaces it per recipient when it renders the piece. A field with no data prints blank: it never falls back to another field or to sample text.
+
+| Token | Source | Notes |
+|-------|--------|-------|
+| `#MyFirstName#`, `#MyLastName#`, `#MyFullName#` | `set_sender` name fields | |
+| `#MyBusinessPhone#`, `#MyBusinessWebsite#` | `set_sender.phone`, `set_sender.website` | |
+| `#MyBusinessEmail#` | `set_sender.email` | v1.7.69. The iframe sends it with the order. Blank when the profile has no email. |
+| `#MyAddress#`, `#MyCity#`, `#MyState#`, `#MyZip#` | `set_sender.address`, `.city`, `.state`, `.zip` | v1.7.69. Send line 1 and line 2 together in `set_sender.address` (e.g. `"10 Office Rd Suite 5"`); there is no separate line 2 field. |
+| `#RecipientFirstName#`, `#RecipientLastName#` | recipient `first_name`, `last_name` | v1.7.69. A company recipient without a first name prints blank. |
+| `#MailingStreet#` | recipient `address` + `address2` | v1.7.69. One line, e.g. `"55 Mailing Way Apt 4"`. |
+| `#MailingCity#`, `#MailingState#`, `#MailingZip#` | recipient `city`, `state`, `zip` | v1.7.69. |
+| `#MailingFullAddress#` | recipient address | v1.7.69. One line: `"55 Mailing Way Apt 4, Atlanta, GA 30301"`. |
+| `#OwnerFullName#` | `placeHolders.OwnerFullName` | |
+| `#PropertyStreet#`, `#PropertyCity#`, `#PropertyState#`, `#PropertyZip#`, `#PropertyCity/State/Zip#` | the matching `placeHolders` keys | Send line 1 and line 2 together in `PropertyStreet`. |
+| `#PropertyFullAddress#` | `placeHolders` property fields | v1.7.69. One line: `PropertyStreet`, then `PropertyCity/State/Zip` (or `PropertyCity`, `PropertyState` and `PropertyZip` when that key is absent). |
+
+- **Mailing and property are separate.** `Mailing*` fields always come from the structured recipient address the piece is mailed to; `Property*` and `Owner*` fields come only from `placeHolders`. Neither ever fills in for the other.
+- **No partner action is required** for fields you do not use: a field appears in a design only when the user adds it. Recipient upload and `set_sender` payloads are unchanged.
+- The editor preview shows sample values. Phone, website, email and the sender address fields show the saved sender profile when it has them. The printed piece uses the real data and prints blank where it is missing.
 
 ### Batching Large Lists
 
@@ -2115,7 +2172,7 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 
 **Cause:** `set_api_config` was not sent, or the `apiToken` value is empty/invalid.
 
-**Fix:** Ensure the parent sends `set_api_config` with a valid `apiBaseUrl` and `apiToken` before the user reaches the product selection page. The iframe queues actions until config arrives, but the Classic tab requires a configured API client to fetch templates. Verify the token is a valid `pk_...` key and that `apiBaseUrl` points to the correct [environment](#3-environments).
+**Fix:** Ensure the parent sends `set_api_config` with a valid `apiBaseUrl` and `apiToken` before the user reaches the product selection page. The iframe queues actions until config arrives, but the Classic tab requires a configured API client to fetch templates. Verify the token is a valid `pk_...` key (or an unexpired embed token) and that `apiBaseUrl` points to the correct [environment](#3-environments).
 
 ### "Please contact your account owner to set up sender information"
 

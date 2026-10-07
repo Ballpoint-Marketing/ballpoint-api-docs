@@ -1,6 +1,6 @@
 # Ballpoint Marketing API — Partner Integration Kit
 
-> **v1.7.64 · September 2026** · Same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (release candidate); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (staging candidate; production pending); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
+> **v1.7.71 · October 2026** · `GET /v1/billing/partner/stats` `total_pieces` now equals the Dashboard Pieces Mailed (`account-summary` `total_pieces_mailed`, same lists, all time); staging candidate · **v1.7.70** · after the payment handoff the user can go back and edit; the next Continue to Payment voids the previous unpaid orders with the new `POST /orders/void` ([§6g-ii](#6g-ii-void-orders-replaced-after-a-checkout-edit)), creates new orders and re-emits the iframe events under the same `campaignId`; replaced orders emit `order.status_changed` (`payment_failed`, `trigger: replaced_by_edit`) and leave partner lists and metrics; staging candidate behind a flag · **v1.7.69** · the design editor offers 24 dynamic fields, 13 more than before (sender email and address, recipient name, mailing address, property full address); the order `sender` object accepts an optional `email`; the API part is live in production since 2026-10-05 (API v3.41.0), the editor dropdown is a staging candidate; see [IFRAME_KIT.md](IFRAME_KIT.md#dynamic-fields-in-the-design-editor) · **v1.7.68** · read-only `presort_suppressed_count` on order list/detail (live in production since 2026-10-05, API v3.41.0); v1.7.67 optional Idempotency-Key on recipient uploads (live in production since 2026-10-05, API v3.41.0; §6n); v1.7.66 print-job booklets accept a multiple of 4 pages from 4 to 32, up to 40,000 pages per job (live in production since API v3.40.0); billed per page plus postage per booklet (live in production since 2026-10-05, API v3.41.0; booklet prices not set in production yet); v1.7.65 Optional short-lived embed token: a server key exchanges itself at `POST /v1/auth/embed-token` for a 60-minute token bound to one user, which the iframe sends as `Authorization: Bearer` (live in production since 2026-10-01, API v3.40.0; §6u); v1.7.64 same-list `set_list` refreshes with replacement `piece_counts` retain the active Deliver To / Remove duplicates selection (live in production since 2026-10-01, iframe v1.22.0); v1.7.63 new catalog and Classic postcard proofs send `postal_layout_profile: "standard_v11"` (staging candidate; production pending — production still prints `standard_v10`); v1.7.62 iframe checkout waits for every order to be accepted and shows rejected submissions on Order Summary (live in production since 2026-10-01, iframe v1.22.0); v1.7.61 Greeting Letter completion reports the billed count as mailed in `order.drop_completed` (live in production since 2026-09-29, API v3.39.0); REST API remains `3.1`
 >
 > **PropStream partner contract.** Every rule this kit describes for PropStream (Send Mail gate, postal proof profiles, printed-postcard artwork gate, direct First Class, Standard/Presort completion evidence, auto-suppress and webhooks) applies to every partner onboarded on the PropStream partner contract. Each such partner keeps its own source identifier, account, keys, orders and invoices.
 >
@@ -75,6 +75,7 @@ You should get back `202 Accepted` with an `order_id`. This ran against **stagin
    - [6r. Partner Feature Configuration](#6r-partner-feature-configuration)
    - [6s. Search Recipients Across Direct Mail](#6s-search-recipients-across-direct-mail)
    - [6t. Print Jobs (Print-Ready PDFs)](#6t-print-jobs-print-ready-pdfs)
+   - [6u. Embed Token (Short-Lived, Per User)](#6u-embed-token-short-lived-per-user)
 7. [Status Updates via Webhooks](#7-status-updates-via-webhooks)
    - [Per-piece RTS Push-Back (V1)](#per-piece-rts-push-back-v1)
 8. [Real-Time UI via SSE (Optional)](#8-real-time-ui-via-sse-optional)
@@ -118,6 +119,7 @@ Ballpoint issues partner keys in two classes, and every key carries an explicit 
 |---|---|---|
 | **Server key** | On your backend only. Never sent to a browser, an embed or a mobile app. | Payment confirmation, recipient uploads and edits, operations dashboard reads |
 | **Embed key** | Delivered to the Ballpoint iframe running in your end user's browser | Everything the embedded experience does: quotes, order creation, cancel/reschedule, tracking reads, templates |
+| **Embed token** *(optional, v1.7.65)* | Issued by your backend with its server key for one signed-in user; delivered to the iframe in place of the embed key; expires after 60 minutes | The same as the embed key, attributed to that user (§6u) |
 
 | Scope | Grants | Routes |
 |---|---|---|
@@ -327,7 +329,7 @@ Available styles: `candy`, `party`, `pastel`, `confetti`, `desert`, `floral`, `s
 - **`color_letter`** uses #10 envelopes — only `plain_white` is supported.
 - **`color_letter` is full color only in V1.** There is no black-and-white print option; the end user chooses only between the supported postage classes.
 - **`color_letter` canvas artwork is one-sided in V1.** Send `canvas_json.front`; `canvas_json.back` is not required and is ignored for the printed insert. Two-sided canvas products continue sending both `front` and `back`.
-- The Color Letter editor stores the 11 V1 dynamic fields as canonical `#Token#` values. Ballpoint resolves sender fields from the saved sender profile and owner/property fields from each recipient's `placeHolders`; absent values print blank.
+- The Color Letter editor stores its dynamic fields as canonical `#Token#` values (24 since v1.7.69; see [IFRAME_KIT.md](IFRAME_KIT.md#dynamic-fields-in-the-design-editor)). Ballpoint resolves sender fields from the saved sender profile, recipient and mailing fields from the structured recipient, and owner/property fields from each recipient's `placeHolders`; absent values print blank.
 - **`color_letter` has no per-order piece limit beyond the global maximum for every product.** Its complete `canvas_json` must be at most 20 MiB, 50 levels deep, 10,000 JSON nodes, and 1,000 Fabric objects. Embedded image sources must be base64 PNG, JPEG, or WebP and no more than 14 MiB encoded. Remote image sources must be HTTPS assets under Ballpoint's approved `/images/` or `/assets/` paths, or PropStream's approved `/direct-mail/` S3 prefix. Relative Ballpoint asset paths are also accepted. Other hosts, URL fragments, unsupported query parameters, and merge tokens inside image URLs are rejected before order creation. These request-validation limits do not change existing two-sided products.
 - **`hybrid_letter`** and **`greeting_letter`** use 5x7 envelopes — all decorative styles available.
 - **Postcards** — do not include `envelope_style` (the API will reject it).
@@ -730,7 +732,8 @@ request field or partner-side action changed.
 
 For every PropStream printed postcard, the current Ballpoint-hosted iframe also
 sends the exact `postal_layout_profile` it displayed: `standard_v11` for a
-new catalog or Classic proof (contract 1.7.63), `standard_v10` for a
+new catalog or Classic proof (contract 1.7.63; staging candidate, production
+still sends `standard_v10`), `standard_v10` for a
 Realtor/Agent proof, or `cyo_compact_white_v2` (4x6) / `cyo_compact_white_v3`
 (6x9) when the exact Create Your Own rollout is enabled. `standard_v11` prints
 the same compact recipient box as those Create Your Own profiles. `standard_v10`
@@ -775,6 +778,7 @@ The partner/iframe request shape may include an optional `sender` object. Empty 
 |----------------|-----------------|
 | `zip` | 5 digits (`12345`), 9 digits (`123456789`), or ZIP+4 (`12345-6789`); maximum 10 characters. |
 | `phone` | 10 digits, or 11 digits beginning with `1`; `+`, parentheses, spaces, periods, and hyphens are accepted formatting. Letters and extensions are rejected; maximum 20 characters. |
+| `email` | Optional business email (contract 1.7.69), maximum 254 characters, surrounding spaces and control characters removed; blank is treated as absent. Printed only where a design uses `#MyBusinessEmail#`. |
 
 Valid formatted values are persisted as supplied by the API client. The embedded iframe may normalize a valid phone to `AAA-BBB-CCCC` before sending it.
 
@@ -904,6 +908,15 @@ customer-facing quote captured with the partner markup. The retail pair is
 fill those gaps with the account's current markup. None of these display/read
 fields replaces the authoritative charge-now preview or the settled ledger.
 
+`presort_suppressed_count` (1.7.68, live in production since 2026-10-05) is
+the number of pieces AccuZIP removed from that order at presort. It is read
+from the same `order.presort_suppressed` event Ballpoint sent for the order, so
+it always equals that event's `suppressedCount`, and it is `null` when no such
+event exists (no piece removed, production not started yet, or an order mailed
+before the event was enabled). `piece_count` keeps the ordered quantity; the pieces that go
+to mail are `piece_count - presort_suppressed_count`. Read-only and additive: no
+request or webhook changes.
+
 `display_status` is the single field to show your users. `usps_status` is `null` until USPS scans arrive (1–2 days after production completes).
 
 For PropStream 4x6 Standard/Presort orders, Ballpoint keeps the order at its current production status until finalized AccuZIP evidence can be linked to that order. First Class orders and Greeting Letter orders (any postage) use the frozen order count: they have no AccuZIP output to link, so `order.drop_completed` reports `actual_mailed` equal to `billed_count`. This changes neither the request shape nor the status vocabulary.
@@ -947,6 +960,8 @@ GET /v1/billing/orders
 > The same repeated `list_id` filter (1–100 values, `422 LIST_ID_LIMIT_EXCEEDED` over the cap, present-but-empty = zero results) is also accepted on the partner dashboard reads `GET /v1/billing/partner/stats`, `GET /v1/billing/partner/orders`, and the insights endpoint `GET /v1/mail-tracking/account-summary`. The iframe's `set_dashboard_filter` postMessage drives these under the hood (see [IFRAME_KIT.md](IFRAME_KIT.md)).
 
 > **`total_pieces_mailed` is the canonical "Pieces Mailed" parity total.** `GET /v1/mail-tracking/account-summary` sums `piece_count` for orders in the authorized account/tenant, repeated `list_id`, and legacy campaign Creation Date scope. Ordinary orders with `payment_confirmed=false` are excluded. Once a canonical Multi-Send is purchased, however, its eligible committed drops are included even when a future drop still has `payment_confirmed=false`: the group must have one consistent, non-empty external campaign identity, one complete and unique `drop_index` sequence `1..N` matching `total_drops=N`, and a confirmed first drop. Incomplete or malformed groups fail closed. Orders with `production_status` of `cancelled` or `payment_failed` are excluded even within a purchased Multi-Send; other `failed` orders retain their existing inclusion behavior. `active_campaigns`, `completed_campaigns`, and `total_rts` are unchanged and keep their existing definitions.
+
+> **Replaced orders (v1.7.70).** Orders voided after a checkout edit ([§6g-ii](#6g-ii-void-orders-replaced-after-a-checkout-edit)) are left out of partner order lists, every `/v1/billing/partner/stats` count, `account-summary` and the purchased Multi-Send rule above. Their replacements carry the same external campaign identity.
 
 **Example:**
 
@@ -1106,6 +1121,36 @@ curl -X POST https://api.ballpointmarketing.com/orders/ord_7f3a2b/cancel \
 **Note:** Cancellation behavior depends on the account's billing model. For invoiced partners (`billing_mode: none`), there is no charge to reverse and the cancelled order will not appear on the next invoice. For payment-gated partners, cancelling from `pending_payment` or `payment_failed` is free (no debit happened); cancelling from `accepted` after payment confirmation auto-refunds the partner-balance debit. The dedicated `order.drop_cancelled` webhook carries `ballpoint_billed` and `ballpoint_billed_amount_tcents` for reconciliation.
 
 Once an order moves to `prep` or beyond, it cannot be cancelled — staff time and (later) materials are being spent on the order. Contact Ballpoint support for production-stage issues.
+
+A replaced order (see §6g-ii) cannot be cancelled: the call returns `409`.
+
+#### 6g-ii. Void orders replaced after a checkout edit
+
+v1.7.70. Used by the iframe when the user goes back from the partner payment step to edit the mailer: before it creates the new orders, it voids the unpaid orders of the previous checkout. Partners do not need to call it.
+
+```
+POST /orders/void
+Content-Type: application/json
+
+{ "order_ids": ["ord_7f3a2b", "ord_7f3a2c"] }
+```
+
+- **All or nothing.** Every id must be an unpaid order in `scheduled` or `pending_payment` (or already `payment_failed`). If any order is paid or past those states, the call returns `409 ORDER_NOT_VOIDABLE` with an `orders` list of the blocking ids and statuses, and nothing changes.
+- **Effect.** Each order moves to `payment_failed` and is marked replaced; pending production jobs stop. Each order that changes emits `order.status_changed` with `new_status: payment_failed` and `trigger: replaced_by_edit`. An order that already failed or expired is only marked, with no new event. No `order.drop_cancelled` is sent.
+- **Idempotent.** Repeating the call returns `200` with `status_changed: false` for orders already replaced.
+- **Scope.** Same tenant rules as cancel (`404 ORDER_NOT_FOUND` across tenants). With an embed token, only orders of the token's user. Until the `propstream_checkout_edit_reissue_enabled` flag is enabled for the user, the call returns `403 FEATURE_DISABLED`.
+- **Afterwards.** A replaced order cannot be paid (`confirm-payment` returns `409`) or cancelled, is left out of the partner order lists, `/v1/billing/partner/stats`, `/v1/billing/partner/alerts`, `/v1/billing/partner/ops/summary`, `/v1/billing/partner/ops/orders` and `account-summary`, and still answers `GET /v1/billing/orders/{order_id}`.
+
+**Response (`200`):**
+
+```json
+{
+  "orders": [
+    { "id": "ord_7f3a2b", "status": "payment_failed", "replaced": true, "status_changed": true },
+    { "id": "ord_7f3a2c", "status": "payment_failed", "replaced": true, "status_changed": true }
+  ]
+}
+```
 
 ---
 
@@ -1451,13 +1496,13 @@ The existing statistics and orders routes below power customer dashboards, scope
 
 #### `GET /v1/billing/partner/stats`
 
-Aggregate counts for a dashboard top panel: raw order count, status-filtered `total_pieces`, the canonical Completed order KPI, the canonical Scheduled drop KPI, status breakdown, SLA buckets, and RTS summary.
+Aggregate counts for a dashboard top panel: raw order count, canonical Pieces Mailed `total_pieces`, the canonical Completed order KPI, the canonical Scheduled drop KPI, status breakdown, SLA buckets, and RTS summary.
 
 **Query parameters:**
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `days` | integer | 7 | Range of recent days to aggregate (1–365) |
+| `days` | integer | 7 | Range of recent days to aggregate (1–365); does not narrow `total_pieces` |
 | `external_user_id` | string | — | Narrow to a single end-user within the account. Omit for account-wide totals |
 | `list_id` | string (repeatable) | — | Narrow to one or more campaign lists. Repeat the parameter (`?list_id=a&list_id=b`) for multiple lists; max 100. Omit for account-wide totals. Present-but-empty returns zero results. Combinable with `external_user_id` (AND) |
 
@@ -1508,11 +1553,11 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/stats?days=30&lis
 
 `completed_orders` is a non-negative integer and is the canonical Completed KPI for a partner-native dashboard. It counts each eligible order once when its display `status` is `complete` or `delivered`. A/B siblings remain separate, so a delivered pair contributes two. Explicitly unconfirmed and soft-deleted orders are excluded. Do **not** derive Completed by adding values from `orders_by_status`: that object is a raw production-status breakdown, and one order must never be counted twice across status dimensions.
 
-`total_pieces` sums `piece_count` for scoped orders except those with `production_status` of `cancelled` or `payment_failed`. `total_orders` and `orders_by_status` still count those orders. Other payment and status inclusion rules for `total_pieces`, including `failed`, are unchanged.
-
 `scheduled_drops` is a non-negative integer and is the canonical Scheduled KPI. It counts logical drops, not raw orders: an A/B sibling pair is one drop, while each Multi-Send drop is one. Accepted drops are included. Ordinary unconfirmed/abandoned orders are excluded; eligible committed drops of a canonical purchased Multi-Send are included under the same fail-closed rule documented for `total_pieces_mailed` in [§6d](#6d-list-orders). Do **not** derive this KPI by summing `orders_by_status`: that object intentionally remains a raw per-order breakdown, so an A/B pair contributes two orders there.
 
-The `days` window is evaluated against order `created_at` for `completed_orders`, `total_orders`, `total_pieces`, raw status counts, SLA, and `scheduled_drops`; `rts_summary` retains its existing `mail_tracking_summary.last_updated_at` basis. Unknown `list_id` (or one with no orders in the partner's scope) returns the same shape with all counts, including `completed_orders` and `scheduled_drops`, zero.
+`total_pieces` (v1.7.71) is the Dashboard's Pieces Mailed: the same value as `total_pieces_mailed` in [`account-summary`](#get-v1mail-trackingaccount-summary) for the same `list_id` scope, all time (the Dashboard default range). `external_user_id`, when sent, narrows it further; the Dashboard has no equivalent, so send only `list_id` to get the same number. It follows the canonical payment and purchased Multi-Send rules in [§6d](#6d-list-orders), but excludes orders with `production_status` of `cancelled` or `payment_failed`, even within a purchased Multi-Send. Other `failed` orders retain their existing treatment. `total_orders` and `orders_by_status` keep their existing raw order scope; `days` does not narrow `total_pieces`.
+
+The `days` window is evaluated against order `created_at` for `completed_orders`, `total_orders`, `orders_by_status`, SLA, and `scheduled_drops`; `rts_summary` retains its existing `mail_tracking_summary.last_updated_at` basis. Unknown `list_id` (or one with no orders in the partner's scope) returns the same shape with all counts, including `completed_orders` and `scheduled_drops`, zero.
 
 #### `GET /v1/mail-tracking/account-summary`
 
@@ -1744,6 +1789,16 @@ curl -X POST https://api.ballpointmarketing.com/v1/billing/orders/ord_7f3a2b/res
 
 ### 6n. Upload Recipients (Initial Upload)
 
+**Upload retries (1.7.67 — live in production since 2026-10-05).** Send an optional `Idempotency-Key` header with a stable opaque key for each logical block. Save that key and the exact body before sending; use the same key and body if the response is lost or the request times out. Use a new key for a new block. The receipt is scoped to the order and its account, and commits in the same transaction as recipients and render readiness.
+
+- A matching retry returns the original response, without appending again, resetting the render generation, repeating campaign deduplication or deleting later blocks. This includes a final block retried after the order has advanced.
+- The body includes `append`, recipient order and duplicates. Reusing a key for different validated content returns `422 IDEMPOTENCY_KEY_REUSE` without mutation.
+- An outstanding receipt returns `409 IDEMPOTENCY_KEY_IN_PROGRESS` and `Retry-After: 3`. Simultaneous uploads may wait for the order lock, then replay the completed response. Old outstanding receipts are never taken over by this route.
+- Receipts use the existing retention policy, 48 hours by default (configurable). After that window, reconcile the order's recipients and readiness before sending; a retired receipt cannot prevent another write.
+- Missing or empty headers keep legacy replace/append behavior. Repeating a legacy append can duplicate rows; replacing again can start another render generation. Distinct keys do not deduplicate repeated addresses. The existing opt-in campaign-instance deduplication still applies to new writes.
+- A replay is the original upload receipt, not a fresh order-status read. For a 40,000-recipient order, persist four separate block keys, upload at most 10,000 per call and retry a failed block with its original key. This upload limit is separate from the production batch limit.
+
+
 ```
 POST /v1/billing/orders/{order_id}/recipients
 X-Partner-Key: pk_test_...
@@ -1787,7 +1842,7 @@ The PropStream flow is create the order first (with `piece_count`, via `POST /or
 - At least one of `first_name` / `last_name` (enforced per-row — see partial acceptance below).
 - Optional: `company`, `address2`, `contact_id` (<=64; partner-side recipient id, stored verbatim and round-tripped, never interpreted by Ballpoint), `address_type` (`PROPERTY` | `MAILING`; optional for order-level upload), `placeHolders` (camelCase; PropStream V1 Owner/Property merge values plus optional message-only `PropertyValue`; used for render personalization only, never as the delivery address).
 
-- `append` (default `false`): `false` REPLACES all existing recipients on the order (idempotent re-upload); `true` APPENDS to existing recipients (for chunked uploads of large orders).
+- `append` (default `false`): `false` REPLACES all existing recipients on the order; `true` APPENDS to existing recipients (for chunked uploads of large orders).
 
 The standard handwritten editor on the 37 approved canvas-backed printed postcard products uses this exact mapping at render time:
 
@@ -1798,7 +1853,7 @@ The standard handwritten editor on the 37 approved canvas-backed printed postcar
 | `{city}` | `placeHolders.PropertyCity` | blank; never falls back to mailing `city` |
 | `{property_value}` | `placeHolders.PropertyValue` | blank |
 
-For those approved designs, the same mapping runs for ordinary per-order rendering and production batching before the card is rasterized or assembled into a PDF. `PropertyValue` is message-only and does not add a 12th canonical Color Letter `#Token#` field. Classic, Build Your Own, Home Services, letters, unsupported products, and the standalone `message` metadata field do not gain synthesized `canvas_json` artwork.
+For those approved designs, the same mapping runs for ordinary per-order rendering and production batching before the card is rasterized or assembled into a PDF. `PropertyValue` is message-only and is not one of the canonical `#Token#` dynamic fields. Classic, Build Your Own, Home Services, letters, unsupported products, and the standalone `message` metadata field do not gain synthesized `canvas_json` artwork.
 
 **Response (`200`):**
 
@@ -1822,7 +1877,7 @@ Before opening the payment step, require both `ready === true` **and** `piece_co
 
 If an initial A/B upload has already reduced an order to `piece_count: 0`, retrying this POST with a non-empty list cannot repair it because the new list would exceed the order's current piece count. For an eligible gated, unconfirmed order, use the [Edit Leads PATCH](#6o-edit-leads--replace--resize--reprice-recipients-patch) with a verified recipient-disjoint slice so the order is resized and repriced; otherwise cancel and recreate the order. If you cancel, drop the cancelled order's id from subsequent [`POST /v1/billing/campaigns/preview`](#6a-ii-preview-campaign-cost-payment-gate) calls — a cancelled order that still has `piece_count: 0` keeps returning `409 INVALID_PIECE_COUNT` and blocks the preview for its healthy siblings. The PATCH is a replacement operation and does not construct or validate the A/B split for the partner.
 
-**Allowed order statuses:** `scheduled`, `pending_payment`, `accepted`, `prep`. Any other status → `409 RECIPIENTS_LOCKED`.
+**Allowed order statuses for a new upload:** `scheduled`, `pending_payment`, `accepted`, `prep`. Any other status → `409 RECIPIENTS_LOCKED`. A matching committed idempotency receipt replays before this status gate.
 
 **Partial acceptance:** rows missing BOTH `first_name` and `last_name` are rejected per-row into `rejected_details`, and the request still succeeds with the valid rows. (Malformed REQUIRED fields — bad zip, non-2-letter state, missing address/city/state/zip — fail validation for the whole request: `422`.)
 
@@ -2353,10 +2408,10 @@ For partners that build the finished, print-ready file themselves (for example, 
 | Rule | Value |
 |------|-------|
 | Page size | Every page 5.5 × 8.5 in (396 × 612 pt), no bleed |
-| Booklet | Saddle-stitched, `pages_per_booklet` of `4` or `8` |
+| Booklet | Saddle-stitched, `pages_per_booklet` a multiple of `4` from `4` to `32` (for example `28`); pad with blank pages to reach it |
 | Page count | Exactly `booklet_count × pages_per_booklet`, booklets in page order |
-| Mailing address | Printed on each booklet in the PDF itself; no separate recipient list |
-| File | Not encrypted, at most 250 MB, at most 10,000 booklets per job |
+| Mailing address | Printed on the booklet's last page with the First Class postage indicia; no separate recipient list |
+| File | Not encrypted, at most 250 MB, at most 10,000 booklets and 40,000 pages (`booklet_count × pages_per_booklet`) per job; split larger batches into several jobs |
 
 **Flow — once per daily batch:**
 
@@ -2430,14 +2485,57 @@ Follow progress with `GET /v1/billing/orders/{order_id}` (`production_status`).
 | 422 | `PDF_ENCRYPTED` | Password-protected PDF |
 | 422 | `PDF_PAGE_SIZE` | A page is not 5.5 × 8.5 in; the error names the page |
 | 422 | `PDF_PAGE_COUNT` | Page total differs from `booklet_count × pages_per_booklet` |
-| 400 | `NO_PRICING` | Pricing is not configured for this account yet |
+| 400 | `NO_PRICING` | Print-job pricing is not configured yet |
 | 402 | spending-limit and daily-cap codes (§10) | The job exceeds an account limit agreed at onboarding |
 | 403 | `ACCOUNT_INACTIVE` | The account is inactive |
 | 422 | list-shaped `detail` | Request body failed validation (missing field, wrong type, value out of range) |
 | 429 | `ACCOUNT_RPM_EXCEEDED` / `ACCOUNT_RPD_EXCEEDED` | Account request rate exceeded; retry after `Retry-After` |
 | 503 | `PRINT_JOBS_BUSY` | Another job is being validated; retry after `Retry-After` |
 
-**Billing.** Print jobs are invoiced weekly per booklet once Ballpoint completes the job. Postage for these booklets is handled by Ballpoint outside the API.
+**Billing.** Print jobs are invoiced weekly once Ballpoint completes the job: price per page × pages, plus First Class postage per booklet. The price is fixed when the job is accepted. (Live in production since 2026-10-05. Booklet prices are not set in production yet, so a production submission returns `400 NO_PRICING` until they are.) The mailing address and postage indicia are printed on the booklet's last page; Ballpoint mails the booklets.
+
+---
+
+### 6u. Embed Token (Short-Lived, Per User)
+
+An optional replacement for the embed key in the browser. Your backend exchanges its **server key** for a token bound to one of your signed-in users, and passes that token to the iframe instead of a partner key. A copied token works for **60 minutes**, is attributed to **that user**, and only does what the embedded experience does; it cannot confirm payment or change recipients.
+
+**Who can issue.** A server key (one holding `payments:write` or `recipients:write`) sent as `X-Partner-Key`. An embed key receives `403 INSUFFICIENT_SCOPE`; a request carrying a bearer token instead of a partner key receives `401 PARTNER_KEY_REQUIRED` (a token cannot issue another token). Least-privilege keys (§1) cannot issue.
+
+**Request.** The body names the user and nothing else. Account, partner source and tenant come from the key. Take `external_user_id` from your backend's authenticated session, never from the browser.
+
+```bash
+curl -X POST https://staging-api.ballpointmarketing.com/v1/auth/embed-token \
+  -H "X-Partner-Key: $SERVER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"external_user_id": "user-123"}'
+```
+
+`200 OK`:
+
+```json
+{ "token": "eyJhbGciOi…", "token_type": "Bearer", "expires_in": 3600 }
+```
+
+Send `token` to the iframe as `apiToken` in `set_api_config` (see the Iframe Kit, *Embed token*). The iframe calls the API with `Authorization: Bearer <token>`. When the token is about to expire, the iframe sends `request_config`; answer it with a newly issued token. Treat the token as opaque: do not parse or store it.
+
+**What a token can do.** Everything the embed key does in the iframe (quotes, order creation, cancel/reschedule, tracking, templates, feature configuration), attributed to the user it was issued for; an `X-External-User-ID` header cannot change that user, and an order whose body names a different `external_user_id` is refused with `403 EXTERNAL_USER_MISMATCH` before anything is created. Reads stay scoped to your tenant, exactly as with the embed key. The token takes the **issuing key's PII level**, so give the server key that issues tokens the same PII level as your embed key. It **never** confirms payment, uploads or edits recipients, or submits print jobs (`403 INSUFFICIENT_SCOPE`), even for accounts where scope enforcement is not yet active. Those stay on your server key.
+
+**Validity.** Every request re-checks the issuing key: revoking, expiring or disabling it, removing both issuing scopes from it, or making it least-privilege invalidates its tokens immediately. Staging tokens never work in production. An expired or invalidated token receives `401 INVALID_TOKEN`.
+
+| Status | Code | Meaning |
+|---|---|---|
+| 401 | `MISSING_CREDENTIALS` / `INVALID_PARTNER_KEY` | No credential, or an unknown key |
+| 401 | `INVALID_TOKEN` | The request carried an invalid or expired bearer token |
+| 401 | `PARTNER_KEY_REQUIRED` | The request carried a valid bearer token, or a credential that is not a partner key (a token cannot issue another token) |
+| 403 | `INSUFFICIENT_SCOPE` | The key is not a server key (`required_scope`: `payments:write or recipients:write`); least-privilege keys get `required_scope: null` |
+| 403 | `ACCOUNT_SUSPENDED` | The account is suspended |
+| 422 | `INVALID_EXTERNAL_USER_ID` | `external_user_id` is empty, longer than 100 characters, has leading/trailing spaces or contains control characters |
+| 422 | list-shaped `detail` | The body has a field other than `external_user_id` |
+| 429 | rate limit (§10) | Per-key or per-account request rate exceeded (issuance shares the server key's budget); retry after `Retry-After` |
+| 503 | `JWT_DISABLED` | Embed tokens are not configured on this server |
+
+**Adoption.** Optional. The embed key keeps working unchanged; PropStream needs no action.
 
 ---
 
@@ -2515,6 +2613,8 @@ removed still emits normally; no printable PDF is manufactured for that case.
 - Ballpoint does not send `creditTotalTCents`. PropStream calculates prepaid
   wallet credit as the order's saved `unitPriceTCents` from
   `POST /v1/billing/campaigns/preview` multiplied by `suppressedCount`.
+- Since 1.7.68 the same count is also readable on `GET /v1/billing/orders` and
+  `GET /v1/billing/orders/{order_id}` as `presort_suppressed_count`.
 - Delivery is at least once. Deduplicate the wallet credit on
   `X-Ballpoint-Event-Id` / top-level `event_id`, not on the wrapped `id`.
 - Activation is coordinated receiver-first and applies from the enabled
@@ -2558,9 +2658,10 @@ When an order's status changes, we send an `order.status_changed` event. **Flat 
 | Scheduler promotes a paid, due order (pending deployment) | `previous_production_status` → `production_status` (values `scheduled` → `accepted`) | `usps_status`, `display_status`, `note` (`null`); same production-transition variant, no refund |
 | Partner-initiated cancel | `previous_status` → `new_status` (values `scheduled`/`accepted` → `cancelled`) | — |
 | Scheduler expires an unconfirmed payment | `previous_status` → `new_status` (values `scheduled` → `payment_failed`) | `trigger` (`payment_confirmation_expired`), `failure_reason` (`expired_no_payment_confirmation`) |
+| Order replaced after a checkout edit (v1.7.70) | `previous_status` → `new_status` (values `scheduled`/`pending_payment` → `payment_failed`) | `trigger` (`replaced_by_edit`), `failure_reason` (`replaced_by_edit`) |
 | Order-job dead-letter (terminal failure) | `previous_production_status` → `production_status` (`failed` terminal) | `error_message` |
 
-**A robust consumer reads either field-name pair.** The `production_status` / `new_status` value string set is identical across paths (`scheduled | accepted | prep | printing | writing | inserting | stamping | shipping | complete | cancelled | failed | payment_failed`); only the field name carrying the value changes. Fields present on every trigger: `order_id`, `campaign_id`, `external_user_id`. Fields present on staff transitions, scheduler promotion, partner cancellation, and scheduler expiry (not dead-letter): `list_id`, `external_user_metadata`. Fields present on staff transitions, scheduler promotion, and dead-letter — not on partner cancellation or scheduler expiry, which use these fields only for outbox routing: `source`, `external_account_id`.
+**A robust consumer reads either field-name pair.** The `production_status` / `new_status` value string set is identical across paths (`scheduled | accepted | prep | printing | writing | inserting | stamping | shipping | complete | cancelled | failed | payment_failed`); only the field name carrying the value changes. Fields present on every trigger: `order_id`, `campaign_id`, `external_user_id`. Fields present on staff transitions, scheduler promotion, partner cancellation, scheduler expiry and checkout replacement (not dead-letter): `list_id`, `external_user_metadata`. Fields present on staff transitions, scheduler promotion, and dead-letter — not on partner cancellation, scheduler expiry or checkout replacement, which use these fields only for outbox routing: `source`, `external_account_id`.
 
 Promotion and its notification are committed together. Reprocessing an already-promoted order does not create another acceptance event; a later legitimate reschedule and promotion is a distinct transition. The correction does not replay historical acceptance events or mark previously accepted orders as mailed.
 
@@ -3319,6 +3420,7 @@ Before switching to your live key:
 | Get order | `GET` | `/v1/billing/orders/{id}` | `X-Partner-Key` |
 | List orders | `GET` | `/v1/billing/orders?external_user_id=...&status=...&limit=20&offset=0` | `X-Partner-Key` |
 | Cancel order | `POST` | `/orders/{id}/cancel` | `X-Partner-Key` |
+| Void replaced orders | `POST` | `/orders/void` | `X-Partner-Key` or embed token |
 | Confirm payment | `POST` | `/v1/billing/orders/{id}/confirm-payment` | `X-Partner-Key` — **server key, `payments:write`** |
 | Partner dashboard stats | `GET` | `/v1/billing/partner/stats?days=30&list_id=...&external_user_id=...` | `X-Partner-Key` |
 | Account insights summary (iframe automatic) | `GET` | `/v1/mail-tracking/account-summary?from=...&to=...&time_zone=...&list_id=...` | `X-Partner-Key` |
@@ -3335,6 +3437,7 @@ Before switching to your live key:
 | Funnel analytics (iframe, automatic — no partner action needed) | `POST` | `/v1/partner/funnel-events` | `X-Partner-Key`, `X-External-User-ID` |
 | Request a print-job upload | `POST` | `/v1/print-jobs/upload-url` | `X-Partner-Key` — **`print_jobs:write`** |
 | Submit a print job | `POST` | `/v1/print-jobs` | `X-Partner-Key` — **`print_jobs:write`** |
+| Issue an embed token (optional) | `POST` | `/v1/auth/embed-token` | `X-Partner-Key` — **server key** |
 | Health check | `GET` | `/health` | *(none)* |
 
 ---

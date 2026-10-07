@@ -2,12 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://docs.ballpointmarketing.com/contracts/webhooks/order.status_changed/logical.schema.json",
   "title": "order.status_changed logical payload",
-  "description": "The four runtime variants are intentionally preserved as shipped.",
+  "description": "The five runtime variants are intentionally preserved as shipped.",
   "oneOf": [
     { "$ref": "#/$defs/worker_failed" },
     { "$ref": "#/$defs/staff_transition" },
     { "$ref": "#/$defs/partner_cancelled" },
-    { "$ref": "#/$defs/payment_expired" }
+    { "$ref": "#/$defs/payment_expired" },
+    { "$ref": "#/$defs/replaced_by_edit" }
   ],
   "unevaluatedProperties": false,
   "$defs": {
@@ -97,6 +98,25 @@
         "new_status": { "const": "payment_failed" },
         "trigger": { "const": "payment_confirmation_expired" },
         "failure_reason": { "const": "expired_no_payment_confirmation" },
+        "external_user_id": { "$ref": "#/$defs/nullableString" },
+        "external_user_metadata": { "$ref": "#/$defs/nullableObject" },
+        "list_id": { "type": "string" }
+      }
+    },
+    "replaced_by_edit": {
+      "type": "object",
+      "required": [
+        "order_id", "campaign_id", "previous_status", "new_status",
+        "trigger", "failure_reason", "external_user_id",
+        "external_user_metadata", "list_id"
+      ],
+      "properties": {
+        "order_id": { "type": "string", "minLength": 1 },
+        "campaign_id": { "$ref": "#/$defs/nullableString" },
+        "previous_status": { "enum": ["scheduled", "pending_payment"] },
+        "new_status": { "const": "payment_failed" },
+        "trigger": { "const": "replaced_by_edit" },
+        "failure_reason": { "const": "replaced_by_edit" },
         "external_user_id": { "$ref": "#/$defs/nullableString" },
         "external_user_metadata": { "$ref": "#/$defs/nullableObject" },
         "list_id": { "type": "string" }
