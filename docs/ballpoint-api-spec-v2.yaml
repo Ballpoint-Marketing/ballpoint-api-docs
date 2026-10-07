@@ -1018,7 +1018,7 @@ components:
         total_pieces:
           type: integer
           minimum: 0
-          description: Dashboard Pieces Mailed (contract 1.7.71) — equal to account-summary total_pieces_mailed for the same list_id scope, all time (external_user_id, when sent, narrows it further and the Dashboard has no equivalent); unpaid orders are excluded under the canonical rule (purchased Multi-Send drops included). The days window does not narrow it.
+          description: Dashboard Pieces Mailed (contract 1.7.71) — equal to account-summary total_pieces_mailed for the same list_id scope, all time (external_user_id, when sent, narrows it further and the Dashboard has no equivalent). It follows the canonical payment and purchased Multi-Send rules but excludes production_status cancelled or payment_failed even within a purchased Multi-Send; other failed orders retain their existing treatment. total_orders and orders_by_status remain raw counts. The days window does not narrow total_pieces.
         completed_orders:
           type: integer
           minimum: 0
@@ -1027,7 +1027,7 @@ components:
         scheduled_drops:
           type: integer
           minimum: 0
-          description: Canonical Scheduled KPI. An A/B sibling pair counts as one logical drop, each Multi-Send drop counts once, and accepted drops are included. Ordinary unconfirmed orders are excluded. A purchased Multi-Send includes all committed drops only when its group has one consistent non-empty external_campaign_id, a complete unique 1..N drop_index sequence matching total_drops=N, and a confirmed first drop; incomplete or malformed groups fail closed.
+          description: Canonical Scheduled KPI. An A/B sibling pair counts as one logical drop, each Multi-Send drop counts once, and accepted drops are included. Ordinary unconfirmed orders are excluded. A purchased Multi-Send includes eligible committed drops only when its group has one consistent non-empty external_campaign_id, a complete unique 1..N drop_index sequence matching total_drops=N, and a confirmed first drop; incomplete or malformed groups fail closed.
           example: 5
         orders_by_status:
           $ref: '#/components/schemas/PartnerOrderStatusCounts'
@@ -1052,7 +1052,7 @@ components:
         total_pieces_mailed:
           type: integer
           minimum: 0
-          description: Pieces ordered in the authorized campaign scope, using the legacy campaign created_at date basis and the converted half-open instant bounds. Ordinary unconfirmed orders are excluded. A purchased Multi-Send includes all committed drops only when its group has one consistent non-empty external_campaign_id, a complete unique 1..N drop_index sequence matching total_drops=N, and a confirmed first drop; incomplete or malformed groups fail closed. Cancelled and failed orders in scope remain included.
+          description: Eligible pieces in the authorized campaign scope, using the legacy campaign created_at date basis and the converted half-open instant bounds. Ordinary unconfirmed orders are excluded. A purchased Multi-Send includes committed drops only when its group has one consistent non-empty external_campaign_id, a complete unique 1..N drop_index sequence matching total_drops=N, and a confirmed first drop; incomplete or malformed groups fail closed. Orders with production_status cancelled or payment_failed are excluded even in a purchased Multi-Send. Other failed orders retain their existing inclusion behavior.
         scheduled_drops:
           type: integer
           minimum: 0
@@ -2665,8 +2665,9 @@ paths:
         GET /v1/billing/partner/stats: an A/B sibling pair counts once, every
         Multi-Send drop counts once, and accepted drops are included. For
         scheduled_drops and total_pieces_mailed, ordinary unconfirmed orders
-        are excluded; a complete canonical purchased Multi-Send includes every
-        committed drop even while future drops remain unconfirmed. Active,
+        are excluded; a complete canonical purchased Multi-Send includes eligible
+        committed drops even while future drops remain unconfirmed. Orders with
+        production_status cancelled or payment_failed are excluded from total_pieces_mailed. Active,
         Completed, and RTS visibility is unchanged. Optional from/to values are
         inclusive local calendar dates in time_zone. The server converts local
         midnight at from and local midnight on the day after to independently
@@ -3881,20 +3882,21 @@ paths:
       - Partner Dashboard
       summary: Get partner dashboard statistics
       description: >-
-        Returns partner-scoped raw order totals, the canonical Completed order
-        KPI, the canonical Scheduled logical-drop KPI, SLA buckets, and RTS
+        Returns partner-scoped raw order counts, canonical Pieces Mailed total_pieces,
+        the canonical Completed order KPI, the canonical Scheduled logical-drop KPI, SLA buckets, and RTS
         totals. completed_orders counts each eligible order once when display
         status is complete or delivered; A/B siblings remain separate and
         explicitly unconfirmed orders are excluded. scheduled_drops is not a
         sum of orders_by_status: an A/B sibling pair counts once, each
         Multi-Send drop counts once, and accepted drops are included. For this
         logical KPI, ordinary unconfirmed orders are excluded and all committed
-        drops of a complete canonical purchased Multi-Send are included.
+        eligible drops of a complete canonical purchased Multi-Send are included.
         total_pieces (contract 1.7.71) is the Dashboard Pieces Mailed: the
         account-summary total_pieces_mailed for the same list_id scope, all
         time; external_user_id, when sent, narrows it further and the Dashboard
-        has no equivalent. The rolling days window uses order created_at and
-        applies to every other count, not to total_pieces.
+        has no equivalent. Cancelled and payment_failed orders are excluded
+        from the piece total even in a purchased Multi-Send. The rolling days
+        window uses order created_at and applies to every other count, not to total_pieces.
       operationId: get_partner_stats_v1_billing_partner_stats_get
       security:
       - partnerKeyAuth: []

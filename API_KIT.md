@@ -959,7 +959,7 @@ GET /v1/billing/orders
 
 > The same repeated `list_id` filter (1–100 values, `422 LIST_ID_LIMIT_EXCEEDED` over the cap, present-but-empty = zero results) is also accepted on the partner dashboard reads `GET /v1/billing/partner/stats`, `GET /v1/billing/partner/orders`, and the insights endpoint `GET /v1/mail-tracking/account-summary`. The iframe's `set_dashboard_filter` postMessage drives these under the hood (see [IFRAME_KIT.md](IFRAME_KIT.md)).
 
-> **`total_pieces_mailed` is the canonical "Pieces Mailed" parity total.** `GET /v1/mail-tracking/account-summary` sums `piece_count` for orders in the authorized account/tenant, repeated `list_id`, and legacy campaign Creation Date scope. Ordinary orders with `payment_confirmed=false` are excluded. Once a canonical Multi-Send is purchased, however, every committed drop is included even when a future drop still has `payment_confirmed=false`: the group must have one consistent, non-empty external campaign identity, one complete and unique `drop_index` sequence `1..N` matching `total_drops=N`, and a confirmed first drop. Incomplete or malformed groups fail closed. Cancelled and failed orders remain included in Pieces Mailed. `active_campaigns`, `completed_campaigns`, and `total_rts` are unchanged and keep their existing definitions.
+> **`total_pieces_mailed` is the canonical "Pieces Mailed" parity total.** `GET /v1/mail-tracking/account-summary` sums `piece_count` for orders in the authorized account/tenant, repeated `list_id`, and legacy campaign Creation Date scope. Ordinary orders with `payment_confirmed=false` are excluded. Once a canonical Multi-Send is purchased, however, its eligible committed drops are included even when a future drop still has `payment_confirmed=false`: the group must have one consistent, non-empty external campaign identity, one complete and unique `drop_index` sequence `1..N` matching `total_drops=N`, and a confirmed first drop. Incomplete or malformed groups fail closed. Orders with `production_status` of `cancelled` or `payment_failed` are excluded even within a purchased Multi-Send; other `failed` orders retain their existing inclusion behavior. `active_campaigns`, `completed_campaigns`, and `total_rts` are unchanged and keep their existing definitions.
 
 > **Replaced orders (v1.7.70).** Orders voided after a checkout edit ([§6g-ii](#6g-ii-void-orders-replaced-after-a-checkout-edit)) are left out of partner order lists, every `/v1/billing/partner/stats` count, `account-summary` and the purchased Multi-Send rule above. Their replacements carry the same external campaign identity.
 
@@ -1496,13 +1496,13 @@ The existing statistics and orders routes below power customer dashboards, scope
 
 #### `GET /v1/billing/partner/stats`
 
-Aggregate counts for a dashboard top panel: raw order totals, the canonical Completed order KPI, the canonical Scheduled drop KPI, status breakdown, SLA buckets, and RTS summary.
+Aggregate counts for a dashboard top panel: raw order count, canonical Pieces Mailed `total_pieces`, the canonical Completed order KPI, the canonical Scheduled drop KPI, status breakdown, SLA buckets, and RTS summary.
 
 **Query parameters:**
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `days` | integer | 7 | Range of recent days to aggregate (1–365) |
+| `days` | integer | 7 | Range of recent days to aggregate (1–365); does not narrow `total_pieces` |
 | `external_user_id` | string | — | Narrow to a single end-user within the account. Omit for account-wide totals |
 | `list_id` | string (repeatable) | — | Narrow to one or more campaign lists. Repeat the parameter (`?list_id=a&list_id=b`) for multiple lists; max 100. Omit for account-wide totals. Present-but-empty returns zero results. Combinable with `external_user_id` (AND) |
 
@@ -1553,9 +1553,9 @@ curl -s "https://api.ballpointmarketing.com/v1/billing/partner/stats?days=30&lis
 
 `completed_orders` is a non-negative integer and is the canonical Completed KPI for a partner-native dashboard. It counts each eligible order once when its display `status` is `complete` or `delivered`. A/B siblings remain separate, so a delivered pair contributes two. Explicitly unconfirmed and soft-deleted orders are excluded. Do **not** derive Completed by adding values from `orders_by_status`: that object is a raw production-status breakdown, and one order must never be counted twice across status dimensions.
 
-`scheduled_drops` is a non-negative integer and is the canonical Scheduled KPI. It counts logical drops, not raw orders: an A/B sibling pair is one drop, while each Multi-Send drop is one. Accepted drops are included. Ordinary unconfirmed/abandoned orders are excluded; all committed drops of a canonical purchased Multi-Send are included under the same fail-closed rule documented for `total_pieces_mailed` in [§6d](#6d-list-orders). Do **not** derive this KPI by summing `orders_by_status`: that object intentionally remains a raw per-order breakdown, so an A/B pair contributes two orders there.
+`scheduled_drops` is a non-negative integer and is the canonical Scheduled KPI. It counts logical drops, not raw orders: an A/B sibling pair is one drop, while each Multi-Send drop is one. Accepted drops are included. Ordinary unconfirmed/abandoned orders are excluded; eligible committed drops of a canonical purchased Multi-Send are included under the same fail-closed rule documented for `total_pieces_mailed` in [§6d](#6d-list-orders). Do **not** derive this KPI by summing `orders_by_status`: that object intentionally remains a raw per-order breakdown, so an A/B pair contributes two orders there.
 
-`total_pieces` (v1.7.71) is the Dashboard's Pieces Mailed: the same value as `total_pieces_mailed` in [`account-summary`](#get-v1mail-trackingaccount-summary) for the same `list_id` scope, all time (the Dashboard default range). `external_user_id`, when sent, narrows it further; the Dashboard has no equivalent, so send only `list_id` to get the same number. It follows the canonical rule documented for `total_pieces_mailed` in [§6d](#6d-list-orders), so unpaid orders do not count; `days` does not narrow it.
+`total_pieces` (v1.7.71) is the Dashboard's Pieces Mailed: the same value as `total_pieces_mailed` in [`account-summary`](#get-v1mail-trackingaccount-summary) for the same `list_id` scope, all time (the Dashboard default range). `external_user_id`, when sent, narrows it further; the Dashboard has no equivalent, so send only `list_id` to get the same number. It follows the canonical payment and purchased Multi-Send rules in [§6d](#6d-list-orders), but excludes orders with `production_status` of `cancelled` or `payment_failed`, even within a purchased Multi-Send. Other `failed` orders retain their existing treatment. `total_orders` and `orders_by_status` keep their existing raw order scope; `days` does not narrow `total_pieces`.
 
 The `days` window is evaluated against order `created_at` for `completed_orders`, `total_orders`, `orders_by_status`, SLA, and `scheduled_drops`; `rts_summary` retains its existing `mail_tracking_summary.last_updated_at` basis. Unknown `list_id` (or one with no orders in the partner's scope) returns the same shape with all counts, including `completed_orders` and `scheduled_drops`, zero.
 
@@ -1613,7 +1613,7 @@ curl -s "https://api.ballpointmarketing.com/v1/mail-tracking/account-summary?fro
 
 The response shape is unchanged: `time_zone` is not echoed. Omitting a bound still returns `null` for the corresponding `date_from` or `date_to`; a supplied bound is echoed as its original `YYYY-MM-DD` local date.
 
-Pieces Mailed includes every committed drop of a canonical purchased Multi-Send even when future drops remain unconfirmed; ordinary unconfirmed orders stay excluded, cancelled/failed orders stay included, and Active/Completed/RTS behavior is unchanged. These are aggregate semantics only—no status taxonomy, status tab, order lifecycle, or webhook changed.
+Pieces Mailed includes committed drops of a canonical purchased Multi-Send even when future drops remain unconfirmed; ordinary unconfirmed orders and drops with `production_status` of `cancelled` or `payment_failed` are excluded. Other `failed` orders and Active/Completed/RTS behavior are unchanged. These are aggregate semantics only—no status taxonomy, status tab, order lifecycle, or webhook changed.
 
 #### `GET /v1/billing/partner/orders`
 
