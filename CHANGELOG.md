@@ -1,13 +1,50 @@
 # Changelog
 
-## Unreleased — Mailing areas above the artwork
+## 2026-10-07 — Mailing areas above the artwork; Color Letter reopens with its layers
 
-- **Availability:** live in production since 2026-10-07 (API v3.42.0, iframe v1.24.0). No version bump: these are display corrections inside the editor plus one print correction, and no message, payload, route or protocol version changes.
+- **Availability:** live in production since 2026-10-07 (API v3.42.0, iframe v1.24.0). No contract version change: these are corrections inside the editor plus one print correction; no message, payload, route or protocol version changes.
 - **The mailing areas stay on top while the customer designs.** On every printed postcard back, Create Your Own and catalog alike, the postage, return, recipient and barcode areas are drawn above the customer's artwork in the editor and in Preview, as they are at print. Artwork can still be selected, moved, cropped and reordered underneath. Editable text over the mailing areas in Create Your Own remains an error to resolve, and images that reach the mailing areas are still accepted after the mailing-side review.
 - **Create Your Own previews the printed addresses.** The return area shows the customer's own return address from their sender information. On the compact Create Your Own layouts (`cyo_compact_white_v2` and `cyo_compact_white_v3`), the recipient area shows a fictional sample address in the handwriting face, colour, size and placement used at print. The sample is illustrative: real recipient addresses and the barcode are produced per piece at print. When the sender information is incomplete, the return area keeps its placeholder label. The guide is never saved with the design, submitted or printed.
-- **One stamp on Home Services backs.** Saved Home Services catalog designs carried an old postage mark drawn inside their back image, so a second, faded stamp could print next to the real one. New designs use cleaned back images, and orders that still carry the old image have that area masked at print.
+- **One stamp on Home Services backs.** Saved Home Services catalog designs carried an old postage mark drawn inside their back image, so a second, faded stamp could print next to the real one. New designs use cleaned back images, and orders that still carry the old image have that area masked with white at print, including older orders whose print file is produced after this release.
+- **Color Letter reopens with its layers.** Reopening Customize on a Color Letter now restores the layers already designed for it, including a saved design it came from; edits stay on that letter in the campaign.
 - **Representative recipient unchanged.** `set_preview_recipient` continues to apply only to the eligible proofs of the approved printed postcard products, as IFRAME_KIT states. Create Your Own neither reads nor displays it.
 - **Partner action:** none.
+
+## Unreleased — Print-job postage tiered by the booklets in the job
+
+- **Availability:** staging candidate. Booklet prices are not set in production yet. No contract version change (`1.7.71`).
+- **What changed:** First Class postage per booklet now depends on the number of booklets in the job: one rate for fewer than 500 booklets, a lower rate from 500 (exactly 500 gets the lower rate). Each job is rated on its own booklet count; the price per page is unchanged, and the price is still fixed when the job is accepted.
+- **Partner action:** send a week's booklets as one job to reach the lower rate; when a batch over 40,000 pages must be split, keep every part at 500 booklets or more.
+- **Unchanged:** routes, request and response shapes, error codes (a count no rate covers is the existing `400 NO_PRICING`), webhooks, iframe messages, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit §6t *Billing*.
+
+## v1.7.72 — 2026-10-07 — Partner stats headline KPIs match the Dashboard
+
+- **Availability:** staging candidate. Not in production.
+- **What changed:** In `GET /v1/billing/partner/stats`, `total_pieces`, `scheduled_drops`, `completed_orders` and `rts_summary` now come from the same server function as the Dashboard insights (`GET /v1/mail-tracking/account-summary`), all time: they equal `total_pieces_mailed`, `scheduled_drops`, `completed_campaigns` and `total_rts` for the same `list_id` values. `days` no longer narrows them; it still narrows `total_orders`, `orders_by_status` and `sla_summary`. `external_user_id` still narrows them to that user. Deletion is scoped on campaigns, as the Dashboard does: orders in a deleted campaign no longer count, while a deleted order in a live campaign does. Return to Sender now counts only campaigns with an order that is not explicitly unpaid and that are not deleted, as the Dashboard does (with `external_user_id`, campaigns where that user has such an order), and `tracked_pieces` and `rts_rate` follow the same campaigns. Expect Completed, Scheduled and Return to Sender to move once: they were a 365-day window and are now all time. Pieces Mailed, on both surfaces, now leaves out cancelled and payment-failed orders.
+- **Partner action:** none. The parent Marketing Campaign Stats panel and the iframe Dashboard show the same four numbers for the same list ids, with the request PropStream sends today (`days=365` and the user's `external_user_id`) when the listed campaigns hold that user's orders.
+- **Unchanged:** request parameters and response shape; message types, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit `/stats` section and Pieces Mailed rule, OpenAPI `PartnerDashboardStats` and `PartnerRtsSummary`, Iframe Kit version header, Postman version marker.
+
+## v1.7.71 — 2026-10-06 — Partner stats Pieces Mailed matches the Dashboard
+
+- **Availability:** staging candidate. Not in production.
+- **What changed:** `total_pieces` in `GET /v1/billing/partner/stats` is now the Dashboard's Pieces Mailed: the same value as `total_pieces_mailed` in `GET /v1/mail-tracking/account-summary` for the same `list_id`, all time, which is the Dashboard's default range. `external_user_id`, when sent, narrows it further; the Dashboard has no equivalent. Unpaid orders no longer count, while every committed drop of a purchased Multi-Send does, exactly as on the Dashboard. `days` keeps narrowing the other fields but not `total_pieces`.
+- **Partner action:** none to keep the numbers equal. The parent Marketing Campaign Stats panel and the iframe Dashboard now show the same Pieces Mailed for the same list ids.
+- **Unchanged:** every other `/stats` field, its `days` window and the response shape; message types, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit `/stats` section, OpenAPI `PartnerDashboardStats.total_pieces`, Iframe Kit version header, Postman version marker.
+
+## v1.7.70 — 2026-10-05 — Edit after checkout: replace unpaid orders under the same campaign
+
+- **Availability:** staging candidate behind the `propstream_checkout_edit_reissue_enabled` flag, disabled until PropStream confirms its handler. Not in production.
+- **What changed:** after the `campaign_submitted` handoff, **Previous** on the Order Summary (while the payment popup has no final result) reopens editing. On the next **Continue to Payment** the iframe calls `POST /orders/void` for the previous unpaid orders, creates new orders, and emits `campaign_created` and `campaign_submitted` again with the **same `campaignId`** and `listId`, the current `listName`, `campaignType` and `recipient_selection`, and the new `orders[]`. The user may change any step, including the mailer type. A plain popup reopen that never left the Order Summary still replays the exact cached payload with no new order (v1.7.36).
+- **New endpoint:** `POST /orders/void` with `{ "order_ids": [...] }` moves unpaid `scheduled` or `pending_payment` orders to `payment_failed`, all or nothing. A paid order, or one past those states, rejects the whole call with `409 ORDER_NOT_VOIDABLE` and nothing changes. Repeating the call is a no-op. An embed token can only void its own user's orders. The route returns `403 FEATURE_DISABLED` while the flag is off for the user.
+- **Webhook:** each replaced order emits `order.status_changed` with `new_status: payment_failed`, `trigger: replaced_by_edit` and `failure_reason: replaced_by_edit` (a fifth as-shipped variant). No `order.drop_cancelled` is sent. A replaced order can no longer be paid (`confirm-payment` returns `409`) or cancelled.
+- **Reads:** replaced orders are left out of `GET /v1/billing/orders` and `GET /v1/billing/partner/orders` for partner keys, `GET /v1/billing/partner/stats` (every count), `/v1/billing/partner/alerts`, `/v1/billing/partner/ops/summary`, `/v1/billing/partner/ops/orders`, `GET /v1/mail-tracking/account-summary` and the purchased Multi-Send rule. `GET /v1/billing/orders/{order_id}` still returns them.
+- **A/B:** a resubmitted split carries a new `campaignInstanceId`, opaque as before.
+- **Partner action:** PropStream updates its `campaign_submitted` and `confirm-submission` handling to accept the same `campaignId` several times and use only the latest `orders[]`; applies `order.status_changed` by `order_id`, since the replaced orders' events can arrive after the new `campaign_submitted`; and sends `ballpointOrderIds` in `payment_result`, so a late result from the replaced checkout cannot match the new one.
+- **Unchanged:** message types and envelope version `1`, every other request and response shape, REST `3.1`.
+- **Artifacts:** Iframe Kit header, `campaign_created` timing and `campaign_submitted` handoff notes, `payment_result` identifiers; API Kit header, §6g-ii void, order list and metrics notes, `order.status_changed` trigger table; OpenAPI `POST /orders/void`; Postman request; webhook JSON Schemas, catalog and fixtures for `replaced_by_edit`.
 
 ## v1.7.69 — 2026-10-03 — 24 dynamic fields in the design editor
 
@@ -172,7 +209,7 @@
 
 ## v1.7.56 — 2026-09-17 — Privileged operations dashboard
 
-- **Availability:** staging candidate; production release and access provisioning are pending.
+- **Availability:** the operations API reads are live in production since 2026-09-19 (API v3.36.0); the dashboard screens for invoice history and mailing commitments are live in production since 2026-10-07 (dashboard v1.17.0). Production access needs a separately provisioned `dashboard:read` key, which has not been issued yet.
 - **Dedicated operations access:** `dashboard:read` grants account/source-wide order visibility and account-wide invoice visibility. Ordinary customer iframe keys cannot use these routes or the existing account invoice reads. `pricing:write` remains a separate permission.
 - **Mailing commitments:** On schedule through the entire committed day in `America/Chicago`; Overdue after it. Completed mailings retain their actual on-time/late result from immutable completion facts. Unknown legacy evidence and excluded orders are reported separately. No At risk tier is exposed by this portal. Completed-mailing rates and open overdue counts are separated by postage class.
 - **Billing audit:** invoice history expands into frozen per-order amounts and product/postage subtotals, including adjustments and earlier-period catch-up orders. New Stripe invoices use grouped product/postage summaries; previously started invoices retain their original retry layout. Amounts, rounding and Net-15 terms do not change.
