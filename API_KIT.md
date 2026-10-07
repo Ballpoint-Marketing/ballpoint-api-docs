@@ -2492,7 +2492,7 @@ Follow progress with `GET /v1/billing/orders/{order_id}` (`production_status`).
 | 429 | `ACCOUNT_RPM_EXCEEDED` / `ACCOUNT_RPD_EXCEEDED` | Account request rate exceeded; retry after `Retry-After` |
 | 503 | `PRINT_JOBS_BUSY` | Another job is being validated; retry after `Retry-After` |
 
-**Billing.** Print jobs are invoiced weekly once Ballpoint completes the job: price per page × pages, plus First Class postage per booklet. The price is fixed when the job is accepted. (Live in production since 2026-10-05. Booklet prices are not set in production yet, so a production submission returns `400 NO_PRICING` until they are.) The mailing address and postage indicia are printed on the booklet's last page; Ballpoint mails the booklets.
+**Billing.** Print jobs are invoiced weekly once Ballpoint completes the job: price per page × pages, plus First Class postage per booklet. The postage rate depends on the number of booklets in the job: one rate for fewer than 500 booklets, a lower rate from 500. Each job is rated on its own booklet count, so sending a week's booklets as one job can reach the lower rate. A batch over 40,000 pages must be split; keep every part at 500 booklets or more (for example 700 + 700, not 1,250 + 150) so none falls to the higher rate. Rates are agreed with Ballpoint. The price is fixed when the job is accepted. (Per-page billing is live in production since 2026-10-05; the postage tiers are a staging candidate. Booklet prices are not set in production yet, so a production submission returns `400 NO_PRICING` until they are.) The mailing address and postage indicia are printed on the booklet's last page; Ballpoint mails the booklets.
 
 ---
 
