@@ -209,7 +209,7 @@
 
 ## v1.7.56 — 2026-09-17 — Privileged operations dashboard
 
-- **Availability:** the operations API reads are live in production since 2026-09-19 (API v3.36.0); the dashboard screens for invoice history and mailing commitments are live in production since 2026-10-07 (dashboard v1.17.0). Production access needs a separately provisioned `dashboard:read` key, which has not been issued yet.
+- **Availability:** the operations API reads are live in production since 2026-09-19 (API v3.36.0); the dashboard screens for invoice history and mailing commitments are live in production since 2026-10-07 (dashboard v1.17.0). Access requires a separately provisioned `dashboard:read` key.
 - **Dedicated operations access:** `dashboard:read` grants account/source-wide order visibility and account-wide invoice visibility. Ordinary customer iframe keys cannot use these routes or the existing account invoice reads. `pricing:write` remains a separate permission.
 - **Mailing commitments:** On schedule through the entire committed day in `America/Chicago`; Overdue after it. Completed mailings retain their actual on-time/late result from immutable completion facts. Unknown legacy evidence and excluded orders are reported separately. No At risk tier is exposed by this portal. Completed-mailing rates and open overdue counts are separated by postage class.
 - **Billing audit:** invoice history expands into frozen per-order amounts and product/postage subtotals, including adjustments and earlier-period catch-up orders. New Stripe invoices use grouped product/postage summaries; previously started invoices retain their original retry layout. Amounts, rounding and Net-15 terms do not change.
