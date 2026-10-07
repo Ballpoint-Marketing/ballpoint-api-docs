@@ -8,6 +8,14 @@
 - **Unchanged:** routes, request and response shapes, error codes (a count no rate covers is the existing `400 NO_PRICING`), webhooks, iframe messages, envelope version `1` and REST `3.1`.
 - **Artifacts:** API Kit §6t *Billing*.
 
+## v1.7.72 — 2026-10-07 — Partner stats headline KPIs match the Dashboard
+
+- **Availability:** staging candidate. Not in production.
+- **What changed:** In `GET /v1/billing/partner/stats`, `total_pieces`, `scheduled_drops`, `completed_orders` and `rts_summary` now come from the same server function as the Dashboard insights (`GET /v1/mail-tracking/account-summary`), all time: they equal `total_pieces_mailed`, `scheduled_drops`, `completed_campaigns` and `total_rts` for the same `list_id` values. `days` no longer narrows them; it still narrows `total_orders`, `orders_by_status` and `sla_summary`. `external_user_id` still narrows them to that user. Deletion is scoped on campaigns, as the Dashboard does: orders in a deleted campaign no longer count, while a deleted order in a live campaign does. Return to Sender now counts only campaigns with an order that is not explicitly unpaid and that are not deleted, as the Dashboard does (with `external_user_id`, campaigns where that user has such an order), and `tracked_pieces` and `rts_rate` follow the same campaigns. Expect Completed, Scheduled and Return to Sender to move once: they were a 365-day window and are now all time. Pieces Mailed, on both surfaces, now leaves out cancelled and payment-failed orders.
+- **Partner action:** none. The parent Marketing Campaign Stats panel and the iframe Dashboard show the same four numbers for the same list ids, with the request PropStream sends today (`days=365` and the user's `external_user_id`) when the listed campaigns hold that user's orders.
+- **Unchanged:** request parameters and response shape; message types, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit `/stats` section and Pieces Mailed rule, OpenAPI `PartnerDashboardStats` and `PartnerRtsSummary`, Iframe Kit version header, Postman version marker.
+
 ## v1.7.71 — 2026-10-06 — Partner stats Pieces Mailed matches the Dashboard
 
 - **Availability:** staging candidate. Not in production.
