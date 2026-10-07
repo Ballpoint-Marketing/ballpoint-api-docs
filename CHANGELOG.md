@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Print-job postage tiered by the booklets in the job
+
+- **Availability:** staging candidate. Booklet prices are not set in production yet. No contract version change (`1.7.71`).
+- **What changed:** First Class postage per booklet now depends on the number of booklets in the job: one rate for fewer than 500 booklets, a lower rate from 500 (exactly 500 gets the lower rate). Each job is rated on its own booklet count; the price per page is unchanged, and the price is still fixed when the job is accepted.
+- **Partner action:** send a week's booklets as one job to reach the lower rate; when a batch over 40,000 pages must be split, keep every part at 500 booklets or more.
+- **Unchanged:** routes, request and response shapes, error codes (a count no rate covers is the existing `400 NO_PRICING`), webhooks, iframe messages, envelope version `1` and REST `3.1`.
+- **Artifacts:** API Kit §6t *Billing*.
+
 ## v1.7.71 — 2026-10-06 — Partner stats Pieces Mailed matches the Dashboard
 
 - **Availability:** staging candidate. Not in production.
