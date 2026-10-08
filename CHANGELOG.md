@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-08 — Mailing areas above the artwork; Color Letter reopens with its layers
+
+- **Availability:** live in production since 2026-10-08 (API v3.42.0, iframe v1.24.0). No contract version change: these are corrections inside the editor plus one print correction; no message, payload, route or protocol version changes.
+- **The mailing areas stay on top while the customer designs.** On every printed postcard back, Create Your Own and catalog alike, the postage, return, recipient and barcode areas are drawn above the customer's artwork in the editor and in Preview, as they are at print. Artwork can still be selected, moved, cropped and reordered underneath. Editable text over the mailing areas in Create Your Own remains an error to resolve, and images that reach the mailing areas are still accepted after the mailing-side review.
+- **Create Your Own previews the printed addresses.** The return area shows the customer's own return address from their sender information. On the compact Create Your Own layouts (`cyo_compact_white_v2` and `cyo_compact_white_v3`), the recipient area shows a fictional sample address in the handwriting face, colour, size and placement used at print. The sample is illustrative: real recipient addresses and the barcode are produced per piece at print. When the sender information is incomplete, the return area keeps its placeholder label. The guide is never saved with the design, submitted or printed.
+- **One stamp on Home Services backs.** Saved Home Services catalog designs carried an old postage mark drawn inside their back image, so a second, faded stamp could print next to the real one. New designs use cleaned back images, and orders that still carry the old image have that area masked with white at print, including older orders whose print file is produced after this release.
+- **Color Letter reopens with its layers.** Reopening Customize on a Color Letter now restores the layers already designed for it, including a saved design it came from; edits stay on that letter in the campaign.
+- **Representative recipient unchanged.** `set_preview_recipient` continues to apply only to the eligible proofs of the approved printed postcard products, as IFRAME_KIT states. Create Your Own neither reads nor displays it.
+- **Partner action:** none.
+
 ## Unreleased — Print-job postage tiered by the booklets in the job
 
 - **Availability:** staging candidate. Booklet prices are not set in production yet. No contract version change (`1.7.71`).
@@ -38,7 +48,7 @@
 
 ## v1.7.69 — 2026-10-03 — 24 dynamic fields in the design editor
 
-- **Availability:** the API part is live in production since 2026-10-05 (API v3.41.0): the renderer resolves the 13 new fields and orders accept the optional sender `email`. The design-editor dropdown with the new fields is not in production yet: production iframe v1.23.0 declares contract 1.7.69 without it (staging candidate).
+- **Availability:** the API part is live in production since 2026-10-05 (API v3.41.0): the renderer resolves the 13 new fields and orders accept the optional sender `email`. The design-editor dropdown with the new fields is live in production since 2026-10-08 (API v3.42.0, iframe v1.24.0); from that build the iframe also sends the sender `email`, so `#MyBusinessEmail#` prints on new orders.
 - **What changed:** the design editor offers 13 more dynamic fields, for 24 in total: `#MyBusinessEmail#`, `#MyAddress#`, `#MyCity#`, `#MyState#`, `#MyZip#`, `#RecipientFirstName#`, `#RecipientLastName#`, `#MailingFullAddress#`, `#MailingStreet#`, `#MailingCity#`, `#MailingState#`, `#MailingZip#` and `#PropertyFullAddress#`. Sender fields come from `set_sender`; recipient and mailing fields from the structured recipient address, with `address2` on the same line as `address`; `#PropertyFullAddress#` only from the property `placeHolders`. A field with no data prints blank and never falls back to another field. The dropdown now groups fields as Sender, Recipient, Mailing Address and Property.
 - **Partner action:** none required. To print a second address line for the sender or the property, send both lines together in `set_sender.address` and in `placeHolders.PropertyStreet`; there is no separate line 2 field.
 - **Existing artwork:** designs that use the older `{{sender_email}}` field printed the sender website, because orders did not carry an email. They now print the email when the order has one and still fall back to the website when it does not.
@@ -95,7 +105,7 @@
 
 ## v1.7.63 — 2026-09-29 — Catalog postcards print with the compact recipient box
 
-- **Availability:** staging candidate; production pending. The production releases of 2026-10-01 (1.7.62, 1.7.64, 1.7.65) and 2026-10-05 (1.7.66 to 1.7.69) shipped without this item: production keeps sending and printing `standard_v10` for catalog and Classic proofs.
+- **Availability:** live in production since 2026-10-08 (API v3.42.0, iframe v1.24.0). Catalog and Classic orders created before that keep their frozen `standard_v10`.
 - **What changed:** `postal_layout_profile` accepts a new immutable value, `standard_v11`. New catalog and Classic 4x6/6x9 proofs from the Ballpoint-hosted iframe send it: the same compact recipient box Create Your Own already prints (`cyo_compact_white_v2` on 4x6, `cyo_compact_white_v3` on 6x9), instead of the wider `standard_v10` area. Like `standard_v10`, it covers the old indicia still drawn inside known saved Home Services artwork. Realtor/Agent postcards keep `standard_v10`: `standard_v11` with a back that carries the Realtor divider returns `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before any write, because the compact box would print over it.
 - **Editor preview:** the postage indicia in the iframe preview now uses the same four lines, sizes and positions as the printed piece. The print itself is unchanged.
 - **Partner action:** none. PropStream does not send this field; the iframe fills it. `standard_v10` stays accepted for catalog proofs from older iframe bundles.
@@ -121,7 +131,7 @@
 
 ## v1.7.60 — 2026-09-26 — Handwritten message parts for Realtor/Agent postcards
 
-- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.23.0); they remain a staging candidate.
+- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.24.0); they remain a staging candidate.
 - **What changed:** `POST /orders` accepts an optional `message_parts` object (`greeting`, required `body`, `signature`) for handwritten pieces whose writing robots place those parts separately. If `message` is also sent it must equal the parts joined by one blank line, otherwise `400 MESSAGE_PARTS_MISMATCH` before any write; a Cursive canvas that still prints the managed message returns `400 MESSAGE_PARTS_PRINTED`; each part holds at most 20 merge tags; the parts are not editable through `PATCH`. `GET /v1/billing/orders/{order_id}/recipients` returns `message_greeting`, `message_body` and `message_signature` per recipient, with message merge tags resolved, for orders that carry parts.
 - **Iframe:** the Realtor/Agent Just Listed and Just Sold postcards replace the single message box with Greeting, Message and Signature fields and a live back preview; their orders send `message_parts` alongside the unchanged composed `message`. Cursive print files leave the message blank because the robots write it; Printed pieces keep it on the card.
 - **Partner action:** none. PropStream sends no new message; the iframe fills the new field. Server-to-server callers may keep sending `message` only.
@@ -199,7 +209,7 @@
 
 ## v1.7.56 — 2026-09-17 — Privileged operations dashboard
 
-- **Availability:** staging candidate; production release and access provisioning are pending.
+- **Availability:** the operations API reads are live in production since 2026-09-19 (API v3.36.0); the dashboard screens for invoice history and mailing commitments are live in production since 2026-10-08 (dashboard v1.17.0). Access requires a separately provisioned `dashboard:read` key.
 - **Dedicated operations access:** `dashboard:read` grants account/source-wide order visibility and account-wide invoice visibility. Ordinary customer iframe keys cannot use these routes or the existing account invoice reads. `pricing:write` remains a separate permission.
 - **Mailing commitments:** On schedule through the entire committed day in `America/Chicago`; Overdue after it. Completed mailings retain their actual on-time/late result from immutable completion facts. Unknown legacy evidence and excluded orders are reported separately. No At risk tier is exposed by this portal. Completed-mailing rates and open overdue counts are separated by postage class.
 - **Billing audit:** invoice history expands into frozen per-order amounts and product/postage subtotals, including adjustments and earlier-period catch-up orders. New Stripe invoices use grouped product/postage summaries; previously started invoices retain their original retry layout. Amounts, rounding and Net-15 terms do not change.
