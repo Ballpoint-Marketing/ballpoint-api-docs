@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.73 — 2026-10-14 — Payment Failed: Previous back to the Order Summary
+
+- **Availability:** staging candidate. Not in production.
+- **What changed:** the **Payment Failed** and **Payment Not Completed** screens add **Previous** next to **Try Again**. Previous returns to the Order Summary of the same checkout and sends no checkout message; Previous on that Order Summary goes back to the same Payment Failed screen when edit after checkout does not apply. From that Order Summary, **Continue to Payment** emits `payment_retry_requested` for the same orders, with the same payload as Try Again, and never a new `campaign_submitted`. Where edit after checkout is enabled (v1.7.70, `propstream_checkout_edit_reissue_enabled`), **Previous** on the Order Summary now reopens editing after a failed or not completed payment too, and the next Continue to Payment replaces the unpaid orders as in v1.7.70; a paid order still refuses the replacement.
+- **Partner action:** none beyond what `payment_retry_requested` already requires: reopen payment for the ids it carries. Keep sending `payment_result` for failed payments. With edit after checkout, a `confirm-payment` for a replaced order returns `409 PAYMENT_ALREADY_FAILED`; do not capture that charge.
+- **Unchanged:** message types and payloads, `payment_result` handling, envelope version `1` and REST `3.1`.
+- **Artifacts:** Iframe Kit `payment_result` receipt behaviour and `payment_retry_requested`, version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
+
 ## 2026-10-08 — Mailing areas above the artwork; Color Letter reopens with its layers
 
 - **Availability:** live in production since 2026-10-08 (API v3.42.0, iframe v1.24.0). No contract version change: these are corrections inside the editor plus one print correction; no message, payload, route or protocol version changes.
