@@ -8,6 +8,14 @@
 - **Unchanged:** message types and payloads, `payment_result` handling, envelope version `1` and REST `3.1`.
 - **Artifacts:** Iframe Kit `payment_result` receipt behaviour and `payment_retry_requested`, version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
 
+## __LIVE_DATE__ — API v3.43.0: partner stats parity in production; Barlow italic in print
+
+- **Availability:** live in production since __LIVE_DATE__ (API v3.43.0). The current contract version stays `1.7.73`; this API release carries the REST parts of 1.7.70 to 1.7.72 (see their entries). The production iframe is unchanged by this release.
+- **Partner stats:** the `GET /v1/billing/partner/stats` changes of 1.7.71 and 1.7.72 are live.
+- **Edit after checkout (1.7.70):** `POST /orders/void` and `orders` `replaced_at` are deployed but disabled; the route returns `403 FEATURE_DISABLED` until the flag is enabled for PropStream.
+- **Print:** designs that use Barlow italic at regular, semibold or bold weight (400, 600, 700) print with Barlow's own italic faces instead of a slanted upright face, so italic Barlow text can be slightly narrower or wider and break lines differently than before.
+- **Partner action:** none.
+
 ## 2026-10-08 — Mailing areas above the artwork; Color Letter reopens with its layers
 
 - **Availability:** live in production since 2026-10-08 (API v3.42.0, iframe v1.24.0). No contract version change: these are corrections inside the editor plus one print correction; no message, payload, route or protocol version changes.
@@ -28,7 +36,7 @@
 
 ## v1.7.72 — 2026-10-07 — Partner stats headline KPIs match the Dashboard
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since __LIVE_DATE__ (API v3.43.0). REST-only; nothing to change in the iframe.
 - **What changed:** In `GET /v1/billing/partner/stats`, `total_pieces`, `scheduled_drops`, `completed_orders` and `rts_summary` now come from the same server function as the Dashboard insights (`GET /v1/mail-tracking/account-summary`), all time: they equal `total_pieces_mailed`, `scheduled_drops`, `completed_campaigns` and `total_rts` for the same `list_id` values. `days` no longer narrows them; it still narrows `total_orders`, `orders_by_status` and `sla_summary`. `external_user_id` still narrows them to that user. Deletion is scoped on campaigns, as the Dashboard does: orders in a deleted campaign no longer count, while a deleted order in a live campaign does. Return to Sender now counts only campaigns with an order that is not explicitly unpaid and that are not deleted, as the Dashboard does (with `external_user_id`, campaigns where that user has such an order), and `tracked_pieces` and `rts_rate` follow the same campaigns. Expect Completed, Scheduled and Return to Sender to move once: they were a 365-day window and are now all time. Pieces Mailed, on both surfaces, now leaves out cancelled and payment-failed orders.
 - **Partner action:** none. The parent Marketing Campaign Stats panel and the iframe Dashboard show the same four numbers for the same list ids, with the request PropStream sends today (`days=365` and the user's `external_user_id`) when the listed campaigns hold that user's orders.
 - **Unchanged:** request parameters and response shape; message types, envelope version `1` and REST `3.1`.
@@ -36,7 +44,7 @@
 
 ## v1.7.71 — 2026-10-06 — Partner stats Pieces Mailed matches the Dashboard
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since __LIVE_DATE__ (API v3.43.0). REST-only; nothing to change in the iframe.
 - **What changed:** `total_pieces` in `GET /v1/billing/partner/stats` is now the Dashboard's Pieces Mailed: the same value as `total_pieces_mailed` in `GET /v1/mail-tracking/account-summary` for the same `list_id`, all time, which is the Dashboard's default range. `external_user_id`, when sent, narrows it further; the Dashboard has no equivalent. Unpaid orders no longer count, while every committed drop of a purchased Multi-Send does, exactly as on the Dashboard. `days` keeps narrowing the other fields but not `total_pieces`.
 - **Partner action:** none to keep the numbers equal. The parent Marketing Campaign Stats panel and the iframe Dashboard now show the same Pieces Mailed for the same list ids.
 - **Unchanged:** every other `/stats` field, its `days` window and the response shape; message types, envelope version `1` and REST `3.1`.
@@ -44,7 +52,7 @@
 
 ## v1.7.70 — 2026-10-05 — Edit after checkout: replace unpaid orders under the same campaign
 
-- **Availability:** staging candidate behind the `propstream_checkout_edit_reissue_enabled` flag, disabled until PropStream confirms its handler. Not in production.
+- **Availability:** the API part is deployed to production since __LIVE_DATE__ (API v3.43.0) but disabled: the `propstream_checkout_edit_reissue_enabled` flag stays off until PropStream confirms its handler, so `POST /orders/void` returns `403 FEATURE_DISABLED`. The iframe part (Previous reopening editing after checkout) is not in the production iframe yet.
 - **What changed:** after the `campaign_submitted` handoff, **Previous** on the Order Summary (while the payment popup has no final result) reopens editing. On the next **Continue to Payment** the iframe calls `POST /orders/void` for the previous unpaid orders, creates new orders, and emits `campaign_created` and `campaign_submitted` again with the **same `campaignId`** and `listId`, the current `listName`, `campaignType` and `recipient_selection`, and the new `orders[]`. The user may change any step, including the mailer type. A plain popup reopen that never left the Order Summary still replays the exact cached payload with no new order (v1.7.36).
 - **New endpoint:** `POST /orders/void` with `{ "order_ids": [...] }` moves unpaid `scheduled` or `pending_payment` orders to `payment_failed`, all or nothing. A paid order, or one past those states, rejects the whole call with `409 ORDER_NOT_VOIDABLE` and nothing changes. Repeating the call is a no-op. An embed token can only void its own user's orders. The route returns `403 FEATURE_DISABLED` while the flag is off for the user.
 - **Webhook:** each replaced order emits `order.status_changed` with `new_status: payment_failed`, `trigger: replaced_by_edit` and `failure_reason: replaced_by_edit` (a fifth as-shipped variant). No `order.drop_cancelled` is sent. A replaced order can no longer be paid (`confirm-payment` returns `409`) or cancelled.
