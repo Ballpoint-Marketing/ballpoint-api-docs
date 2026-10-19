@@ -3257,15 +3257,18 @@ For `POST /orders`, **always retry with the same `Idempotency-Key`**. You will n
 
 ### Rate Limits
 
-- **120 requests per minute** per account
-- **10,000 requests per day** per account
+- **60 requests per minute** per key (sliding window)
+- **120 requests per minute** per account, across all of its keys
+- A **daily request cap** set per account (10,000 requests/day for new standard API accounts unless agreed otherwise)
 
-Every response includes:
+On routes that apply both limits, a single key reaches its own limit before the account limit. Limits agreed during onboarding may differ. Responses from rate-limited routes include these per-key headers:
 
 ```
-X-RateLimit-Remaining: 118
-X-RateLimit-Limit: 120
+X-RateLimit-Remaining: 58
+X-RateLimit-Limit: 60
 ```
+
+The headers describe the per-key window only. A `429` caused by the account limit (`ACCOUNT_RPM_EXCEEDED` / `ACCOUNT_RPD_EXCEEDED`) can arrive while `X-RateLimit-Remaining` is above zero, and a daily-limit `Retry-After` can last until midnight UTC. Always honour `Retry-After` and the error code.
 
 On `429` responses:
 
@@ -3279,7 +3282,7 @@ Retry-After: 12
 
 Intake is **log-only** — every accepted event becomes a single structured log line on Ballpoint's side. No database row, no webhook fan-out, no state change, and no request-body echo in any response. PII (emails, phone numbers, ZIPs, long digit-runs) is scrubbed **client-side by the iframe** before send, and the iframe caps itself at 5 events per page-load (deduped).
 
-**Caps.** Request body ≤ **4096 bytes**; per-partner-key rate limit **60 requests / minute** (sliding window, independent of the account-wide 120/min bucket above); per-field caps on the JSON payload — `name` ≤ 50, `message` ≤ 220, `source` ≤ 300, `pageId` ≤ 40, `buildId` ≤ 64, `lineno`/`colno` 0–10,000,000, `contractVersions` ≤ 6 keys of ≤ 20 chars each. Extra fields and control characters (`\r`, `\n`, `0x00`–`0x1F`) are rejected.
+**Caps.** Request body ≤ **4096 bytes**; per-partner-key rate limit **60 requests / minute** (sliding window, independent of the general per-key and account limits above); per-field caps on the JSON payload — `name` ≤ 50, `message` ≤ 220, `source` ≤ 300, `pageId` ≤ 40, `buildId` ≤ 64, `lineno`/`colno` 0–10,000,000, `contractVersions` ≤ 6 keys of ≤ 20 chars each. Extra fields and control characters (`\r`, `\n`, `0x00`–`0x1F`) are rejected.
 
 | Status | Meaning | Body |
 |--------|---------|------|
