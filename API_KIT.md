@@ -13,32 +13,17 @@ New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barc
 
 ---
 
-## Quick Start (30 seconds)
+## Quick Start
 
-Verify your credentials work — paste this into a terminal:
+Start with [Your First Complete Staging Order](START_HERE.md): obtain the right server-key access, quote two sample postcards, submit artwork with `POST /orders`, upload recipients, read the render status and verify a signed webhook.
 
-```bash
-curl -s -X POST https://staging-api.ballpointmarketing.com/v1/billing/orders \
-  -H "X-Partner-Key: pk_test_PARTNER_REPLACE_ME" \
-  -H "Idempotency-Key: ps-quickstart-$(date +%s)" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "campaign_id": "camp_test",
-    "product_type": "4x6_printed",
-    "postage_type": "first_class",
-    "piece_count": 10
-  }'
-```
-
-You should get back `202 Accepted` with an `order_id`. This ran against **staging**, the partner sandbox: nothing there is printed or mailed. Do not send test traffic to `api.ballpointmarketing.com` — production has no test mode, and an order created there with any live key is fulfilled and invoiced.
-
-**New here?** Start with [`START_HERE.md`](START_HERE.md) for a 5-minute quickstart.
+That walkthrough uses `POST /orders` (**200**, response field `id`). The billing-format `POST /v1/billing/orders` in §6b remains available (**202**, response field `order_id`); its payload does not carry the same artwork and sender fields. Choose the appropriate flow and keep its request/response format consistent.
 
 ### Additional Resources
 
 | Resource | Location |
 |----------|----------|
-| 5-minute quickstart | [`START_HERE.md`](START_HERE.md) |
+| Complete staging-order walkthrough | [`START_HERE.md`](START_HERE.md) |
 | Postman collection | [`examples/ballpoint.postman_collection.json`](examples/ballpoint.postman_collection.json) |
 | Postman staging environment (PropStream integration testing) | [`examples/ballpoint-staging.postman_environment.json`](examples/ballpoint-staging.postman_environment.json) |
 | Postman sandbox environment | [`examples/ballpoint-sandbox.postman_environment.json`](examples/ballpoint-sandbox.postman_environment.json) |
@@ -130,7 +115,20 @@ Ballpoint issues partner keys in two classes, and every key carries an explicit 
 | `print_jobs:write` | Submitting print-ready PDF jobs (least-privilege keys, §6t) | `POST /v1/print-jobs/upload-url`, `POST /v1/print-jobs` |
 | *(none required)* | Every other partner route — except on least-privilege keys (below) | — |
 
-**Least-privilege keys.** Keys issued for a specific capability, such as print jobs (§6t), reach **only** the routes their scopes open; with `read`, they can also read their own orders (`GET /v1/billing/orders/{id}`). Every other route answers `403 INSUFFICIENT_SCOPE` with `required_scope: null` (the route is not available to the key at all) and the message "This partner key is not authorized for this route." Existing keys are not least-privilege and keep their current access.
+**Least-privilege keys.** Keys issued for a specific capability, such as print jobs (§6t), reach **only** the routes their scopes open; with `read`, they can also read their own orders (`GET /v1/billing/orders/{id}`). Every other route answers `403 INSUFFICIENT_SCOPE` with `required_scope: null` (the route is not available to the key at all) and the message "This partner key is not authorized for this route." Legacy keys keep their current access. Existing restricted print-job keys keep their current route set.
+
+**Assisted API-orders profile (unreleased; availability confirmed by Ballpoint).**
+For approved backend integrations, Ballpoint provisions a restricted key with
+`read,orders:write,recipients:write,tracking:read`. `orders:write` opens the
+existing quote and creation routes plus recipient upload; upload additionally
+requires `recipients:write`, regardless of the legacy rollout capability.
+`tracking:read` opens the order-level mail-tracking route, and `read` opens
+order detail. These are the five operations listed in [START_HERE](START_HERE.md).
+Other partner routes remain unavailable, including confirm-payment, recipient
+PATCH/delta, cancel/reschedule, print jobs, operations stats and embed-token
+issuance. Accounts, keys and webhook registration are supplied by Ballpoint;
+there is no public signup or automatic key issuance. Production access follows
+a separately approved staging run. No existing key gains these new permissions.
 
 A key used on a route that requires `payments:write` or `recipients:write` without holding it receives `403 INSUFFICIENT_SCOPE`, with the required scope named in the error body (see §10). The `dashboard:read` and `pricing:write` checks predate this change and keep returning `403 FORBIDDEN`. **Rollout:** enforcement of `payments:write` and `recipients:write` is activated per partner on an agreed date, after that partner's backend has switched to its server key; your current integration is unaffected until then.
 
@@ -172,9 +170,9 @@ Your users select recipients in your platform, then the Ballpoint iframe handles
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-### Flow B — API-Only (Future Partners)
+### Flow B — API-Only
 
-> **Note:** No API-only clients exist yet. This pattern is documented for future partners.
+Your backend submits order content and a recipient list using a server key. Follow [START_HERE.md](START_HERE.md) for the complete sequence and account prerequisites.
 
 ```
 Partner sends order via POST /orders with their own recipient data
@@ -185,18 +183,16 @@ Partner sends order via POST /orders with their own recipient data
 
 ### What Ballpoint Handles
 
-- **Campaign creation** — Ballpoint creates the campaign and provides you the `campaign_id`
+- **Campaign creation** — `POST /orders` derives an account-scoped campaign from your `list_id` and creates it when needed. The billing-format route accepts your `campaign_id`, creates it if absent and checks ownership if it already exists.
 - **Recipients** — **you provide the mailing list**. Your users select recipients in your platform; that data flows into the ordering process.
 - **Fulfillment** — Ballpoint handles printing, handwriting, envelope stuffing, postage, and USPS drop-off
 
-> **Note:** There is no `POST /campaigns` endpoint today. Campaign setup happens
-> through the Ballpoint dashboard. Once a campaign is ready, you receive the
-> `campaign_id` to reference when creating orders via the API.
+> **Campaign identity:** a separate dashboard campaign-creation step is not required for these order routes. With the billing-format route, choose a unique campaign ID for your account; an ID already owned by another account is rejected. With `POST /orders`, use `list_id` to group related orders within your account.
 
 ### What Your Platform Calls via API
 
 - **Preview cost** — show your users what they'll pay before ordering
-- **Create order** — submit an order referencing an existing campaign
+- **Create order** — submit an order with the campaign/list identity appropriate to the chosen route
 - **List orders** — query orders by user, status, with pagination
 - **Check tracking** — get USPS delivery status for an order or campaign
 - **Cancel order** — cancel before production starts
@@ -239,7 +235,7 @@ Cancelling an order before production `prep` begins removes it from the fulfillm
 
 ### Pattern A — Server-to-Server
 
-> **Note:** No API-only clients exist yet. This pattern is documented for future partners who want direct API integration without an iframe.
+Use this pattern for direct backend integration without an iframe. Product, account access, pricing and fulfillment configuration must be confirmed during onboarding; see [the first-order walkthrough](START_HERE.md).
 
 Your backend creates orders and receives webhook status updates.
 
@@ -336,7 +332,9 @@ Available styles: `candy`, `party`, `pastel`, `confetti`, `desert`, `floral`, `s
 
 ### Pricing Table
 
-The table below is the Ballpoint **base-price schedule effective July 12, 2026**.
+The table below is the **existing integration base-price schedule effective July 12, 2026**. New customers explicitly onboarded on the standard API profile use a separate base-price schedule; they do not inherit this table. That opt-in profile is **pending deployment and account setup**, uses a flat unit price at every quantity (no volume discounts), and does not reprice existing integrations. Use your own authenticated cost preview and the pricing supplied during onboarding.
+
+Standard API pricing covers the supported products below. The commercial #10 letter with a written envelope is not a distinct supported API product; do not send it as `color_letter` (printed envelope) or `hybrid_letter` (5x7 envelope).
 Prices are in **tenth-cents** (tcents). Divide by 10,000 for dollars:
 `5388 tcents = $0.5388/piece`. Partner-authenticated pricing and preview
 responses apply that account's configured markup to the primary display-price
@@ -704,7 +702,7 @@ POST /v1/billing/orders
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `campaign_id` | string | Yes | Campaign to fulfill (provided by Ballpoint) |
+| `campaign_id` | string | Yes | Caller-chosen campaign ID for this account. Created if absent; an existing campaign must belong to the caller's account. Use a unique ID rather than a shared sample value. |
 | `product_type` | string | Yes | One of the 7 product types. The three legacy aliases (`check_mailer`, `commercial_letter`, `hybrid_greeting`) are accepted and normalized to their canonical product before validation, pricing, and persistence — see [Legacy product aliases](#legacy-product-aliases). |
 | `postage_type` | string | Yes | `first_class`, `standard`, or `presort` |
 | `piece_count` | integer | Yes | Number of mail pieces |
@@ -3259,15 +3257,18 @@ For `POST /orders`, **always retry with the same `Idempotency-Key`**. You will n
 
 ### Rate Limits
 
-- **120 requests per minute** per account
-- **10,000 requests per day** per account
+- **60 requests per minute** per key (sliding window)
+- **120 requests per minute** per account, across all of its keys
+- A **daily request cap** set per account (10,000 requests/day for new standard API accounts unless agreed otherwise)
 
-Every response includes:
+On routes that apply both limits, a single key reaches its own limit before the account limit. Limits agreed during onboarding may differ. Responses from rate-limited routes include these per-key headers:
 
 ```
-X-RateLimit-Remaining: 118
-X-RateLimit-Limit: 120
+X-RateLimit-Remaining: 58
+X-RateLimit-Limit: 60
 ```
+
+The headers describe the per-key window only. A `429` caused by the account limit (`ACCOUNT_RPM_EXCEEDED` / `ACCOUNT_RPD_EXCEEDED`) can arrive while `X-RateLimit-Remaining` is above zero, and a daily-limit `Retry-After` can last until midnight UTC. Always honour `Retry-After` and the error code.
 
 On `429` responses:
 
@@ -3281,7 +3282,7 @@ Retry-After: 12
 
 Intake is **log-only** — every accepted event becomes a single structured log line on Ballpoint's side. No database row, no webhook fan-out, no state change, and no request-body echo in any response. PII (emails, phone numbers, ZIPs, long digit-runs) is scrubbed **client-side by the iframe** before send, and the iframe caps itself at 5 events per page-load (deduped).
 
-**Caps.** Request body ≤ **4096 bytes**; per-partner-key rate limit **60 requests / minute** (sliding window, independent of the account-wide 120/min bucket above); per-field caps on the JSON payload — `name` ≤ 50, `message` ≤ 220, `source` ≤ 300, `pageId` ≤ 40, `buildId` ≤ 64, `lineno`/`colno` 0–10,000,000, `contractVersions` ≤ 6 keys of ≤ 20 chars each. Extra fields and control characters (`\r`, `\n`, `0x00`–`0x1F`) are rejected.
+**Caps.** Request body ≤ **4096 bytes**; per-partner-key rate limit **60 requests / minute** (sliding window, independent of the general per-key and account limits above); per-field caps on the JSON payload — `name` ≤ 50, `message` ≤ 220, `source` ≤ 300, `pageId` ≤ 40, `buildId` ≤ 64, `lineno`/`colno` 0–10,000,000, `contractVersions` ≤ 6 keys of ≤ 20 chars each. Extra fields and control characters (`\r`, `\n`, `0x00`–`0x1F`) are rejected.
 
 | Status | Meaning | Body |
 |--------|---------|------|
@@ -3388,7 +3389,7 @@ Your staging key (`pk_test_PARTNER_REPLACE_ME`):
 
 - Orders are created exactly as in production and go through the same validation and payment gate
 - Nothing is printed or mailed, so nothing reaches an invoice
-- Use `camp_test` as the campaign ID for testing
+- Use a unique campaign/list ID for your test run; [START_HERE.md](START_HERE.md) generates and saves one. Do not reuse a shared `camp_test` across unrelated accounts.
 
 **What happens to staging orders?** They are created with their normal initial status and stay there — production status does not auto-advance because there is no physical fulfillment. To test your webhook handler, ask us to trigger test events against your endpoint. We can simulate the full lifecycle (`accepted` → `prep` → `printing` → ... → `shipping` → `complete` → `shipped` → `delivered`) so you can verify your handler end-to-end without waiting for real mail.
 

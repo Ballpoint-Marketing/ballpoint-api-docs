@@ -1,0 +1,83 @@
+{
+  "product_id": "4x6_printed",
+  "product_type": "4x6_printed",
+  "postage_type": "first_class",
+  "postcard_size": "4x6",
+  "pieces": 2,
+  "list_id": "onboarding-demo",
+  "external_id": "onboarding-demo",
+  "external_user_id": "onboarding-user",
+  "sender": {
+    "name": "Example Integration",
+    "address": "10 Example Way",
+    "city": "Austin",
+    "state": "TX",
+    "zip": "78701"
+  },
+  "canvas_json": {
+    "front": {
+      "version": "5.3.0",
+      "width": 600,
+      "height": 408,
+      "background": "#ffffff",
+      "objects": [
+        {
+          "type": "textbox",
+          "left": 40,
+          "top": 50,
+          "width": 520,
+          "fontSize": 28,
+          "fontFamily": "Arial",
+          "fill": "#162539",
+          "text": "Staging integration sample",
+          "originX": "left",
+          "originY": "top"
+        },
+        {
+          "type": "textbox",
+          "left": 40,
+          "top": 120,
+          "width": 520,
+          "fontSize": 22,
+          "fontFamily": "Arial",
+          "fill": "#162539",
+          "text": "Hello {{first_name}}",
+          "originX": "left",
+          "originY": "top"
+        },
+        {
+          "type": "textbox",
+          "left": 40,
+          "top": 190,
+          "width": 520,
+          "fontSize": 16,
+          "fontFamily": "Arial",
+          "fill": "#162539",
+          "text": "Fictional sample. Not approved for mailing.",
+          "originX": "left",
+          "originY": "top"
+        }
+      ]
+    },
+    "back": {
+      "version": "5.3.0",
+      "width": 600,
+      "height": 408,
+      "background": "#ffffff",
+      "objects": [
+        {
+          "type": "textbox",
+          "left": 24,
+          "top": 160,
+          "width": 170,
+          "fontSize": 14,
+          "fontFamily": "Arial",
+          "fill": "#162539",
+          "text": "Integration sample",
+          "originX": "left",
+          "originY": "top"
+        }
+      ]
+    }
+  }
+}

@@ -3,7 +3,7 @@ info:
   title: Ballpoint Marketing API (v1, staging)
   version: 3.1.0
   x-partner-contract-version: 1.7.73
-  description: "This spec documents the v1 API contract using staging as its default server and examples. Partner contract 1.7.73 is iframe-only (Payment Failed Previous) with no REST change. Partner contract 1.7.72 makes the `/v1/billing/partner/stats` headline KPIs (total_pieces, scheduled_drops, completed_orders, rts_summary) the Dashboard insight numbers, all time. Partner contract 1.7.71 makes `/v1/billing/partner/stats` `total_pieces` equal to the Dashboard Pieces Mailed; 1.7.71 and 1.7.72 are live in production since 2026-10-15 (API v3.43.0). Partner contract 1.7.70 adds `POST /orders/void` (replace unpaid orders after a checkout edit; deployed to production on 2026-10-15 (API v3.43.0) but disabled: the flag stays off until PropStream confirms its handler). Partner contract 1.7.65 adds `POST /v1/auth/embed-token`, an optional short-lived per-user token for the iframe; 1.7.62, 1.7.64 and 1.7.65 are live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0); the API parts of 1.7.66 to 1.7.69 are live since 2026-10-05 (API v3.41.0), while the iframe Mailer Count Change display remains a staging candidate and the dynamic-field editor dropdown is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0; the 1.7.63 `standard_v11` catalog/Classic postal profile is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0; the Realtor/Agent handwritten postcards that send the 1.7.60 `message_parts` are not yet offered by the production iframe. A future v2 remains out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Test-mode account principal; not a partner credential |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nErrors raised by the API sit under `detail` (FastAPI wire envelope) and carry a trace ID:\n\n```json\n{\n  \"detail\": {\n    \"error\": {\n      \"type\": \"validation_error\",\n      \"code\": \"INVALID_ADDRESS\",\n      \"message\": \"Address could not be verified\",\n      \"trace_id\": \"tr_abc123\"\n    }\n  }\n}\n```\n\nA key used on a route whose scope it does not hold receives `403` with code `INSUFFICIENT_SCOPE`, `required_scope` and `granted_scopes`. An embed token whose order body names a different `external_user_id` receives `403 EXTERNAL_USER_MISMATCH`. Request-validation failures use FastAPI's list-shaped `detail` with status 422.\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.73`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on all responses:\n    - `X-RateLimit-Remaining`: requests remaining in window\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
+  description: "This spec documents the v1 API contract using staging as its default server and examples. Partner contract 1.7.73 is iframe-only (Payment Failed Previous) with no REST change. Partner contract 1.7.72 makes the `/v1/billing/partner/stats` headline KPIs (total_pieces, scheduled_drops, completed_orders, rts_summary) the Dashboard insight numbers, all time. Partner contract 1.7.71 makes `/v1/billing/partner/stats` `total_pieces` equal to the Dashboard Pieces Mailed; 1.7.71 and 1.7.72 are live in production since 2026-10-15 (API v3.43.0). Partner contract 1.7.70 adds `POST /orders/void` (replace unpaid orders after a checkout edit; deployed to production on 2026-10-15 (API v3.43.0) but disabled: the flag stays off until PropStream confirms its handler). Partner contract 1.7.65 adds `POST /v1/auth/embed-token`, an optional short-lived per-user token for the iframe; 1.7.62, 1.7.64 and 1.7.65 are live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0); the API parts of 1.7.66 to 1.7.69 are live since 2026-10-05 (API v3.41.0), while the iframe Mailer Count Change display remains a staging candidate and the dynamic-field editor dropdown is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0; the 1.7.63 `standard_v11` catalog/Classic postal profile is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0; the Realtor/Agent handwritten postcards that send the 1.7.60 `message_parts` are not yet offered by the production iframe. A future v2 remains out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Test-mode account principal; not a partner credential |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nErrors raised by the API sit under `detail` (FastAPI wire envelope) and carry a trace ID:\n\n```json\n{\n  \"detail\": {\n    \"error\": {\n      \"type\": \"validation_error\",\n      \"code\": \"INVALID_ADDRESS\",\n      \"message\": \"Address could not be verified\",\n      \"trace_id\": \"tr_abc123\"\n    }\n  }\n}\n```\n\nA key used on a route whose scope it does not hold receives `403` with code `INSUFFICIENT_SCOPE`, `required_scope` and `granted_scopes`. An embed token whose order body names a different `external_user_id` receives `403 EXTERNAL_USER_MISMATCH`. Request-validation failures use FastAPI's list-shaped `detail` with status 422.\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.73`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on rate-limited routes (per-key window):\n    - `X-RateLimit-Remaining`: requests remaining in the per-key window\n    - `X-RateLimit-Limit`: per-key window size\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
   contact:
     name: Ballpoint API Support
     email: api-support@ballpointmarketing.com
@@ -115,6 +115,113 @@ components:
         type: string
         format: uuid
   schemas:
+    CostPreviewRequest:
+      properties:
+        product_type:
+          description: 4x6_printed | 4x6_cursive | 6x9_printed | 6x9_cursive | color_letter
+            | hybrid_letter | greeting_letter
+          title: Product Type
+          type: string
+        postage_type:
+          description: first_class | standard | presort (varies by product)
+          title: Postage Type
+          type: string
+        piece_count:
+          description: Number of pieces (max 500,000)
+          exclusiveMinimum: 0
+          maximum: 500000
+          title: Piece Count
+          type: integer
+        envelope_style:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          description: Envelope design. Required for letter products (color_letter, hybrid_letter,
+            greeting_letter). Postcards must not include this field.
+          title: Envelope Style
+      required:
+      - product_type
+      - postage_type
+      - piece_count
+      title: CostPreviewRequest
+      type: object
+    CostPreviewResponse:
+      properties:
+        product_type:
+          title: Product Type
+          type: string
+        postage_type:
+          title: Postage Type
+          type: string
+        piece_count:
+          title: Piece Count
+          type: integer
+        envelope_style:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Envelope Style
+        unit_price_tcents:
+          description: Per-piece price in tenth-cents as shown to the end user (marked-up
+            when a partner markup applies; base otherwise). 5054 = $0.5054
+          title: Unit Price Tcents
+          type: integer
+        total_tcents:
+          description: Total in tenth-cents (same rule as unit_price_tcents)
+          title: Total Tcents
+          type: integer
+        total_dollars:
+          description: Total in dollars (same rule as unit_price_tcents)
+          title: Total Dollars
+          type: string
+        partner_cost_unit_price_tcents:
+          description: Wholesale per-piece price the partner pays Ballpoint. Equals unit_price_tcents
+            when no partner markup is configured.
+          title: Partner Cost Unit Price Tcents
+          type: integer
+        partner_cost_total_tcents:
+          description: Wholesale total the partner pays Ballpoint.
+          title: Partner Cost Total Tcents
+          type: integer
+        partner_cost_total_dollars:
+          description: Wholesale total in dollars.
+          title: Partner Cost Total Dollars
+          type: string
+        billing_mode:
+          title: Billing Mode
+          type: string
+        balance_cents:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          default: null
+          title: Balance Cents
+        balance_after_cents:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          default: null
+          title: Balance After Cents
+        limits:
+          additionalProperties: true
+          title: Limits
+          type: object
+      required:
+      - product_type
+      - postage_type
+      - piece_count
+      - unit_price_tcents
+      - total_tcents
+      - total_dollars
+      - partner_cost_unit_price_tcents
+      - partner_cost_total_tcents
+      - partner_cost_total_dollars
+      - billing_mode
+      - limits
+      title: CostPreviewResponse
+      type: object
     UploadRecipient:
       properties:
         first_name:
@@ -1947,6 +2054,68 @@ security:
 - bearerAuth: []
 - partnerKeyAuth: []
 paths:
+  /v1/billing/orders/preview:
+    post:
+      tags:
+      - Billing
+      summary: Preview an order cost without creating an order
+      operationId: preview_order_cost_v1_billing_orders_preview_post
+      description: Authenticated read-only quote for the account. Returns display prices
+        and partner base costs in tenth-cents. Limits are reported in limits.passed
+        and limits.checks; HTTP 200 alone does not mean the account passed those checks.
+        This operation already exists in the API and Postman collection. A successful
+        preview does not grant permission for order creation or recipient upload.
+      security:
+      - partnerKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostPreviewRequest'
+      responses:
+        '200':
+          description: Quote and account limit checks; no order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostPreviewResponse'
+        '400':
+          description: Invalid product/postage combination or missing pricing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The key is not authorized for this route
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Request body validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/billing/orders/{order_id}/recipients:
     post:
       tags:
@@ -2005,6 +2174,12 @@ paths:
                 type: integer
         '422':
           description: Malformed recipient fields or IDEMPOTENCY_KEY_REUSE for changed content.
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/billing/pricing:
     get:
       tags:
@@ -2068,6 +2243,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Order not found (also returned for cross-tenant lookups)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
           content:
             application/json:
               schema:
@@ -3771,6 +3952,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/billing/partner/pricing:
     get:
       tags:
