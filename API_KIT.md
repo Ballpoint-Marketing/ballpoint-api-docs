@@ -332,7 +332,9 @@ Available styles: `candy`, `party`, `pastel`, `confetti`, `desert`, `floral`, `s
 
 ### Pricing Table
 
-The table below is the Ballpoint **base-price schedule effective July 12, 2026**.
+The table below is the **existing integration base-price schedule effective July 12, 2026**. New customers explicitly onboarded on the standard API profile use a separate base-price schedule; they do not inherit this table. That opt-in profile is **pending deployment and account setup**, uses a flat unit price at every quantity (no volume discounts), and does not reprice existing integrations. Use your own authenticated cost preview and the pricing supplied during onboarding.
+
+Standard API pricing covers the supported products below. The commercial #10 letter with a written envelope is not a distinct supported API product; do not send it as `color_letter` (printed envelope) or `hybrid_letter` (5x7 envelope).
 Prices are in **tenth-cents** (tcents). Divide by 10,000 for dollars:
 `5388 tcents = $0.5388/piece`. Partner-authenticated pricing and preview
 responses apply that account's configured markup to the primary display-price

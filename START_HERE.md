@@ -11,7 +11,7 @@ For an embedded editor, use the [Iframe Kit](IFRAME_KIT.md). For print-ready PDF
 Ballpoint supplies the following during onboarding:
 
 - A staging **server key**, kept only on your backend. For the assisted API-orders profile, Ballpoint provisions `read`, `orders:write`, `recipients:write` and `tracking:read` after confirming that this profile is deployed in staging.
-- A staging account enabled for this product and postage combination, with its prices and payment behavior confirmed.
+- A separate staging account for your company, configured by Ballpoint with the agreed product, base prices and spending limits. Account and key creation are assisted; this guide does not provide self-service signup.
 - Access to each operation in the table below, including `recipients:write`. Possessing a server key does not by itself guarantee access to every route.
 - A registered HTTPS webhook endpoint for your account and its own signing secret, when you reach step 7.
 
@@ -70,7 +70,9 @@ jq -e '.product_type == "4x6_printed" and .postage_type == "first_class"
   and has("unit_price_tcents") and has("total_tcents")' preview-response.json
 ```
 
-Expected: HTTP **200**, a quote for two pieces, and `limits.passed: true`. Review the price against the terms supplied by Ballpoint. Prices expressed in `tcents` are tenth-cents: divide by 10,000 for dollars. The primary fields are display prices; `partner_cost_*` fields are the Ballpoint base cost. Do not hardcode a price or infer weekly card charging from `billing_mode`.
+Expected: HTTP **200**, a quote for two pieces, and `limits.passed: true`. Review the price against the terms supplied by Ballpoint. Prices expressed in `tcents` use 10,000 units per dollar. The primary fields are display prices; `partner_cost_*` fields are the Ballpoint base cost. Do not hardcode a price or infer weekly card charging from `billing_mode`.
+
+For new accounts explicitly enabled on the standard API price profile, the base unit price is flat at every quantity; volume discounts are not enabled. Existing integrations retain their agreed pricing. This profile is pending deployment and account setup; Ballpoint must confirm availability before you use it. The preview for your own account is the source of truth, not another integration's price table.
 
 Build the exact creation request **once**, preserving both the quote and a unique reference:
 
