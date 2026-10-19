@@ -7,6 +7,15 @@
 - **Unchanged:** runtime behavior, request and response shapes, webhooks, pricing and the partner contract version.
 - **Partner action:** none required. Send validated addresses for First Class and Greeting Letter, or choose `standard`/`presort` where the product offers it.
 
+## Unreleased — Tenant-gated auto-suppress and delegated Export Leads (BL-1016, BL-1004)
+
+- **Availability:** iframe staging candidate; requires tenant flags in `/v1/config` and partner-side handlers before integration QA. Armstrong will coordinate the contract-version bump and API flag configuration.
+- **Auto-suppress:** `auto_suppress_next_drop_enabled: true` displays the existing next-drop checkbox and permits its existing `auto_suppress_next_drop_changed` intent event for that tenant. A missing/false flag hides the control. The event remains free of recipients and PII; the parent still applies suppression and sends `recipients_updated` after a successful recipient change.
+- **Export Leads:** `export_leads_delegated: true` makes the delivered/cancelled campaign-detail button emit the new `export_leads_requested` event with `{ ballpointCampaignId, orderIds, listId }`. The parent handles the export. With a missing/false flag, the iframe keeps its current local CSV export, including PropStream's existing behavior. The iframe emits nothing when a shared persisted campaign id, order ids, or list id cannot be resolved.
+- **Partner action:** configure the two flags for each tenant and implement the delegated export listener before enabling delegation. For the initial staging rollout, enable auto-suppress for PropStream and BatchLeads, keep delegation off for PropStream, and enable delegation for BatchLeads only after its parent handler is ready.
+- **Unchanged:** REST routes and payloads, `auto_suppress_next_drop_changed` payload, recipient-update ownership, postMessage envelope version `1`, and REST version `3.1`. No server credential enters the iframe.
+- **Artifacts:** Iframe Kit event and visibility sections; API Kit §6r flag semantics. Contract-version metadata will be coordinated with the release.
+
 ## v1.7.77 — 2026-10-23 — Early `set_dashboard_filter` held until the tenant exists; Iframe Kit corrections
 
 - **Availability:** the `set_dashboard_filter` change is an iframe staging candidate, not in production. The other items correct the Iframe Kit to match behavior already live in production.

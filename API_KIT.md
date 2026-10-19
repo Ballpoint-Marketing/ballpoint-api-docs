@@ -2207,6 +2207,17 @@ Rate limits are 10 requests/minute per partner-key + external-user pair and
 3,000 requests/minute per partner key. Headerless requests skip the per-user
 tier. Standard `401`, `403`, and `429` errors apply.
 
+Two tenant-scoped iframe capabilities use this same response: `auto_suppress_next_drop_enabled`
+shows the **Auto-suppress on next drop** preference and permits its
+`auto_suppress_next_drop_changed` message; `export_leads_delegated` makes the
+campaign-detail **Export Leads** button send `export_leads_requested` to the
+embedding parent instead of downloading the iframe's CSV. Missing or false
+values disable the respective capability. The partner's backend handles any
+recipient changes or delegated export; these flags add no REST route or
+request/response field. See the Iframe Kit for message payloads. Both flags
+require tenant configuration before staging QA; they are not implied by the
+partner's origin or source name.
+
 For PropStream, `propstream_send_mail_enabled` authoritatively gates both
 `POST /orders` and `POST /v1/billing/orders`. A disabled evaluation returns
 `403 FEATURE_DISABLED` before idempotency, order creation, or billing. Other
