@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — BL-303: optional `set_list.campaignName`
+
+- **Availability:** iframe staging candidate; not yet deployed. The partner contract version will be assigned with the coordinated release.
+- **What changed:** a parent may send an optional `campaignName` string on singular `set_list` to prefill the editable Direct Mail Name. An absent or blank initial value uses the list `name`. Same-list refreshes update only an untouched list-derived prefill and preserve a name the user edited.
+- **Partner action:** BatchLeads may pass its Create DM Campaign modal name with the selected list. Other partners may omit the field and retain the current list-name behavior.
+- **Unchanged:** REST routes, envelope version `1`, and the existing list-name-plus-month fallback later in the creation flow.
+- **Artifact:** Iframe Kit `set_list` table and refresh rules.
+
 ## v1.7.73 — 2026-10-14 — Payment Failed: Previous back to the Order Summary
 
 - **Availability:** staging candidate. Not in production.

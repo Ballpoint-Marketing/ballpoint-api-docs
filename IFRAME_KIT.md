@@ -336,6 +336,7 @@ does not assert staging deployment or production availability.
 |-------|------|-------------|
 | `count` | number or string | Number of recipients in the list |
 | `name` | string | Human-readable list name (shown in the UI) |
+| `campaignName` | string | Optional Direct Mail Name prefill, up to 120 characters. The user may edit it. Absent or blank on the first `set_list` falls back to `name`; a same-list refresh updates only a list-derived prefill and preserves a user edit. |
 | `listId` | string | Your internal list identifier |
 | `externalAccountId` | string | Your account/tenant identifier |
 | `externalUserId` | string | Your user identifier |
@@ -416,7 +417,7 @@ First accepted list context, including optional Customer Number:
 After PropStream's Edit Leads modal saves changes to the recipient list, the parent SHOULD send `set_list` again to refresh the iframe's view of the list. Rules:
 
 - **Same `listId` required.** The refresh `set_list` payload MUST carry the same `listId` as the original first-receipt `set_list`. Any other `listId` is treated as a list switch attempt and REJECTED.
-- **Updatable fields on refresh:** `count`, `name`, `piece_counts`, `externalUserIsAccountOwner`. These are re-validated and re-applied. The iframe's count display, pricing UI, recipient selection state, and sender-info CTA visibility refresh in place.
+- **Updatable fields on refresh:** `count`, `name`, `campaignName`, `piece_counts`, `externalUserIsAccountOwner`. These are re-validated and re-applied. An explicit `campaignName` updates only an untouched list-derived prefill, never a name the user edited; omitting it retains the prior explicit prefill. A blank value clears the explicit prefill and uses `name`. The iframe's count display, pricing UI, recipient selection state, and sender-info CTA visibility refresh in place.
 - **Preserving vs clearing `piece_counts` on refresh:** if the refresh payload OMITS the `piece_counts` key entirely, the iframe preserves the currently-active table and the user's combo selection. To replace the table, include `piece_counts` with the new values; the user's Deliver To / Remove duplicates selection stays unchanged. To explicitly clear the table back to legacy single-count behavior, include `piece_counts: null`. Omitting the key is NOT the same as clearing.
 - **Pricing/display on refresh when `piece_counts` is active:** a replacement table re-resolves the current combination through `piece_counts[deliver_to][dedup_on ? "dedup_on" : "dedup_off"]`; the visible recipient count and price use that result. A refresh that omits `piece_counts` keeps using the current table and combination. If no table is active, the refreshed raw count drives display and price directly (legacy behavior).
 - **Immutable fields on refresh:** `externalAccountId`, `externalUserId`, `tenantKey`, `customerNumber`. The values from the first-receipt set_list are authoritative for the session. Refresh payloads attempting to change these are:
