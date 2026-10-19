@@ -4,7 +4,7 @@ Everything you need to integrate with the Ballpoint Marketing direct mail API: o
 
 ## Getting Started
 
-**[START_HERE.md](START_HERE.md)** — Zero to a working test order in under 5 minutes.
+**[START_HERE.md](START_HERE.md)** — A complete backend-to-backend staging order: access, quote, artwork, recipients, rendering checks and signed notifications.
 
 ## Documentation
 
@@ -14,7 +14,7 @@ Everything you need to integrate with the Ballpoint Marketing direct mail API: o
 | [Iframe Integration Kit](IFRAME_KIT.md) | Embedded iframe pattern: bootstrap, message contracts, recipient upload, partner payment gate flow |
 | [OpenAPI Spec](docs/ballpoint-api-spec-v2.yaml) | Machine-readable API specification (import into Postman, Swagger UI, etc.) |
 | [Webhook Contract Catalog](contracts/webhooks/catalog.json) | Canonical event inventory, JSON Schemas, exact raw-body fixtures, and signed header fixtures |
-| [Quick Start Guide](START_HERE.md) | Step-by-step first-order walkthrough |
+| [First Order Guide](START_HERE.md) | Complete staging walkthrough with fictional artwork and recipient fixtures |
 | [Changelog](CHANGELOG.md) | Revision history for the integration kits |
 
 ## Examples

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Assisted API onboarding
+
+- **Walkthrough:** replaces the minimal first-order snippet with a backend-to-backend staging walkthrough, including account/route-access prerequisites, a quote, two-sided sample artwork, two fictional recipients, saved idempotency keys, render checks and signed webhook acceptance criteria.
+- **Clarifications:** health checks do not verify credentials; `POST /orders` returns `200` with `id`, while the existing billing-format route returns `202` with `order_id`. Campaigns can be created during order submission. Recipient readiness, render completion and physical fulfillment are separate checks.
+- **Availability:** this guide does not provision accounts, broaden key permissions, enable products or claim a successful staging/production run. Account setup and production approval remain prerequisites. Local simulations are not evidence of mailing.
+- **New opt-in key profile:** assisted backend orders use `read,orders:write,recipients:write,tracking:read`; existing keys retain their access. Provisioning remains internal. Availability depends on API deployment and account setup.
+- **Contract:** no HTTP request/response, iframe or webhook schema/version change; partner contract remains `1.7.73`, REST `3.1`.
+- **Artifacts:** START_HERE, API Kit, README, fictional JSON fixtures and Postman collection guidance. OpenAPI now documents the existing cost-preview route with schemas generated from its current API models; this corrects a missing reference entry rather than adding an API capability. Iframe Kit and existing request/response contracts are unchanged.
+
 ## v1.7.73 — 2026-10-14 — Payment Failed: Previous back to the Order Summary
 
 - **Availability:** staging candidate. Not in production.

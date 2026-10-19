@@ -1,0 +1,25 @@
+{
+  "recipients": [
+    {
+      "first_name": "Alex",
+      "last_name": "One",
+      "address": "1 Example Way",
+      "city": "Austin",
+      "state": "TX",
+      "zip": "78701",
+      "contact_id": "onboarding-001",
+      "address_type": "MAILING"
+    },
+    {
+      "first_name": "Taylor",
+      "last_name": "Two",
+      "address": "2 Example Lane",
+      "city": "Austin",
+      "state": "TX",
+      "zip": "78701",
+      "contact_id": "onboarding-002",
+      "address_type": "MAILING"
+    }
+  ],
+  "append": false
+}

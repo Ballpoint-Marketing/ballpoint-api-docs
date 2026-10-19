@@ -115,6 +115,113 @@ components:
         type: string
         format: uuid
   schemas:
+    CostPreviewRequest:
+      properties:
+        product_type:
+          description: 4x6_printed | 4x6_cursive | 6x9_printed | 6x9_cursive | color_letter
+            | hybrid_letter | greeting_letter
+          title: Product Type
+          type: string
+        postage_type:
+          description: first_class | standard | presort (varies by product)
+          title: Postage Type
+          type: string
+        piece_count:
+          description: Number of pieces (max 500,000)
+          exclusiveMinimum: 0
+          maximum: 500000
+          title: Piece Count
+          type: integer
+        envelope_style:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          description: Envelope design. Required for letter products (color_letter, hybrid_letter,
+            greeting_letter). Postcards must not include this field.
+          title: Envelope Style
+      required:
+      - product_type
+      - postage_type
+      - piece_count
+      title: CostPreviewRequest
+      type: object
+    CostPreviewResponse:
+      properties:
+        product_type:
+          title: Product Type
+          type: string
+        postage_type:
+          title: Postage Type
+          type: string
+        piece_count:
+          title: Piece Count
+          type: integer
+        envelope_style:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Envelope Style
+        unit_price_tcents:
+          description: Per-piece price in tenth-cents as shown to the end user (marked-up
+            when a partner markup applies; base otherwise). 5054 = $0.5054
+          title: Unit Price Tcents
+          type: integer
+        total_tcents:
+          description: Total in tenth-cents (same rule as unit_price_tcents)
+          title: Total Tcents
+          type: integer
+        total_dollars:
+          description: Total in dollars (same rule as unit_price_tcents)
+          title: Total Dollars
+          type: string
+        partner_cost_unit_price_tcents:
+          description: Wholesale per-piece price the partner pays Ballpoint. Equals unit_price_tcents
+            when no partner markup is configured.
+          title: Partner Cost Unit Price Tcents
+          type: integer
+        partner_cost_total_tcents:
+          description: Wholesale total the partner pays Ballpoint.
+          title: Partner Cost Total Tcents
+          type: integer
+        partner_cost_total_dollars:
+          description: Wholesale total in dollars.
+          title: Partner Cost Total Dollars
+          type: string
+        billing_mode:
+          title: Billing Mode
+          type: string
+        balance_cents:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          default: null
+          title: Balance Cents
+        balance_after_cents:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          default: null
+          title: Balance After Cents
+        limits:
+          additionalProperties: true
+          title: Limits
+          type: object
+      required:
+      - product_type
+      - postage_type
+      - piece_count
+      - unit_price_tcents
+      - total_tcents
+      - total_dollars
+      - partner_cost_unit_price_tcents
+      - partner_cost_total_tcents
+      - partner_cost_total_dollars
+      - billing_mode
+      - limits
+      title: CostPreviewResponse
+      type: object
     UploadRecipient:
       properties:
         first_name:
@@ -1947,6 +2054,68 @@ security:
 - bearerAuth: []
 - partnerKeyAuth: []
 paths:
+  /v1/billing/orders/preview:
+    post:
+      tags:
+      - Billing
+      summary: Preview an order cost without creating an order
+      operationId: preview_order_cost_v1_billing_orders_preview_post
+      description: Authenticated read-only quote for the account. Returns display prices
+        and partner base costs in tenth-cents. Limits are reported in limits.passed
+        and limits.checks; HTTP 200 alone does not mean the account passed those checks.
+        This operation already exists in the API and Postman collection. A successful
+        preview does not grant permission for order creation or recipient upload.
+      security:
+      - partnerKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostPreviewRequest'
+      responses:
+        '200':
+          description: Quote and account limit checks; no order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostPreviewResponse'
+        '400':
+          description: Invalid product/postage combination or missing pricing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The key is not authorized for this route
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Request body validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/billing/orders/{order_id}/recipients:
     post:
       tags:
