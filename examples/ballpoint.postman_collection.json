@@ -1070,7 +1070,7 @@
                     "mail-tracking"
                   ]
                 },
-                "description": "USPS delivery tracking for one order. Empty zero-count summary before the first scan (1-2 business days after drop)."
+                "description": "USPS delivery tracking for one order. For a mailed order, a zero-count summary before the first scan (1-2 business days after drop). From 1.7.74, an order not yet mailed returns 404 ORDER_NOT_MAILED (no tracking yet)."
               },
               "event": [
                 {
