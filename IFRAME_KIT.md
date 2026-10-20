@@ -129,6 +129,18 @@ After the iframe loads, it sends a `ready` message. Your page then sends configu
 
 If the user performs an action before `set_api_config` arrives, the iframe queues it automatically and replays it once config is received. No action is lost.
 
+**Parent-owned failure fallback (BL-306, staging candidate):** Start a 10-second
+timer when setting the iframe `src`. Clear it only after a `ready` from that
+iframe window with the exact iframe origin, `source: "ballpoint-mailer"`, and
+`version: 1`. If the timer expires, or a trusted `fatal_error` arrives at any
+point, hide the iframe and show your application's fallback over the entire
+embedded region. `ready` confirms the iframe can receive configuration; it
+does not prove the later authentication succeeded. A retry should mount a new
+iframe and send fresh configuration, including a newly issued embed token.
+The iframe cannot report a script failure that prevents its error listener
+from loading, so the parent timer is required for that case. See
+[`fatal_error`](#fatal_error--unrecoverable-iframe-failure).
+
 ### Listening for the Ready Event
 
 ```javascript
@@ -930,6 +942,35 @@ Both blocks are additive (v1.6.7+) and carry the same shape returned by `GET /v1
 These fields are diagnostic and non-sensitive. Partners may ignore them — they do not affect handshake, ordering, billing, or any contract behavior. Existing `iframeVersion`, `maxVersion`, and `buildStamp` are unchanged.
 
 The payload above is an **illustrative staging example** (`environment: "staging"`, `releaseTag: ""`); it does not assert the version or build currently deployed to staging. On a production deploy, `environment` reads `"production"` and `releaseTag` carries the release git tag — the field shapes are identical.
+
+#### `fatal_error` — Unrecoverable iframe failure
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "fatal_error",
+  "reason": "auth_failed",
+  "page": "setup",
+  "buildId": "b88d6fd"
+}
+```
+
+`reason` is one of `bootstrap_failed` (an uncaught error before `ready`),
+`runtime_error` (an uncaught error or unhandled rejection after `ready`), or
+`auth_failed` (initial `set_api_config` is rejected, or an API 401 persists
+after the iframe's existing configuration recovery and submit retries).
+The first fatal event wins: the iframe sends at most one per loaded document;
+a retry that mounts a new iframe can report a new event. A rejected token
+refresh while valid configuration remains, a scope-related 403, or a
+recoverable network failure does not by itself emit this event.
+
+`page` is the current iframe page ID without the `page-` prefix, or
+`"unknown"` if no page can be identified. `buildId` matches
+`ready.build.buildId`, or is `"unknown"` when build metadata is unavailable.
+The message never includes exception text, URLs, tokens, account/list IDs, or
+sender data. Apply the same exact `event.source`, `event.origin`, envelope
+`source`, and `version` checks as for `ready` before displaying your fallback.
 
 #### `resize` — Iframe content height changed
 
