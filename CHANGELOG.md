@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — BL-611 disclosure merge field
+
+- **Iframe:** optional `set_sender.disclosure` accepts up to 2,000 characters after tag removal and trimming. An overlong value rejects the full message without changing sender state; the existing snapshot, patch and explicit empty-string rules apply. The shared editor offers `#Disclosure#` under Sender and saves the literal token in artwork.
+- **Order and print contract:** the iframe sends non-empty disclosure as order `sender.disclosure`, including frozen retry snapshots. The API renderer must replace `#Disclosure#` with that order's sender text only where the token occurs; absent text prints blank. A disclosure value alone never adds print content to artwork.
+- **Availability:** iframe candidate; the API field, renderer, OpenAPI schema and coordinated partner-contract version bump are Armstrong-owned and pending. No production or BatchLeads staging print claim until the API change is deployed and verified.
+- **Unchanged:** postMessage envelope version `1`, REST `3.1`, existing tokens and partner-specific behavior.
+
 ## v1.7.74 — 2026-10-20 — Iframe fatal_error; order tracking before mailing
 
 - **Availability:** staging candidate. Not in production; the tracking change reaches production with the next API release and `fatal_error` with the next iframe release.

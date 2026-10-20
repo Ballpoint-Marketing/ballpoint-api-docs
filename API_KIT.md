@@ -325,7 +325,7 @@ Available styles: `candy`, `party`, `pastel`, `confetti`, `desert`, `floral`, `s
 - **`color_letter`** uses #10 envelopes — only `plain_white` is supported.
 - **`color_letter` is full color only in V1.** There is no black-and-white print option; the end user chooses only between the supported postage classes.
 - **`color_letter` canvas artwork is one-sided in V1.** Send `canvas_json.front`; `canvas_json.back` is not required and is ignored for the printed insert. Two-sided canvas products continue sending both `front` and `back`.
-- The Color Letter editor stores its dynamic fields as canonical `#Token#` values (24 since v1.7.69; see [IFRAME_KIT.md](IFRAME_KIT.md#dynamic-fields-in-the-design-editor)). Ballpoint resolves sender fields from the saved sender profile, recipient and mailing fields from the structured recipient, and owner/property fields from each recipient's `placeHolders`; absent values print blank.
+- The Color Letter editor stores its dynamic fields as canonical `#Token#` values (24 since v1.7.69; BL-611 adds `#Disclosure#` as the 25th after the coordinated iframe/API release; see [IFRAME_KIT.md](IFRAME_KIT.md#dynamic-fields-in-the-design-editor)). Ballpoint resolves sender fields from the order's sender snapshot, recipient and mailing fields from the structured recipient, and owner/property fields from each recipient's `placeHolders`; absent values print blank.
 - **`color_letter` has no per-order piece limit beyond the global maximum for every product.** Its complete `canvas_json` must be at most 20 MiB, 50 levels deep, 10,000 JSON nodes, and 1,000 Fabric objects. Embedded image sources must be base64 PNG, JPEG, or WebP and no more than 14 MiB encoded. Remote image sources must be HTTPS assets under Ballpoint's approved `/images/` or `/assets/` paths, or PropStream's approved `/direct-mail/` S3 prefix. Relative Ballpoint asset paths are also accepted. Other hosts, URL fragments, unsupported query parameters, and merge tokens inside image URLs are rejected before order creation. These request-validation limits do not change existing two-sided products.
 - **`hybrid_letter`** and **`greeting_letter`** use 5x7 envelopes — all decorative styles available.
 - **Postcards** — do not include `envelope_style` (the API will reject it).
@@ -777,6 +777,7 @@ The partner/iframe request shape may include an optional `sender` object. Empty 
 | `zip` | 5 digits (`12345`), 9 digits (`123456789`), or ZIP+4 (`12345-6789`); maximum 10 characters. |
 | `phone` | 10 digits, or 11 digits beginning with `1`; `+`, parentheses, spaces, periods, and hyphens are accepted formatting. Letters and extensions are rejected; maximum 20 characters. |
 | `email` | Optional business email (contract 1.7.69), maximum 254 characters, surrounding spaces and control characters removed; blank is treated as absent. Printed only where a design uses `#MyBusinessEmail#`. |
+| `disclosure` | Optional sender-profile legal text (BL-611 staging candidate), maximum 2,000 characters after tag removal and trimming; blank is treated as absent. Printed only where artwork uses `#Disclosure#`. The matching API field and renderer are pending Armstrong's implementation. |
 
 Valid formatted values are persisted as supplied by the API client. The embedded iframe may normalize a valid phone to `AAA-BBB-CCCC` before sending it.
 

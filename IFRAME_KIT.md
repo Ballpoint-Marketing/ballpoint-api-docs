@@ -853,6 +853,7 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 | `phone` | string | 10 digits, or 11 digits beginning with `1`. Standard `+`, parentheses, space, period, and hyphen formatting is accepted; letters are rejected. |
 | `email` | string | Optional email address |
 | `website` | string | Website URL |
+| `disclosure` | string | Optional sender-profile legal text. Up to 2,000 characters after tag removal and trimming; an overlong value rejects the entire `set_sender` message before sender state changes. Omitted on a later patch preserves the current value; `""` clears it. BL-611 staging candidate, pending matching API renderer. |
 | `logo` | string | Optional. URL to sender logo image |
 | `externalUserIsAccountOwner` | boolean | Optional Dashboard-first role bootstrap. Honored only until a singular `set_list` is accepted; `set_list` is authoritative afterward. Strict boolean `true` is required. |
 | `tenantKey` | string | Optional. Tenant scope key |
@@ -868,7 +869,7 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 
 #### Complete and partial profiles
 
-A sender profile is complete only when `fullName`, `address`, `city`, and `state` are non-empty and both `zip` and `phone` are valid according to the formats above. `email`, `website`, and `logo` are optional.
+A sender profile is complete only when `fullName`, `address`, `city`, and `state` are non-empty and both `zip` and `phone` are valid according to the formats above. `email`, `website`, `disclosure`, and `logo` are optional.
 
 | Profile received | Sender Information step | Direct Mail Dashboard |
 |------------------|-------------------------|-----------------------|
@@ -1317,7 +1318,7 @@ Sent when an account owner clicks **Set up now** or **Complete in Marketing Prof
 | `externalAccountId` | string | Partner account identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** if the user reaches "Set up now" before any `set_list` or `set_tenant` has arrived (e.g., very first session before list selection). |
 | `externalUserId` | string | Partner user identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** under the same condition as `externalAccountId`. |
 
-No sender PII (`fullName`, `firstName`, `lastName`, `businessName`, `address`, `city`, `state`, `zip`, `phone`, `email`, `website`, `logo`) is ever included in this event. The parent already owns the sender data via the existing `set_sender` flow.
+No sender PII (`fullName`, `firstName`, `lastName`, `businessName`, `address`, `city`, `state`, `zip`, `phone`, `email`, `website`, `disclosure`, `logo`) is ever included in this event. The parent already owns the sender data via the existing `set_sender` flow.
 
 **Visibility / lifecycle**
 
@@ -2046,6 +2047,7 @@ The design editor (Create Your Own, Color Letter and the editable catalog artwor
 | `#MyFirstName#`, `#MyLastName#`, `#MyFullName#` | `set_sender` name fields | |
 | `#MyBusinessPhone#`, `#MyBusinessWebsite#` | `set_sender.phone`, `set_sender.website` | |
 | `#MyBusinessEmail#` | `set_sender.email` | v1.7.69. The iframe sends it with the order. Blank when the profile has no email. |
+| `#Disclosure#` | `set_sender.disclosure` | BL-611 staging candidate. Optional sender-profile text, sent as order `sender.disclosure`. It prints only where this token appears in artwork, and prints blank when absent. |
 | `#MyAddress#`, `#MyCity#`, `#MyState#`, `#MyZip#` | `set_sender.address`, `.city`, `.state`, `.zip` | v1.7.69. Send line 1 and line 2 together in `set_sender.address` (e.g. `"10 Office Rd Suite 5"`); there is no separate line 2 field. |
 | `#RecipientFirstName#`, `#RecipientLastName#` | recipient `first_name`, `last_name` | v1.7.69. A company recipient without a first name prints blank. |
 | `#MailingStreet#` | recipient `address` + `address2` | v1.7.69. One line, e.g. `"55 Mailing Way Apt 4"`. |
@@ -2056,8 +2058,8 @@ The design editor (Create Your Own, Color Letter and the editable catalog artwor
 | `#PropertyFullAddress#` | `placeHolders` property fields | v1.7.69. One line: `PropertyStreet`, then `PropertyCity/State/Zip` (or `PropertyCity`, `PropertyState` and `PropertyZip` when that key is absent). |
 
 - **Mailing and property are separate.** `Mailing*` fields always come from the structured recipient address the piece is mailed to; `Property*` and `Owner*` fields come only from `placeHolders`. Neither ever fills in for the other.
-- **No partner action is required** for fields you do not use: a field appears in a design only when the user adds it. Recipient upload and `set_sender` payloads are unchanged.
-- The editor preview shows sample values. Phone, website, email and the sender address fields show the saved sender profile when it has them. The printed piece uses the real data and prints blank where it is missing.
+- **No partner action is required** for fields you do not use: a field appears in a design only when the user adds it. Recipient upload is unchanged. To use `#Disclosure#`, the parent sends the optional `set_sender.disclosure` field from its sender profile.
+- The editor preview shows sample values. Phone, website, email, disclosure and the sender address fields show the saved sender profile when it has them. When disclosure is absent, its preview uses the labelled text “Sample disclosure text”; the printed piece uses the real data and prints blank where it is missing. Artwork stores the literal `#Disclosure#`, never the preview text.
 
 ### Batching Large Lists
 
