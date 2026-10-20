@@ -1,6 +1,6 @@
 # Ballpoint Marketing Iframe — Partner Integration Kit
 
-Partner contract version: **v1.7.73** (the **Payment Failed** and **Payment Not Completed** screens add **Previous**, back to the Order Summary of the same checkout; from there **Continue to Payment** emits `payment_retry_requested` for the same orders, as **Try Again** does, and where edit after checkout is enabled **Previous** reopens editing (v1.7.70) after a failed payment too; staging candidate. v1.7.72: `GET /v1/billing/partner/stats` headline KPIs now equal the Dashboard insights for the same lists, all time; REST-only, no postMessage change; live in production since 2026-10-15 (API). v1.7.71: `GET /v1/billing/partner/stats` `total_pieces` now equals the Dashboard Pieces Mailed for the same lists; REST-only, no postMessage change; live in production since 2026-10-15 (API). v1.7.70: after the payment handoff, **Previous** reopens editing and the next **Continue to Payment** replaces the unpaid orders: the iframe voids them with `POST /orders/void` and emits `campaign_created` and `campaign_submitted` again with the same `campaignId` and the new `orders[]`; replaced orders emit `order.status_changed` with `payment_failed` and `trigger: replaced_by_edit`; API deployed to production on 2026-10-15 but disabled behind the `propstream_checkout_edit_reissue_enabled` flag; the iframe part is not in the production iframe yet, see [Edit after checkout](#edit-after-checkout-v1770). v1.7.69: the design editor offers 24 dynamic fields, 13 more than before, for sender, recipient, mailing and property data; see [Dynamic fields](#dynamic-fields-in-the-design-editor); the renderer and the optional sender email are live in production since 2026-10-05 (API v3.41.0); the editor dropdown is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0. v1.7.68: read-only `presort_suppressed_count` on order list/detail, live in production since 2026-10-05 (API v3.41.0); the Direct Mail dashboard shows the adjusted mailer count in red with a Mailer Count Change info popover (staging candidate; not in production iframe v1.24.0); no postMessage type or payload change. v1.7.67: REST-only: optional Idempotency-Key for recipient uploads, live in production since 2026-10-05 (API v3.41.0). v1.7.66: REST-only: print-job booklets up to 32 pages and billed per page plus postage; page rules live since API v3.40.0, per-page billing live since 2026-10-05 (API v3.41.0); no postMessage type or payload change. v1.7.65: optional short-lived embed token: `apiToken` may carry a per-user token issued by your backend, renewed through `request_config`; the embed key keeps working unchanged; live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0). v1.7.64: same-list `set_list` refreshes with a replacement `piece_counts` table retain the active Deliver To / Remove duplicates selection and reprice that combination; live in production since 2026-10-01 (iframe v1.22.0). v1.7.63: new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0. v1.7.62: the iframe blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired; live in production since 2026-10-01 (iframe v1.22.0). v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`.)
+Partner contract version: **v1.7.74** (the iframe sends one `fatal_error` per load on a bootstrap or authentication failure it cannot recover from, or as a diagnostic on an uncaught runtime error, and the parent is recommended to keep a 10-second `ready` timer with its own fallback; `GET /v1/orders/{order_id}/mail-tracking` returns `404 ORDER_NOT_MAILED` before mailing, which the iframe already reads as no tracking yet; staging candidate. v1.7.73: the **Payment Failed** and **Payment Not Completed** screens add **Previous**, back to the Order Summary of the same checkout; from there **Continue to Payment** emits `payment_retry_requested` for the same orders, as **Try Again** does, and where edit after checkout is enabled **Previous** reopens editing (v1.7.70) after a failed payment too; staging candidate. v1.7.72: `GET /v1/billing/partner/stats` headline KPIs now equal the Dashboard insights for the same lists, all time; REST-only, no postMessage change; live in production since 2026-10-15 (API). v1.7.71: `GET /v1/billing/partner/stats` `total_pieces` now equals the Dashboard Pieces Mailed for the same lists; REST-only, no postMessage change; live in production since 2026-10-15 (API). v1.7.70: after the payment handoff, **Previous** reopens editing and the next **Continue to Payment** replaces the unpaid orders: the iframe voids them with `POST /orders/void` and emits `campaign_created` and `campaign_submitted` again with the same `campaignId` and the new `orders[]`; replaced orders emit `order.status_changed` with `payment_failed` and `trigger: replaced_by_edit`; API deployed to production on 2026-10-15 but disabled behind the `propstream_checkout_edit_reissue_enabled` flag; the iframe part is not in the production iframe yet, see [Edit after checkout](#edit-after-checkout-v1770). v1.7.69: the design editor offers 24 dynamic fields, 13 more than before, for sender, recipient, mailing and property data; see [Dynamic fields](#dynamic-fields-in-the-design-editor); the renderer and the optional sender email are live in production since 2026-10-05 (API v3.41.0); the editor dropdown is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0. v1.7.68: read-only `presort_suppressed_count` on order list/detail, live in production since 2026-10-05 (API v3.41.0); the Direct Mail dashboard shows the adjusted mailer count in red with a Mailer Count Change info popover (staging candidate; not in production iframe v1.24.0); no postMessage type or payload change. v1.7.67: REST-only: optional Idempotency-Key for recipient uploads, live in production since 2026-10-05 (API v3.41.0). v1.7.66: REST-only: print-job booklets up to 32 pages and billed per page plus postage; page rules live since API v3.40.0, per-page billing live since 2026-10-05 (API v3.41.0); no postMessage type or payload change. v1.7.65: optional short-lived embed token: `apiToken` may carry a per-user token issued by your backend, renewed through `request_config`; the embed key keeps working unchanged; live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0). v1.7.64: same-list `set_list` refreshes with a replacement `piece_counts` table retain the active Deliver To / Remove duplicates selection and reprice that combination; live in production since 2026-10-01 (iframe v1.22.0). v1.7.63: new catalog and Classic postcard proofs declare `standard_v11`, the compact recipient box Create Your Own already prints, and the editor shows the postage indicia at print size; live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0. v1.7.62: the iframe blocks checkout until every order is accepted and shows rejected submissions on Order Summary; `campaign_submission_pending` is retired; live in production since 2026-10-01 (iframe v1.22.0). v1.7.61: Greeting Letter completion emits `order.drop_completed` with the billed count as mailed, live in production since 2026-09-29 (API v3.39.0, iframe v1.21.0). Iframe message envelope remains version `1`.)
 
 **Backend recipient retries (1.7.67, live in production since 2026-10-05).** For the initial recipient upload after order submission, your backend should persist one `Idempotency-Key` and body per block of up to 10,000 recipients. Retry a lost response using the same pair; allocate a new key for the next block. This is a backend integration change, with no iframe message change. See [API Kit §6n](API_KIT.md#6n-upload-recipients-initial-upload) for the retention window, conflict responses and reconciliation after expiration.
 
@@ -128,6 +128,22 @@ After the iframe loads, it sends a `ready` message. Your page then sends configu
 ```
 
 If the user performs an action before `set_api_config` arrives, the iframe queues it automatically and replays it once config is received. No action is lost.
+
+**Parent-owned failure fallback (BL-306, staging candidate, recommended):** a
+parent timer started when the iframe `src` is set, about 10 seconds long and
+cleared by a `ready` from that iframe window (exact iframe origin,
+`source: "ballpoint-mailer"`, `version: 1`), covers the case where the iframe
+cannot start at all, including a script failure that happens before its error
+listener loads. When that timer expires, or a trusted `fatal_error` arrives
+with `reason` `bootstrap_failed` or `auth_failed`, the iframe will not recover
+on its own, and the parent can hide it and show its own fallback over the
+embedded region. `runtime_error` is diagnostic: the iframe usually keeps
+working, so hiding it on that reason would end a working session; logging it,
+or offering a reload without hiding the iframe, keeps the user's work. `ready`
+confirms the iframe can receive configuration; it does not prove the later
+authentication succeeded. A retry mounts a new iframe with fresh
+configuration, including a newly issued embed token. See
+[`fatal_error`](#fatal_error--iframe-failure-report).
 
 ### Listening for the Ready Event
 
@@ -930,6 +946,44 @@ Both blocks are additive (v1.6.7+) and carry the same shape returned by `GET /v1
 These fields are diagnostic and non-sensitive. Partners may ignore them — they do not affect handshake, ordering, billing, or any contract behavior. Existing `iframeVersion`, `maxVersion`, and `buildStamp` are unchanged.
 
 The payload above is an **illustrative staging example** (`environment: "staging"`, `releaseTag: ""`); it does not assert the version or build currently deployed to staging. On a production deploy, `environment` reads `"production"` and `releaseTag` carries the release git tag — the field shapes are identical.
+
+#### `fatal_error` — Iframe failure report
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "fatal_error",
+  "reason": "auth_failed",
+  "page": "setup",
+  "buildId": "b88d6fd"
+}
+```
+
+`reason` is one of:
+
+- `bootstrap_failed`: an uncaught error or unhandled rejection happened before
+  `ready`, and `ready` still had not been sent 3 seconds later. A stray error
+  followed by a normal `ready` sends nothing.
+- `auth_failed`: the initial `set_api_config` is rejected, the first
+  `/v1/config` request for the configured credential returns 401, or an order
+  submission still gets 401 after the iframe's configuration recovery and
+  submit retries. A 401 on a later `/v1/config` refresh does not send it.
+- `runtime_error`: an uncaught error or unhandled rejection after `ready`.
+  This is diagnostic; the iframe usually keeps working (see the parent
+  fallback above).
+
+The first fatal event wins: the iframe sends at most one per loaded document;
+a retry that mounts a new iframe can report a new event. A rejected token
+refresh while valid configuration remains, a scope-related 403, or a
+recoverable network failure does not by itself emit this event.
+
+`page` is the current iframe page ID without the `page-` prefix, or
+`"unknown"` if no page can be identified. `buildId` matches
+`ready.build.buildId`, or is `"unknown"` when build metadata is unavailable.
+The message never includes exception text, URLs, tokens, account/list IDs, or
+sender data. The same exact `event.source`, `event.origin`, envelope `source`
+and `version` checks as for `ready` apply to this message.
 
 #### `resize` — Iframe content height changed
 

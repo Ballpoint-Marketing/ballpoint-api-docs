@@ -157,12 +157,12 @@ Ballpoint operations must inspect the generated front/back PDFs for the two reci
 Optional tracking read, once the key has permission:
 
 ```bash
-curl --fail-with-body --silent --show-error \
+curl --silent --show-error -w '\nHTTP %{http_code}\n' \
   "$BALLPOINT_BASE/v1/orders/$ORDER_ID/mail-tracking" \
   -H "X-Partner-Key: $BALLPOINT_API_KEY"
 ```
 
-Treat staging tracking as an API response-shape check. Empty tracking or a display label is not evidence of mailing or delivery.
+Staging orders are never mailed. Once the 1.7.74 release is live this read returns **404** with `detail.error.code: "ORDER_NOT_MAILED"` until an order is mailed, which means "no tracking yet", not an error. Until then it returns a zero-count summary. Either way, staging tracking is only an API response-shape check; an empty summary or a display label is not evidence of mailing or delivery.
 
 ## 7. Receive and verify one signed notification
 
