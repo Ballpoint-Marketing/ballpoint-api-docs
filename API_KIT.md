@@ -220,7 +220,7 @@ For the full endpoint contract, see [§6k Confirm Payment](#6k-confirm-payment-p
 
 Cost = `unit_price_tcents × pieces mailed`. No minimums, no surcharges, no per-request fees. See [§5 Product Catalog & Pricing](#5-product-catalog--pricing) for the full price list.
 
-**You are invoiced for pieces actually mailed, never for the ordered quantity.** When addresses are suppressed the drop mails fewer pieces than were ordered, and only the mailed pieces are billed — the invoice line names the suppressed count. `order.drop_completed` reports the same figures per drop (`billed_count`, `actual_mailed`, `rts_suppressed_count`), so every invoice reconciles against events you already receive. An order whose mailed quantity cannot yet be established is held out of the invoice and billed on a later one, never estimated. First Class and Greeting Letter orders have no AccuZIP output, so their frozen order count is the mailed quantity.
+**You are invoiced for pieces actually mailed, never for the ordered quantity.** When addresses are suppressed the drop mails fewer pieces than were ordered, and only the mailed pieces are billed — the invoice line names the suppressed count. `order.drop_completed` reports the same figures per drop (`billed_count`, `actual_mailed`, `rts_suppressed_count`), so every invoice reconciles against events you already receive. Drop events exist only for orders that carry a drop identity (campaign, drop index and total drops), which today means orders submitted through the embedded iframe flow. Standard API orders created with `POST /orders` receive `order.status_changed`, not drop events, and reconcile against the invoice and the order status. An order whose mailed quantity cannot yet be established is held out of the invoice and billed on a later one, never estimated. First Class and Greeting Letter orders have no AccuZIP output, so their frozen order count is the mailed quantity.
 
 ### Cancellations
 
@@ -1067,7 +1067,9 @@ curl -s https://api.ballpointmarketing.com/v1/orders/ord_7f3a2b/mail-tracking \
 | `rts` | Return-to-sender pieces (bad addresses) |
 | `rts_rate` | `rts / total_pieces` |
 
-**Note:** Tracking data appears 1–2 business days after Ballpoint drops the mail at USPS. Before the first scan, this endpoint returns a summary with zero counts.
+**Note:** Tracking data appears 1–2 business days after Ballpoint drops the mail at USPS. Before the first scan, this endpoint returns a summary with zero counts, `mail_status: shipped` and `total_pieces` equal to the order's piece count.
+
+**Not mailed yet (1.7.74 candidate, pending release):** for an order that has not reached `shipping` or `complete` (for example `accepted`, `printing`, `scheduled`, `pending_payment`) or that ended `cancelled`, `payment_failed` or `failed`, and has no tracking data, the endpoint returns `404` with `detail.error.code: "ORDER_NOT_MAILED"` instead of a `shipped` summary. Treat it as "no tracking yet" and read the order status from `GET /v1/billing/orders/{order_id}`. An unknown or foreign order still returns `404 ORDER_NOT_FOUND`.
 
 ---
 
