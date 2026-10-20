@@ -3371,7 +3371,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/MailTrackingSummary'
         '404':
-          description: Order not found
+          description: Order not found (`ORDER_NOT_FOUND`), or, from the 1.7.74 release, an order that has not been mailed and has no tracking yet (`ORDER_NOT_MAILED`)
         '429':
           description: Rate limit exceeded
           content:
