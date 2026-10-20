@@ -129,16 +129,20 @@ After the iframe loads, it sends a `ready` message. Your page then sends configu
 
 If the user performs an action before `set_api_config` arrives, the iframe queues it automatically and replays it once config is received. No action is lost.
 
-**Parent-owned failure fallback (BL-306, staging candidate):** Start a 10-second
-timer when setting the iframe `src`. Clear it only after a `ready` from that
-iframe window with the exact iframe origin, `source: "ballpoint-mailer"`, and
-`version: 1`. If the timer expires, or a trusted `fatal_error` arrives at any
-point, hide the iframe and show your application's fallback over the entire
-embedded region. `ready` confirms the iframe can receive configuration; it
-does not prove the later authentication succeeded. A retry should mount a new
-iframe and send fresh configuration, including a newly issued embed token.
-The iframe cannot report a script failure that prevents its error listener
-from loading, so the parent timer is required for that case. See
+**Parent-owned failure fallback (BL-306, staging candidate, recommended):** a
+parent timer started when the iframe `src` is set, about 10 seconds long and
+cleared by a `ready` from that iframe window (exact iframe origin,
+`source: "ballpoint-mailer"`, `version: 1`), covers the case where the iframe
+cannot start at all, including a script failure that happens before its error
+listener loads. When that timer expires, or a trusted `fatal_error` arrives
+with `reason` `bootstrap_failed` or `auth_failed`, the iframe will not recover
+on its own, and the parent can hide it and show its own fallback over the
+embedded region. `runtime_error` is diagnostic: the iframe usually keeps
+working, so hiding it on that reason would end a working session; logging it,
+or offering a reload without hiding the iframe, keeps the user's work. `ready`
+confirms the iframe can receive configuration; it does not prove the later
+authentication succeeded. A retry mounts a new iframe with fresh
+configuration, including a newly issued embed token. See
 [`fatal_error`](#fatal_error--unrecoverable-iframe-failure).
 
 ### Listening for the Ready Event
@@ -956,11 +960,19 @@ The payload above is an **illustrative staging example** (`environment: "staging
 }
 ```
 
-`reason` is one of `bootstrap_failed` (an uncaught error before `ready`),
-`runtime_error` (an uncaught error or unhandled rejection after `ready`), or
-`auth_failed` (initial `set_api_config` is rejected, required `/v1/config`
-returns 401, or an order API 401 persists after the iframe's existing
-configuration recovery and submit retries).
+`reason` is one of:
+
+- `bootstrap_failed`: an uncaught error or unhandled rejection happened before
+  `ready`, and `ready` still had not been sent 3 seconds later. A stray error
+  followed by a normal `ready` sends nothing.
+- `auth_failed`: the initial `set_api_config` is rejected, the first
+  `/v1/config` request for the configured credential returns 401, or an order
+  submission still gets 401 after the iframe's configuration recovery and
+  submit retries. A 401 on a later `/v1/config` refresh does not send it.
+- `runtime_error`: an uncaught error or unhandled rejection after `ready`.
+  This is diagnostic; the iframe usually keeps working (see the parent
+  fallback above).
+
 The first fatal event wins: the iframe sends at most one per loaded document;
 a retry that mounts a new iframe can report a new event. A rejected token
 refresh while valid configuration remains, a scope-related 403, or a
@@ -970,8 +982,8 @@ recoverable network failure does not by itself emit this event.
 `"unknown"` if no page can be identified. `buildId` matches
 `ready.build.buildId`, or is `"unknown"` when build metadata is unavailable.
 The message never includes exception text, URLs, tokens, account/list IDs, or
-sender data. Apply the same exact `event.source`, `event.origin`, envelope
-`source`, and `version` checks as for `ready` before displaying your fallback.
+sender data. The same exact `event.source`, `event.origin`, envelope `source`
+and `version` checks as for `ready` apply to this message.
 
 #### `resize` — Iframe content height changed
 
