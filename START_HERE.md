@@ -162,7 +162,7 @@ curl --silent --show-error -w '\nHTTP %{http_code}\n' \
   -H "X-Partner-Key: $BALLPOINT_API_KEY"
 ```
 
-Staging orders are never mailed. Once the 1.7.74 release is live this read returns **404** with `detail.error.code: "ORDER_NOT_MAILED"` until an order is mailed; treat that as "no tracking yet", not as an error. Until then it returns a zero-count summary. Either way, staging tracking is only an API response-shape check; an empty summary or a display label is not evidence of mailing or delivery.
+Staging orders are never mailed. Once the 1.7.74 release is live this read returns **404** with `detail.error.code: "ORDER_NOT_MAILED"` until an order is mailed, which means "no tracking yet", not an error. Until then it returns a zero-count summary. Either way, staging tracking is only an API response-shape check; an empty summary or a display label is not evidence of mailing or delivery.
 
 ## 7. Receive and verify one signed notification
 
