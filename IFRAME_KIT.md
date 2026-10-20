@@ -958,8 +958,9 @@ The payload above is an **illustrative staging example** (`environment: "staging
 
 `reason` is one of `bootstrap_failed` (an uncaught error before `ready`),
 `runtime_error` (an uncaught error or unhandled rejection after `ready`), or
-`auth_failed` (initial `set_api_config` is rejected, or an API 401 persists
-after the iframe's existing configuration recovery and submit retries).
+`auth_failed` (initial `set_api_config` is rejected, required `/v1/config`
+returns 401, or an order API 401 persists after the iframe's existing
+configuration recovery and submit retries).
 The first fatal event wins: the iframe sends at most one per loaded document;
 a retry that mounts a new iframe can report a new event. A rejected token
 refresh while valid configuration remains, a scope-related 403, or a
