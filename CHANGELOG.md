@@ -1,17 +1,16 @@
 # Changelog
 
-## Unreleased — 1.7.74 candidate (pending coordinated version bump)
+## v1.7.74 — 2026-10-20 — Iframe fatal_error; order tracking before mailing
 
-- **Order tracking before mailing:** `GET /v1/orders/{order_id}/mail-tracking` returns `404 ORDER_NOT_MAILED` for an order that has not been mailed (status before `shipping`/`complete`, or cancelled/failed) and has no tracking data, instead of a placeholder `shipped` summary. The embedded iframe reads this route once an order shows as mailed and treats any 404 as "no tracking yet", so PropStream and BatchLeads screens are unchanged. Backend callers should read the order status instead.
+- **Availability:** staging candidate. Not in production; the tracking change reaches production with the next API release and `fatal_error` with the next iframe release.
+- **Iframe `fatal_error`:** one `fatal_error` per iframe load with `{reason, page, buildId}`. Reasons are `bootstrap_failed`, `auth_failed`, and `runtime_error`; the payload contains no exception text or customer data.
+- **Parent fallback (recommended):** start a 10-second timer when setting the iframe `src` and clear it on a trusted `ready`. On timeout or a trusted `fatal_error`, hide the iframe and show your own fallback; a retry mounts a new iframe with fresh configuration and a newly issued embed token. Partners that ignore `fatal_error` keep today's behaviour.
+- **Order tracking before mailing:** `GET /v1/orders/{order_id}/mail-tracking` returns `404 ORDER_NOT_MAILED` for an order that has not been mailed (status before `shipping`/`complete`, or cancelled/failed) and has no tracking data, instead of a placeholder `shipped` summary. The embedded iframe reads this route once an order shows as mailed and treats any 404 as "no tracking yet", so PropStream and BatchLeads screens are unchanged. Whether an order was mailed is read from the order status.
 - **Tracking piece count (fix, no contract change):** before the first scan the summary reports the order's piece count in `total_pieces` instead of `1`.
 - **Drop events scope (clarification):** `order.drop_completed` and `order.drop_cancelled` are emitted only for orders with a drop identity (embedded iframe flow). Standard API orders created with `POST /orders` receive `order.status_changed`.
-
-## Unreleased — BL-306: iframe fatal_error and parent ready fallback
-
-- **Availability:** iframe and contract change for staging review; not a production release. Armstrong owns the next partner contract-version bump.
-- **Iframe event:** one `fatal_error` per iframe load with `{reason, page, buildId}`. Reasons are `bootstrap_failed`, `auth_failed`, and `runtime_error`; the payload contains no exception text or customer data.
-- **Partner action:** start a 10-second timer when setting the iframe `src`; clear it on trusted `ready`. Hide the iframe and show a parent-owned fallback on timeout or trusted `fatal_error`. A retry remounts the iframe and reissues per-user authentication.
-- **Unchanged:** postMessage envelope version `1`, REST API `3.1`, and backend credential ownership. No API route or key-scope change.
+- **Partner action:** none required. Without the parent timer, a failure before `ready` still leaves the iframe area blank, as today.
+- **Unchanged:** postMessage envelope version `1`, REST `3.1`, credentials and key scopes. No new route.
+- **Artifacts:** Iframe Kit (`fatal_error`, parent fallback), API Kit (tracking, drop event scope), OpenAPI (`404` on mail-tracking), START_HERE §6, Postman, and the version headers.
 
 ## Unreleased — Assisted API onboarding
 
