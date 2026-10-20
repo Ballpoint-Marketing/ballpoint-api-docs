@@ -2,7 +2,7 @@
 
 ## Unreleased — 1.7.74 candidate (pending coordinated version bump)
 
-- **Order tracking before mailing:** `GET /v1/orders/{order_id}/mail-tracking` returns `404 ORDER_NOT_MAILED` for an order that has not been mailed (status before `shipping`/`complete`, or cancelled/failed) and has no tracking data, instead of a placeholder `shipped` summary. The embedded iframe reads this route only after mailing, so PropStream and BatchLeads screens are unchanged. Backend callers should read the order status instead.
+- **Order tracking before mailing:** `GET /v1/orders/{order_id}/mail-tracking` returns `404 ORDER_NOT_MAILED` for an order that has not been mailed (status before `shipping`/`complete`, or cancelled/failed) and has no tracking data, instead of a placeholder `shipped` summary. The embedded iframe reads this route once an order shows as mailed and treats any 404 as "no tracking yet", so PropStream and BatchLeads screens are unchanged. Backend callers should read the order status instead.
 - **Tracking piece count (fix, no contract change):** before the first scan the summary reports the order's piece count in `total_pieces` instead of `1`.
 - **Drop events scope (clarification):** `order.drop_completed` and `order.drop_cancelled` are emitted only for orders with a drop identity (embedded iframe flow). Standard API orders created with `POST /orders` receive `order.status_changed`.
 

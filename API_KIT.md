@@ -1067,7 +1067,7 @@ curl -s https://api.ballpointmarketing.com/v1/orders/ord_7f3a2b/mail-tracking \
 | `rts` | Return-to-sender pieces (bad addresses) |
 | `rts_rate` | `rts / total_pieces` |
 
-**Note:** Tracking data appears 1–2 business days after Ballpoint drops the mail at USPS. Before the first scan, this endpoint returns a summary with zero counts, `mail_status: shipped` and `total_pieces` equal to the order's piece count.
+**Note:** Tracking data appears 1–2 business days after Ballpoint drops the mail at USPS. For a mailed order, before the first scan, this endpoint returns a summary with zero counts, `mail_status: shipped` and `total_pieces` equal to the order's piece count.
 
 **Not mailed yet (1.7.74 candidate, pending release):** for an order that has not reached `shipping` or `complete` (for example `accepted`, `printing`, `scheduled`, `pending_payment`) or that ended `cancelled`, `payment_failed` or `failed`, and has no tracking data, the endpoint returns `404` with `detail.error.code: "ORDER_NOT_MAILED"` instead of a `shipped` summary. Treat it as "no tracking yet" and read the order status from `GET /v1/billing/orders/{order_id}`. An unknown or foreign order still returns `404 ORDER_NOT_FOUND`.
 
