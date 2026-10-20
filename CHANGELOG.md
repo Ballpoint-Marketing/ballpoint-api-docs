@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.75 — 2026-10-20 — Optional `set_list.campaignName`; Direct Mail Name follows the list name
+
+- **Availability:** staging candidate. Not in production.
+- **What changed:** a parent may send an optional `campaignName` string on singular `set_list` to prefill the editable Direct Mail Name. An absent, `null` or blank value on the first `set_list` uses the list `name`. A same-list refresh updates only an untouched list-derived prefill, never a name the user edited; omitting the field keeps an earlier explicit prefill.
+- **Validation:** `campaignName` must be a string; any other type makes the whole `set_list` invalid, as for `name`. Values longer than 120 characters are shortened to 120 and markup is removed.
+- **Direct Mail Name default (correction):** the Direct Mail Name now starts from the list `name` sent in `set_list` (or `campaignName` when present). Before this version, an embedded session could keep a built-in placeholder name instead of the partner's list name. This applies to every partner, including those that do not send `campaignName`.
+- **Multi Send and A/B:** when a refresh replaces the Direct Mail Name after drops were prepared, every submitted order uses the name shown on the Order Summary.
+- **Partner action:** none. BatchLeads may pass its campaign name with the selected list; other partners may omit the field.
+- **Unchanged:** REST routes, envelope version `1`, REST `3.1`, and the list-name-plus-month fallback later in the creation flow.
+- **Artifacts:** Iframe Kit `set_list` table and refresh rules, version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
+
 ## v1.7.74 — 2026-10-20 — Iframe fatal_error; order tracking before mailing
 
 - **Availability:** staging candidate. Not in production; the tracking change reaches production with the next API release and `fatal_error` with the next iframe release.
