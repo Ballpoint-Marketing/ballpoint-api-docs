@@ -3,7 +3,7 @@
 ## Unreleased — Campaign detail production-lock copy (BL-902 / BL-1008)
 
 - Locked detail rows show the product's live `sla_business_days` in business days, followed by the production message. When the matching pricing row is unavailable, they show only the production message and no invented number.
-- Activities whose drops have all crossed the production lock keep Edit Leads visible as a focusable, unavailable control with the production reason, including a delivered drop beside a production drop. A later editable Multi Send drop keeps the action available; fully delivered activities keep Export Leads.
+- Scheduled-view activities whose drops have all crossed the production lock keep Edit Leads visible as a focusable, unavailable control with the production reason, including a delivered drop beside a production drop. A later editable Multi Send drop keeps the action available; Delivered-view activities keep Export Leads.
 - No REST route, postMessage payload, envelope version, or partner-specific behavior changes. Armstrong owns the contract version bump with the iframe rollout.
 
 ## v1.7.75 — 2026-10-20 — Optional `set_list.campaignName`; Direct Mail Name follows the list name
