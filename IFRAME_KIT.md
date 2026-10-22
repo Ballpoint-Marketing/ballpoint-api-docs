@@ -847,7 +847,8 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 | `firstName` | string | Optional person-name alias. If `fullName` is omitted, the iframe derives it from `businessName`, or from `firstName` + `lastName`. |
 | `lastName` | string | Optional person-name alias used with `firstName` when `fullName` and `businessName` are omitted. |
 | `businessName` | string | Optional company-name alias. If `fullName` is omitted, a non-empty `businessName` takes precedence over the derived person name. |
-| `address` | string | Street address |
+| `address` | string | Street address line 1 (up to 200 characters). |
+| `address2` | string | Optional street address line 2 (up to 200 characters), such as `Apt 4`. Send it separately from `address`; the iframe retains both fields and sends `sender.address2` on new orders. |
 | `city` | string | City |
 | `state` | string | Two-letter state code (e.g. `FL`) |
 | `zip` | string or number | ZIP code: 5 digits, 9 digits, or ZIP+4 (`12345-6789`). Alphabetic/malformed values are rejected. |
@@ -862,6 +863,7 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 
 - **First accepted payload is a snapshot.** The first `set_sender` in an iframe load/tenant scope clears any sender values cached for that scope before applying the supplied fields. This prevents stale Marketing Profile data from a prior session from surviving.
 - **Later payloads are patches.** A later `set_sender` in the same iframe load/tenant scope updates only fields present in the message. Omitted fields preserve their current values; a field sent explicitly as `""` clears that value.
+- **Address line 2 is optional.** Send line 1 in `address` and line 2 in `address2` (for example, `address: "123 Main St", address2: "Apt 4"`). The iframe displays them on one street line and sends them as separate order sender fields. Do not also append line 2 to `address`, or it will print twice. An existing parent that omits `address2` keeps its current address output.
 - **A late first tenant assignment preserves the accepted snapshot.** In a Dashboard-first bootstrap, `set_sender` may arrive before the first `tenantKey`. When `set_list`, `set_lists`, `set_api_config`, or `set_tenant` later establishes that first tenant scope, the iframe persists the already-accepted sender snapshot in the tenant-scoped namespace before continuing and removes the temporary unscoped copy after the scoped write succeeds. This applies only to the transition from no tenant to the first tenant; it never copies sender data between two established tenants.
 - **Name derivation is deterministic.** Send `fullName` when possible. If it is omitted and any name alias is present, `businessName` wins; otherwise `firstName` and `lastName` are joined.
 - **Invalid contact fields fail closed.** A non-empty `zip` or `phone` that does not match the formats above is discarded rather than stripped into a different value. The profile remains partial and cannot advance or submit until a valid replacement arrives.
@@ -1318,7 +1320,7 @@ Sent when an account owner clicks **Set up now** or **Complete in Marketing Prof
 | `externalAccountId` | string | Partner account identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** if the user reaches "Set up now" before any `set_list` or `set_tenant` has arrived (e.g., very first session before list selection). |
 | `externalUserId` | string | Partner user identifier echoed verbatim from the most recent `set_list` / `set_tenant`. **MAY be empty string** under the same condition as `externalAccountId`. |
 
-No sender PII (`fullName`, `firstName`, `lastName`, `businessName`, `address`, `city`, `state`, `zip`, `phone`, `email`, `website`, `logo`) is ever included in this event. The parent already owns the sender data via the existing `set_sender` flow.
+No sender PII (`fullName`, `firstName`, `lastName`, `businessName`, `address`, `address2`, `city`, `state`, `zip`, `phone`, `email`, `website`, `logo`) is ever included in this event. The parent already owns the sender data via the existing `set_sender` flow.
 
 **Visibility / lifecycle**
 
@@ -2047,7 +2049,8 @@ The design editor (Create Your Own, Color Letter and the editable catalog artwor
 | `#MyFirstName#`, `#MyLastName#`, `#MyFullName#` | `set_sender` name fields | |
 | `#MyBusinessPhone#`, `#MyBusinessWebsite#` | `set_sender.phone`, `set_sender.website` | |
 | `#MyBusinessEmail#` | `set_sender.email` | v1.7.69. The iframe sends it with the order. Blank when the profile has no email. |
-| `#MyAddress#`, `#MyCity#`, `#MyState#`, `#MyZip#` | `set_sender.address`, `.city`, `.state`, `.zip` | v1.7.69. Send line 1 and line 2 together in `set_sender.address` (e.g. `"10 Office Rd Suite 5"`); there is no separate line 2 field. |
+| `#MyAddress#` | `set_sender.address` + optional `set_sender.address2` | The sender street prints on one line, e.g. `"123 Main St Apt 4"`. The order retains `sender.address` and `sender.address2` separately. Existing senders without `address2` print as before. |
+| `#MyCity#`, `#MyState#`, `#MyZip#` | `set_sender.city`, `.state`, `.zip` | v1.7.69. |
 | `#RecipientFirstName#`, `#RecipientLastName#` | recipient `first_name`, `last_name` | v1.7.69. A company recipient without a first name prints blank. |
 | `#MailingStreet#` | recipient `address` + `address2` | v1.7.69. One line, e.g. `"55 Mailing Way Apt 4"`. |
 | `#MailingCity#`, `#MailingState#`, `#MailingZip#` | recipient `city`, `state`, `zip` | v1.7.69. |
@@ -2057,7 +2060,7 @@ The design editor (Create Your Own, Color Letter and the editable catalog artwor
 | `#PropertyFullAddress#` | `placeHolders` property fields | v1.7.69. One line: `PropertyStreet`, then `PropertyCity/State/Zip` (or `PropertyCity`, `PropertyState` and `PropertyZip` when that key is absent). |
 
 - **Mailing and property are separate.** `Mailing*` fields always come from the structured recipient address the piece is mailed to; `Property*` and `Owner*` fields come only from `placeHolders`. Neither ever fills in for the other.
-- **No partner action is required** for fields you do not use: a field appears in a design only when the user adds it. Recipient upload and `set_sender` payloads are unchanged.
+- **Existing senders without `address2` are unchanged.** A field appears in a design only when the user adds it. Recipient upload is unchanged; parents using a separate sender line 2 should send it in `set_sender.address2` as described above.
 - The editor preview shows sample values. Phone, website, email and the sender address fields show the saved sender profile when it has them. The printed piece uses the real data and prints blank where it is missing.
 
 ### Batching Large Lists

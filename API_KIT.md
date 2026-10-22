@@ -774,6 +774,7 @@ The partner/iframe request shape may include an optional `sender` object. Empty 
 
 | `sender` field | Accepted format |
 |----------------|-----------------|
+| `address2` | Optional sender street line 2, up to 200 characters. `POST /orders` freezes it separately from `sender.address`; the postal return address and `#MyAddress#` print the two fields together on one street line (`123 Main St Apt 4`). Omit or leave blank to retain the existing output. Do not repeat line 2 inside `sender.address`. |
 | `zip` | 5 digits (`12345`), 9 digits (`123456789`), or ZIP+4 (`12345-6789`); maximum 10 characters. |
 | `phone` | 10 digits, or 11 digits beginning with `1`; `+`, parentheses, spaces, periods, and hyphens are accepted formatting. Letters and extensions are rejected; maximum 20 characters. |
 | `email` | Optional business email (contract 1.7.69), maximum 254 characters, surrounding spaces and control characters removed; blank is treated as absent. Printed only where a design uses `#MyBusinessEmail#`. |

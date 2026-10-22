@@ -1,5 +1,13 @@
 # Changelog
 
+## Pending — BL-609 — Separate sender address line 2
+
+- **Availability:** pending synchronized iframe and API changes, contract version assignment, and BatchLeads staging verification. Armstrong owns the API field, version, review, and merge.
+- **What changed:** `set_sender.address2` is an optional string. The iframe retains it in sender snapshots, order creation, and retries, and sends non-empty values as `POST /orders` `sender.address2`. The API freezes that field and prints `sender.address` plus `sender.address2` on one street line in the postal return address and `#MyAddress#`.
+- **Partner action:** if the sender profile has a separate Address Line 2, send line 1 only in `set_sender.address` and line 2 only in `set_sender.address2`. Do not also append line 2 to `address`. Existing parents that omit `address2`, including current PropStream payloads, keep their prior output.
+- **Unchanged:** recipient and property address fields, sender completeness rules, postMessage envelope version `1`, and REST version `3.1`.
+- **Artifacts:** Iframe Kit `set_sender` and dynamic fields; API Kit `POST /orders` sender.
+
 ## v1.7.75 — 2026-10-20 — Optional `set_list.campaignName`; Direct Mail Name follows the list name
 
 - **Availability:** staging candidate. Not in production.
