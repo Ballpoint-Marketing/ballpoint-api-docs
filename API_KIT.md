@@ -724,7 +724,17 @@ For a PropStream partner request whose canonical `product_type` is `4x6_printed`
 For new PropStream orders, `postage_type: "first_class"` uses the direct
 fulfillment path from the frozen recipient list. It does not pass through
 AccuZIP and therefore does not expose fabricated IMb, container, or tracking
-claims. This release validated the 4x6 and 6x9 postcard paths;
+claims. First Class pieces are not presorted or barcoded, so their addresses
+are mailed exactly as provided: Ballpoint applies no CASS standardization, no
+NCOA move update and no undeliverable-address suppression, and every piece is
+billed. Send addresses you have already validated, or use `standard`/`presort`
+where the product offers it to have undeliverable addresses suppressed and not
+billed. Greeting Letter is the exception: it is mailed and billed at its
+ordered count with any postage. A Hybrid Letter `presort` (Standard Class)
+order too small to presort may be mailed First Class at Ballpoint's cost: its
+`postage_type` then reads `first_class`, the price stays at the Presort rate,
+and it follows this First Class path (no suppression, every piece billed).
+This release validated the 4x6 and 6x9 postcard paths;
 `standard` and `presort` continue to use the existing AccuZIP workflow. No
 request field or partner-side action changed.
 
@@ -2806,7 +2816,7 @@ Production status is set by Ballpoint operations staff. It moves forward only.
 |--------|---------|---------|
 | `scheduled` | Order created with a future drop date. Waiting for the production date to arrive — a cron auto-transitions to `accepted` when the date hits. Send-now orders skip this state. | "Scheduled" |
 | `accepted` | Payment cleared and the order is queued for production. Cancellation allowed up to (and including) this state. | "Order placed" |
-| `prep` | Data formatting and pre-production setup (list cleanup, NCOA, address validation). Cancellation no longer possible — staff time is being spent. | "In production" |
+| `prep` | Data formatting and pre-production setup (list preparation; NCOA and address validation for `standard`/`presort` orders, except Greeting Letter; First Class and Greeting Letter are mailed as provided). Cancellation no longer possible — staff time is being spent. | "In production" |
 | `printing` | In the physical print queue. | "In production" |
 | `writing` | Handwritten content being applied by pen plotters. *Handwritten products only.* | "In production" |
 | `inserting` | Printed materials being folded into envelopes. *Letter products only.* | "In production" |
