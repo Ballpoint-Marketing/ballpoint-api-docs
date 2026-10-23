@@ -848,7 +848,7 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 | `lastName` | string | Optional person-name alias used with `firstName` when `fullName` and `businessName` are omitted. |
 | `businessName` | string | Optional company-name alias. If `fullName` is omitted, a non-empty `businessName` takes precedence over the derived person name. |
 | `address` | string | Street address line 1 (up to 200 characters). |
-| `address2` | string | Optional street address line 2 (up to 200 characters), such as `Apt 4`. Send it separately from `address`; the iframe retains both fields and sends `sender.address2` on new orders. |
+| `address2` | string | Optional street address line 2 (up to 200 characters), such as `Apt 4`. Send it separately from `address`; the iframe retains both fields and sends `sender.address2` on new orders. The iframe cleans it as the API does: line breaks become spaces, control and invisible formatting characters are removed, repeated spaces collapse, and longer values are cut to 200 characters. |
 | `city` | string | City |
 | `state` | string | Two-letter state code (e.g. `FL`) |
 | `zip` | string or number | ZIP code: 5 digits, 9 digits, or ZIP+4 (`12345-6789`). Alphabetic/malformed values are rejected. |

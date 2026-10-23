@@ -1685,7 +1685,7 @@ components:
             maxLength: 200
           - type: 'null'
           title: Address2
-          description: Optional sender address line 2 (contract 1.7.76), for example a suite or unit. Printed after `address` on the same street line in the postal return address and the #MyAddress# dynamic field. Line breaks print as spaces; blank is treated as absent. Values over 200 characters return 422.
+          description: Optional sender address line 2 (contract 1.7.76), for example a suite or unit. Printed after `address` on the same street line in the postal return address and the #MyAddress# dynamic field. Line breaks print as spaces, control and invisible formatting characters are removed and repeated spaces collapse; blank is treated as absent. Values over 200 characters after cleaning return 422.
         city:
           anyOf:
           - type: string
