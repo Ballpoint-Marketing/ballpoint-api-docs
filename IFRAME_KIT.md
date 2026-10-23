@@ -853,7 +853,7 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 | `phone` | string | 10 digits, or 11 digits beginning with `1`. Standard `+`, parentheses, space, period, and hyphen formatting is accepted; letters are rejected. |
 | `email` | string | Optional email address |
 | `website` | string | Website URL |
-| `disclosure` | string | Optional sender-profile legal text. Up to 2,000 characters after tag removal and trimming; an overlong value rejects the entire `set_sender` message before sender state changes. Omitted on a later patch preserves the current value; `""` clears it. BL-611 staging candidate, pending matching API renderer. |
+| `disclosure` | string | Optional sender-profile legal text. Up to 120 Unicode characters after tag removal and trimming; an overlong value rejects the entire `set_sender` message before sender state changes. Omitted on a later patch preserves the current value; `""` clears it. BL-611 iframe release candidate; the matching API field and renderer are on BatchLeads staging. |
 | `logo` | string | Optional. URL to sender logo image |
 | `externalUserIsAccountOwner` | boolean | Optional Dashboard-first role bootstrap. Honored only until a singular `set_list` is accepted; `set_list` is authoritative afterward. Strict boolean `true` is required. |
 | `tenantKey` | string | Optional. Tenant scope key |
@@ -2059,7 +2059,7 @@ The design editor (Create Your Own, Color Letter and the editable catalog artwor
 
 - **Mailing and property are separate.** `Mailing*` fields always come from the structured recipient address the piece is mailed to; `Property*` and `Owner*` fields come only from `placeHolders`. Neither ever fills in for the other.
 - **No partner action is required** for fields you do not use: a field appears in a design only when the user adds it. Recipient upload is unchanged. To use `#Disclosure#`, the parent sends the optional `set_sender.disclosure` field from its sender profile.
-- The editor preview shows sample values. Phone, website, email, disclosure and the sender address fields show the saved sender profile when it has them. When disclosure is absent, its preview uses the labelled text “Sample disclosure text”; the printed piece uses the real data and prints blank where it is missing. Artwork stores the literal `#Disclosure#`, never the preview text.
+- The editor's Preview mode shows sample values. Phone, website, email, disclosure and the sender address fields show the saved sender profile when it has them. The editable canvas keeps `#Disclosure#` literal; Preview mode and proof images show “Sample disclosure text” when disclosure is absent. The printed piece uses the real data and prints blank where it is missing. Artwork stores the literal token, never the preview text.
 
 ### Batching Large Lists
 

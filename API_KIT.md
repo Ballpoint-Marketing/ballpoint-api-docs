@@ -777,7 +777,7 @@ The partner/iframe request shape may include an optional `sender` object. Empty 
 | `zip` | 5 digits (`12345`), 9 digits (`123456789`), or ZIP+4 (`12345-6789`); maximum 10 characters. |
 | `phone` | 10 digits, or 11 digits beginning with `1`; `+`, parentheses, spaces, periods, and hyphens are accepted formatting. Letters and extensions are rejected; maximum 20 characters. |
 | `email` | Optional business email (contract 1.7.69), maximum 254 characters, surrounding spaces and control characters removed; blank is treated as absent. Printed only where a design uses `#MyBusinessEmail#`. |
-| `disclosure` | Optional sender-profile legal text (BL-611 staging candidate), maximum 2,000 characters; blank is treated as absent. The iframe removes tags and trims before sending. Printed only where artwork uses `#Disclosure#`. The matching API field and renderer are pending Armstrong's implementation. |
+| `disclosure` | Optional sender-profile legal text (BL-611 staging candidate), maximum 120 Unicode characters after tags are removed and the value is trimmed; blank is treated as absent. The iframe normalizes before sending, and the API applies the same limit. Printed only where artwork uses `#Disclosure#`. The API field and renderer are on BatchLeads staging; the coordinated release is pending. |
 
 Valid formatted values are persisted as supplied by the API client. The embedded iframe may normalize a valid phone to `AAA-BBB-CCCC` before sending it.
 
