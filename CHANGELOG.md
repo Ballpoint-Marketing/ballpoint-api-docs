@@ -7,6 +7,33 @@
 - **Availability:** iframe release candidate; the API field and renderer are on BatchLeads staging, where a 120-character disclosure was print checked on a 4x6 back. The coordinated partner-contract version bump and production release are pending Armstrong's review and merge.
 - **Unchanged:** postMessage envelope version `1`, REST `3.1`, existing tokens and partner-specific behavior.
 
+## Unreleased — First Class addresses are mailed as provided
+
+- **Availability:** documentation clarification of behavior already live in production: the First Class path since 2026-08-26 (API #224) and the Hybrid Letter Presort upgrade since API v3.41.0. No contract version change (`1.7.76`).
+- **What it clarifies:** the API Kit now states that `first_class` pieces of partners on the PropStream partner contract are not presorted or barcoded, so Ballpoint applies no CASS standardization, NCOA move update or undeliverable-address suppression, and every piece is billed. `standard`/`presort` keep the AccuZIP workflow that suppresses undeliverable addresses before billing, except Greeting Letter, which is mailed and billed at its ordered count with any postage. A Hybrid Letter `presort` (Standard Class) order too small to presort may be mailed First Class at Ballpoint's cost; its `postage_type` then reads `first_class`, the price stays at the Presort rate, and it follows the First Class path.
+- **Unchanged:** runtime behavior, request and response shapes, webhooks, pricing and the partner contract version.
+- **Partner action:** none required. Send validated addresses for First Class and Greeting Letter, or choose `standard`/`presort` where the product offers it.
+
+## v1.7.76 — 2026-10-23 — Production-lock copy on campaign detail; separate sender address line 2
+
+- **Availability:** staging candidate. Not in production.
+- **Production-lock copy (BL-902 / BL-1008):** locked rows on the campaign detail show the product's live `sla_business_days` in business days, followed by the production message. When the matching pricing row is unavailable, they show only the production message and no invented number. Scheduled-view activities whose drops have all crossed the production lock keep Edit Leads visible as a focusable, unavailable control with the production reason, including a delivered drop beside a production drop. A later editable Multi Send drop keeps the action available; Delivered-view activities keep Export Leads. This is shown to every partner; no message or payload changes.
+- **Sender address line 2 (BL-609):** `set_sender.address2` is an optional string of up to 200 characters. The iframe keeps it in sender snapshots, order creation and retries, and sends non-empty values as `POST /orders` `sender.address2`. The API stores the field with the order and prints `sender.address` plus `sender.address2` on one street line (`123 Main St Apt 4`) in the postal return address and `#MyAddress#`. Line breaks inside `address2` print as spaces, control and invisible formatting characters are removed and repeated spaces collapse, the same in the iframe and the API; a blank value counts as absent.
+- **Partner action:** none required. A parent whose sender profile has a separate Address Line 2 may send line 1 only in `set_sender.address` and line 2 only in `set_sender.address2`, without also appending line 2 to `address`. Parents that omit `address2`, including current PropStream payloads, keep their output.
+- **Unchanged:** REST routes, recipient and property address fields, sender completeness rules, postMessage envelope version `1`, REST `3.1`.
+- **Artifacts:** Iframe Kit (campaign detail copy, `set_sender`, dynamic fields), API Kit (`POST /orders` sender), OpenAPI `SenderInfo.address2`, Postman and the version headers.
+
+## v1.7.75 — 2026-10-20 — Optional `set_list.campaignName`; Direct Mail Name follows the list name
+
+- **Availability:** staging candidate. Not in production.
+- **What changed:** a parent may send an optional `campaignName` string on singular `set_list` to prefill the editable Direct Mail Name. An absent, `null` or blank value on the first `set_list` uses the list `name`. A same-list refresh updates only an untouched list-derived prefill, never a name the user edited; omitting the field keeps an earlier explicit prefill.
+- **Validation:** `campaignName` must be a string; any other type makes the whole `set_list` invalid, as for `name`. Values longer than 120 characters are shortened to 120 and markup is removed.
+- **Direct Mail Name default (correction):** the Direct Mail Name now starts from the list `name` sent in `set_list`, when one is sent, or from `campaignName` when present. Before this version, an embedded session could keep a built-in placeholder name instead of the partner's list name. This applies to every partner, including those that do not send `campaignName`.
+- **Multi Send and A/B:** when a refresh replaces the Direct Mail Name after drops were prepared, every submitted order uses the name shown on the Order Summary.
+- **Partner action:** none. BatchLeads may pass its campaign name with the selected list; other partners may omit the field.
+- **Unchanged:** REST routes, envelope version `1`, REST `3.1`, and the list-name-plus-month fallback later in the creation flow.
+- **Artifacts:** Iframe Kit `set_list` table and refresh rules, version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
+
 ## v1.7.74 — 2026-10-20 — Iframe fatal_error; order tracking before mailing
 
 - **Availability:** staging candidate. Not in production; the tracking change reaches production with the next API release and `fatal_error` with the next iframe release.
