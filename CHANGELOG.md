@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — First Class addresses are mailed as provided
+
+- **Availability:** documentation clarification of behavior already live in production: the First Class path since 2026-08-26 (API #224) and the Hybrid Letter Presort upgrade since API v3.41.0. No contract version change (`1.7.76`).
+- **What it clarifies:** the API Kit now states that `first_class` pieces of partners on the PropStream partner contract are not presorted or barcoded, so Ballpoint applies no CASS standardization, NCOA move update or undeliverable-address suppression, and every piece is billed. `standard`/`presort` keep the AccuZIP workflow that suppresses undeliverable addresses before billing, except Greeting Letter, which is mailed and billed at its ordered count with any postage. A Hybrid Letter `presort` (Standard Class) order too small to presort may be mailed First Class at Ballpoint's cost; its `postage_type` then reads `first_class`, the price stays at the Presort rate, and it follows the First Class path.
+- **Unchanged:** runtime behavior, request and response shapes, webhooks, pricing and the partner contract version.
+- **Partner action:** none required. Send validated addresses for First Class and Greeting Letter, or choose `standard`/`presort` where the product offers it.
+
 ## v1.7.76 — 2026-10-23 — Production-lock copy on campaign detail; separate sender address line 2
 
 - **Availability:** staging candidate. Not in production.
