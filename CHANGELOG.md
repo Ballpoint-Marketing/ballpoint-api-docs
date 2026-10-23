@@ -1,10 +1,13 @@
 # Changelog
 
-## Unreleased — Campaign detail production-lock copy (BL-902 / BL-1008)
+## v1.7.76 — 2026-10-23 — Production-lock copy on campaign detail; separate sender address line 2
 
-- Locked detail rows show the product's live `sla_business_days` in business days, followed by the production message. When the matching pricing row is unavailable, they show only the production message and no invented number.
-- Scheduled-view activities whose drops have all crossed the production lock keep Edit Leads visible as a focusable, unavailable control with the production reason, including a delivered drop beside a production drop. A later editable Multi Send drop keeps the action available; Delivered-view activities keep Export Leads.
-- No REST route, postMessage payload, envelope version, or partner-specific behavior changes. Armstrong owns the contract version bump with the iframe rollout.
+- **Availability:** staging candidate. Not in production.
+- **Production-lock copy (BL-902 / BL-1008):** locked rows on the campaign detail show the product's live `sla_business_days` in business days, followed by the production message. When the matching pricing row is unavailable, they show only the production message and no invented number. Scheduled-view activities whose drops have all crossed the production lock keep Edit Leads visible as a focusable, unavailable control with the production reason, including a delivered drop beside a production drop. A later editable Multi Send drop keeps the action available; Delivered-view activities keep Export Leads. This is shown to every partner; no message or payload changes.
+- **Sender address line 2 (BL-609):** `set_sender.address2` is an optional string of up to 200 characters. The iframe keeps it in sender snapshots, order creation and retries, and sends non-empty values as `POST /orders` `sender.address2`. The API stores the field with the order and prints `sender.address` plus `sender.address2` on one street line (`123 Main St Apt 4`) in the postal return address and `#MyAddress#`. A line break inside `address2` prints as a space; a blank value counts as absent.
+- **Partner action:** none required. A parent whose sender profile has a separate Address Line 2 may send line 1 only in `set_sender.address` and line 2 only in `set_sender.address2`, without also appending line 2 to `address`. Parents that omit `address2`, including current PropStream payloads, keep their output.
+- **Unchanged:** REST routes, recipient and property address fields, sender completeness rules, postMessage envelope version `1`, REST `3.1`.
+- **Artifacts:** Iframe Kit (campaign detail copy, `set_sender`, dynamic fields), API Kit (`POST /orders` sender), OpenAPI `SenderInfo.address2`, Postman and the version headers.
 
 ## v1.7.75 — 2026-10-20 — Optional `set_list.campaignName`; Direct Mail Name follows the list name
 
