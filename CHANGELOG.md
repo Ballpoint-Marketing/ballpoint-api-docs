@@ -7,6 +7,16 @@
 - **Unchanged:** runtime behavior, request and response shapes, webhooks, pricing and the partner contract version.
 - **Partner action:** none required. Send validated addresses for First Class and Greeting Letter, or choose `standard`/`presort` where the product offers it.
 
+## v1.7.77 — 2026-10-23 — Early `set_dashboard_filter` held until the tenant exists; Iframe Kit corrections
+
+- **Availability:** the `set_dashboard_filter` change is an iframe staging candidate, not in production. The other items correct the Iframe Kit to match behavior already live in production.
+- **`set_dashboard_filter` with `tenantKey` (iframe, staging candidate):** a filter that arrives before `set_api_config` or `set_list` established the tenant scope is now held and checked against the first tenant, instead of being rejected. This makes the documented order-robust dashboard-first bootstrap true for the filter as well. A different `tenantKey` is still rejected.
+- **Recipient controls without `piece_counts` (correction):** the Deliver To and Remove duplicates controls appear on the Step 1 and review screens even without `piece_counts`; the Iframe Kit previously said they were hidden. Without the table the choice has no effect, the iframe uses `count`, and `campaign_submitted` omits `recipient_selection`.
+- **Unpaid orders on the Dashboard (clarification):** the campaign list leaves out orders with `payment_confirmed: false`, so a campaign whose orders all still await recipients and payment is not listed while `GET /v1/billing/orders` returns them. A purchased Multi-Send keeps all of its drops.
+- **Partner action:** none required. A parent that sends `tenantKey` on several messages must use the same value on all of them.
+- **Unchanged:** message types and fields, REST routes, envelope version `1`, REST `3.1`.
+- **Artifacts:** Iframe Kit (`set_dashboard_filter`, `piece_counts`, recipient selection backward compatibility), version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
+
 ## v1.7.76 — 2026-10-23 — Production-lock copy on campaign detail; separate sender address line 2
 
 - **Availability:** staging candidate. Not in production.
