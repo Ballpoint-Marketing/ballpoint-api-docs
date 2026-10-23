@@ -352,7 +352,7 @@ does not assert staging deployment or production availability.
 |-------|------|-------------|
 | `count` | number or string | Number of recipients in the list |
 | `name` | string | Human-readable list name (shown in the UI) |
-| `campaignName` | string | Optional Direct Mail Name prefill (v1.7.75). The user may edit it. Longer values are shortened to 120 characters and markup is removed; a non-string value makes the whole `set_list` invalid. Absent, `null` or blank on the first `set_list` falls back to `name`; a same-list refresh updates only a list-derived prefill and preserves a user edit. |
+| `campaignName` | string | Optional Direct Mail Name prefill (v1.7.75). The user may edit it. Longer values are shortened to 120 characters and markup is removed; a non-string value makes the whole `set_list` invalid. Absent, `null` or blank on the first `set_list` falls back to `name`; a same-list refresh updates only a list-derived prefill and preserves a user edit. The user must have a valid Direct Mail Name before advancing from the mail-type step. |
 | `listId` | string | Your internal list identifier |
 | `externalAccountId` | string | Your account/tenant identifier |
 | `externalUserId` | string | Your user identifier |
@@ -374,7 +374,7 @@ does not assert staging deployment or production availability.
 | Path | Type | Description |
 |------|------|-------------|
 | `piece_counts.property.dedup_off` | number or null | Count of leads with a property address, no dedup applied. |
-| `piece_counts.property.dedup_on` | number or null | Count of distinct normalized property addresses. |
+| `piece_counts.property.dedup_on` | number or null | Count of distinct normalized property addresses. Accepted in the table, but not selectable in the iframe: Property Address always clears Remove duplicates and uses `property.dedup_off`. |
 | `piece_counts.mailing.dedup_off` | number or null | Count of leads with a mailing address, no dedup applied. |
 | `piece_counts.mailing.dedup_on` | number or null | Count of distinct normalized mailing addresses. |
 | `piece_counts.both.dedup_off` | number or null | Partner-defined count for the `Deliver To = both` + `Remove duplicates = OFF` combination. Whatever number the partner sends here is the number of pieces Ballpoint mails when this combination is selected. Ballpoint does **not** auto-collapse same-lead `property == mailing` or any other intra-list duplicate when `dedup_off` is selected — see [Same-order dedupe](#7-recipient-upload-flow) below. |
@@ -384,6 +384,7 @@ Semantics:
 
 - **`0` is a valid value** for any combination. It means "no recipients available for this selection" (e.g. no leads have a mailing address). The iframe shows the option but with a 0-piece price.
 - **Missing key vs `0`**: an omitted combination (e.g. no `property.dedup_off` key, or the entire `property` block missing) means "option unavailable for selection in iframe UI" — the iframe disables the corresponding option in the Deliver To select (user can see it but cannot pick it). This is distinct from `0`, which is selectable but disables the submit button with a "no recipients available" warning.
+- **Property Address requires `dedup_off`**: the iframe disables Property Address if `property.dedup_off` is missing, even when `property.dedup_on` is present. Selecting Property Address from a dedup-on Mailing or Both choice clears Remove duplicates immediately.
 - **4 KB cap** on the serialized `piece_counts` JSON. Payloads exceeding the cap are silently rejected at the postMessage boundary — the iframe logs a console warning and falls back to legacy behavior (`count` is the recipient total and the Deliver To / Remove duplicates choice has no effect).
 - Leads missing the relevant address contribute 0 for that option (e.g. a lead with no mailing address contributes 0 to `mailing.*`).
 
@@ -775,9 +776,9 @@ When `set_list.piece_counts` (or `set_lists[].piece_counts`) is present, the ifr
 
 1. **Partner pre-computes** the 6 piece counts on its side (raw address availability + dedup math against its own normalized address index).
 2. **Partner sends** `set_list.piece_counts` on bootstrap (alongside `count`, `name`, etc.).
-3. **Iframe shows** two controls:
+3. **Iframe shows** Deliver To and a conditional duplicate-removal control:
    - **Deliver To** — radio/select between `property`, `mailing`, `both` (only options present in `piece_counts` are offered).
-   - **Remove duplicate addresses** — checkbox. Toggles `dedup_off` ↔ `dedup_on`.
+   - **Remove duplicate addresses** — checkbox for Mailing Address and Both only. It toggles `dedup_off` ↔ `dedup_on`; Property Address hides it and clears a prior checked value.
 4. **User selects** → iframe looks up the resolved count via `piece_counts[deliver_to][dedup_on ? "dedup_on" : "dedup_off"]` → displays the count and recomputes price.
 5. **User submits** → iframe echoes the final selection on `campaign_submitted.recipient_selection` (see [Section 6](#6-messages-you-receive-iframe--parent)).
 6. **Partner reconciles** `recipient_selection.piece_count` against each `orders[].pieces` for billing and recipient-upload sizing.
@@ -799,6 +800,10 @@ A user who submits without touching either control emits the default selection. 
 ```
 
 Always read the emitted `recipient_selection` rather than assuming a default — it is the authoritative value for billing and recipient-upload sizing.
+
+On the Select a Direct Mail Type step, **Direct Mail Name is required** before Next is enabled. Leading and trailing whitespace is trimmed; a blank name, control character, or name over 120 characters blocks progress. This also applies when the parent omits a usable name prefill.
+
+For Property Address, the iframe always resolves `piece_counts.property.dedup_off` and emits `recipient_selection` with `remove_duplicate_addresses: false`. This holds for Step 1 and Review edits in Single, Multi, and A/B flows. Review Cancel restores the previously committed selection; Review Save commits the cleared value. A same-`listId` refresh keeps the current Property Address / dedup-off choice and re-resolves it against the new table.
 
 **If your `piece_counts` omits the `mailing` block**, the opening selection lands on an option that is not selectable. Consistent with the missing-key rule above, the iframe disables that option, shows a recipient count of 0, and blocks forward progress until the user chooses an available `Deliver To`: on the list step every campaign type is marked ineligible and **Next** stays disabled, and the final **Continue to Payment** on the Order Summary is fail-closed (see [Fail-closed submit](#fail-closed-submit) below). There is no automatic fallback to another option. Send a `mailing` block if you want the default to resolve to a count.
 
@@ -1777,7 +1782,7 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 | `pendingOrderIds` | string[] | Always empty in emitted events; retained for payload compatibility. |
 | `recipient_selection` | object or omitted | Present only when the parent provided `piece_counts` on `set_list` / `set_lists[]`. Echoes the user's final selection from the iframe's Deliver To + Remove duplicates controls. See [Recipient selection contract](#recipient-selection-contract-piece-count--dedup). |
 | `recipient_selection.deliver_to` | string | One of `"property"`, `"mailing"`, `"both"` — the address type the user chose. |
-| `recipient_selection.remove_duplicate_addresses` | boolean | `true` when the user enabled the Remove duplicates checkbox. |
+| `recipient_selection.remove_duplicate_addresses` | boolean | `true` when the user enabled the Remove duplicates checkbox for Mailing Address or Both; always `false` for Property Address. |
 | `recipient_selection.piece_count` | number | Per-drop piece count resolved from `piece_counts[deliver_to][dedup_on ? "dedup_on" : "dedup_off"]`. Matches each `orders[].pieces` entry — in V1, all drops in a campaign use the same recipient selection, so summing `orders[].pieces` across drops equals `piece_count × number_of_drops`. |
 
 > **Backward compatibility.** `recipient_selection` is **omitted from the payload** (not set to `null`) when the parent did not send `piece_counts` on `set_list`. Existing partners that don't yet emit `piece_counts` continue to receive the legacy `campaign_submitted` shape unchanged.

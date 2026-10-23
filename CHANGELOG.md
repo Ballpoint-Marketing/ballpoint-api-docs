@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — BL-614 — Required Direct Mail Name; Property Address clears duplicate removal
+
+- **Iframe behavior:** Step 1 Next requires a valid Direct Mail Name (nonblank after trimming, at most 120 characters, no control characters). Existing list-derived and optional `set_list.campaignName` prefills remain editable.
+- **Recipient selection:** switching to Property Address clears Remove duplicates on Step 1 or in a Review draft. Property Address uses `piece_counts.property.dedup_off` for counts and pricing; `campaign_submitted.recipient_selection.remove_duplicate_addresses` and iframe-created POST `/orders` metadata are `false`. A Property option without `dedup_off` is unavailable even if `dedup_on` exists. Review Cancel restores the prior committed choice.
+- **Partner action:** provide `piece_counts.property.dedup_off` when Property Address should be available. Size recipient uploads from the emitted `recipient_selection.piece_count` and `orders[].pieces`; do not infer the old hidden dedup-on value.
+- **Unchanged:** message fields, REST routes, postMessage envelope version `1`, REST `3.1`, and behavior for Mailing Address and Both.
+- **Version:** Armstrong assigns the synchronized partner contract version before merge.
+
 ## Unreleased — First Class addresses are mailed as provided
 
 - **Availability:** documentation clarification of behavior already live in production: the First Class path since 2026-08-26 (API #224) and the Hybrid Letter Presort upgrade since API v3.41.0. No contract version change (`1.7.76`).
