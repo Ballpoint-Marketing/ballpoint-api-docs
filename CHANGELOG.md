@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.79 — 2026-10-24 — Tenant flags for Auto-suppress on next drop and delegated Export Leads
+
+- **Availability:** staging candidate. Not in production.
+- **`/v1/config` flags (additive):** the `flags` object gains `auto_suppress_next_drop_enabled` and `export_leads_delegated`. Ballpoint has `auto_suppress_next_drop_enabled` on for PropStream and BatchLeads and `export_leads_delegated` off for both. A missing or false value disables the capability.
+- **Auto-suppress on next drop (BL-1016):** the existing checkbox and its `auto_suppress_next_drop_changed` event now follow `auto_suppress_next_drop_enabled` for the tenant, instead of the parent origin alone. While a config refresh is pending or has failed, the iframe keeps the last value it evaluated for the same tenant and user, so the control does not disappear and reappear; a new tenant or user starts from a fresh evaluation. The event payload is unchanged.
+- **Delegated Export Leads (BL-1004):** with `export_leads_delegated: true`, the delivered/cancelled campaign-detail **Export Leads** button sends the new `export_leads_requested` event with `{ ballpointCampaignId, orderIds, listId }` instead of downloading the CSV. With the flag off, the CSV export is unchanged. The parent must check those ids against its own signed-in user before exporting.
+- **`ballpointCampaignId` (clarification):** on `auto_suppress_next_drop_changed` it is the persisted cross-system campaign id (`orders.external_campaign_id`), as already sent; the kit now says so.
+- **Partner action:** none for PropStream; its checkbox and CSV export behave as before. A partner enabling delegated export implements the `export_leads_requested` listener first.
+- **Unchanged:** REST routes, `auto_suppress_next_drop_changed` payload, recipient-update ownership, postMessage envelope version `1`, REST `3.1`.
+- **Artifacts:** Iframe Kit (auto-suppress visibility, `export_leads_requested`), API Kit §6r flags, version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
+
 ## Unreleased — `rts_update` for batch-printed orders carries the partner campaign id (fix)
 
 - **Availability:** staging. Reaches production with the next API release. No contract version change.
@@ -23,15 +34,6 @@
 - **What it clarifies:** the API Kit now states that `first_class` pieces of partners on the PropStream partner contract are not presorted or barcoded, so Ballpoint applies no CASS standardization, NCOA move update or undeliverable-address suppression, and every piece is billed. `standard`/`presort` keep the AccuZIP workflow that suppresses undeliverable addresses before billing, except Greeting Letter, which is mailed and billed at its ordered count with any postage. A Hybrid Letter `presort` (Standard Class) order too small to presort may be mailed First Class at Ballpoint's cost; its `postage_type` then reads `first_class`, the price stays at the Presort rate, and it follows the First Class path.
 - **Unchanged:** runtime behavior, request and response shapes, webhooks, pricing and the partner contract version.
 - **Partner action:** none required. Send validated addresses for First Class and Greeting Letter, or choose `standard`/`presort` where the product offers it.
-
-## Unreleased — Tenant-gated auto-suppress and delegated Export Leads (BL-1016, BL-1004)
-
-- **Availability:** iframe staging candidate; requires tenant flags in `/v1/config` and partner-side handlers before integration QA. Armstrong will coordinate the contract-version bump and API flag configuration.
-- **Auto-suppress:** `auto_suppress_next_drop_enabled: true` displays the existing next-drop checkbox and permits its existing `auto_suppress_next_drop_changed` intent event for that tenant. A missing/false flag hides the control. The event remains free of recipients and PII; the parent still applies suppression and sends `recipients_updated` after a successful recipient change.
-- **Export Leads:** `export_leads_delegated: true` makes the delivered/cancelled campaign-detail button emit the new `export_leads_requested` event with `{ ballpointCampaignId, orderIds, listId }`. The parent handles the export. With a missing/false flag, the iframe keeps its current local CSV export, including PropStream's existing behavior. The iframe emits nothing when a shared persisted campaign id, order ids, or list id cannot be resolved.
-- **Partner action:** configure the two flags for each tenant and implement the delegated export listener before enabling delegation. For the initial staging rollout, enable auto-suppress for PropStream and BatchLeads, keep delegation off for PropStream, and enable delegation for BatchLeads only after its parent handler is ready.
-- **Unchanged:** REST routes and payloads, `auto_suppress_next_drop_changed` payload, recipient-update ownership, postMessage envelope version `1`, and REST version `3.1`. No server credential enters the iframe.
-- **Artifacts:** Iframe Kit event and visibility sections; API Kit §6r flag semantics. Contract-version metadata will be coordinated with the release.
 
 ## v1.7.77 — 2026-10-23 — Early `set_dashboard_filter` held until the tenant exists; Iframe Kit corrections
 
