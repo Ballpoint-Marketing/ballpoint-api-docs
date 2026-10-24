@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — `rts_update` for batch-printed orders carries the partner campaign id (fix)
+
+- **Availability:** staging. Reaches production with the next API release. No contract version change.
+- **What was wrong:** since 2026-09-11, `campaign.mail_tracking.rts_update` for pieces of orders printed in a production batch carried an internal print-batch id in `data.campaign_id` instead of the `campaign_created` id this kit documents. One event could also mix returned pieces of several Direct Mail campaigns, with counters for the whole batch.
+- **What changed:** each event now covers one Direct Mail campaign, with `data.campaign_id` equal to that campaign's `campaign_created` id, the campaign-wide counters of that campaign, and `piece_id` values equal to the ones `GET /v1/campaigns/{campaign_id}/mail-tracking/pieces` and `/rts` return for the same pieces. A returned piece that cannot be attributed to exactly one order is held back and retried instead of being sent under another id.
+- **Partner action:** none required. Re-sending the returned pieces that were reported under a print-batch id is coordinated separately.
+- **Unchanged:** event type, payload fields, envelope, delivery, events for orders that were not batch-printed, and the partner contract version.
 ## v1.7.78 — 2026-10-23 — Required Direct Mail Name; Property Address without duplicate removal; sender disclosure
 
 - **Availability:** staging candidate. Not in production. Applies to every partner on the shared iframe.
