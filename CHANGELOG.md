@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.79 — 2026-10-24 — Tenant flags for Auto-suppress on next drop and delegated Export Leads
+
+- **Availability:** staging candidate. Not in production.
+- **`/v1/config` flags (additive):** the `flags` object gains `auto_suppress_next_drop_enabled` and `export_leads_delegated`. Ballpoint has `auto_suppress_next_drop_enabled` on for PropStream and BatchLeads and `export_leads_delegated` off for both. A missing or false value disables the capability.
+- **Auto-suppress on next drop (BL-1016):** the existing checkbox and its `auto_suppress_next_drop_changed` event now follow `auto_suppress_next_drop_enabled` for the tenant, instead of the parent origin alone. While a config refresh is pending or has failed, the iframe keeps the last value it evaluated for the same tenant and user, so the control does not disappear and reappear; a new tenant or user starts from a fresh evaluation. The event payload is unchanged.
+- **Delegated Export Leads (BL-1004):** with `export_leads_delegated: true`, the delivered/cancelled campaign-detail **Export Leads** button sends the new `export_leads_requested` event with `{ ballpointCampaignId, orderIds, listId }` instead of downloading the CSV. With the flag off, the CSV export is unchanged. The parent must check those ids against its own signed-in user before exporting.
+- **`ballpointCampaignId` (clarification):** on `auto_suppress_next_drop_changed` it is the persisted cross-system campaign id (`orders.external_campaign_id`), as already sent; the kit now says so.
+- **Partner action:** none for PropStream; its checkbox and CSV export behave as before. A partner enabling delegated export implements the `export_leads_requested` listener first.
+- **Unchanged:** REST routes, `auto_suppress_next_drop_changed` payload, recipient-update ownership, postMessage envelope version `1`, REST `3.1`.
+- **Artifacts:** Iframe Kit (auto-suppress visibility, `export_leads_requested`), API Kit §6r flags, version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
+
 ## Unreleased — `rts_update` for batch-printed orders carries the partner campaign id (fix)
 
 - **Availability:** staging. Reaches production with the next API release. No contract version change.
