@@ -1547,7 +1547,7 @@ No recipient PII (no `recipient_name` / `recipient_address` / `recipient_city` /
 
 #### `auto_suppress_next_drop_changed` — User changed the next-drop auto-suppress preference
 
-Sent when the user checks or unchecks **Auto-suppress on next drop** in the RTS Suppression List. It is part of the PropStream partner contract: a fire-and-forget preference intent. It tells the parent what the user selected; it does not perform suppression inside the iframe.
+Sent when the user checks or unchecks **Auto-suppress on next drop** in the RTS Suppression List. It is a fire-and-forget preference intent for any partner whose `/v1/config` enables `auto_suppress_next_drop_enabled`. It tells the parent what the user selected; it does not perform suppression inside the iframe.
 
 ```json
 {
@@ -1565,27 +1565,50 @@ Sent when the user checks or unchecks **Auto-suppress on next drop** in the RTS 
 | `version` | number | Always `1`. |
 | `type` | string | Always `auto_suppress_next_drop_changed`. |
 | `enabled` | boolean | `true` when checked; `false` when unchecked. |
-| `ballpointCampaignId` | string | Non-empty server-side Ballpoint campaign id for the suppression-list view. Never a PropStream list id and never `null` on this event. |
+| `ballpointCampaignId` | string | The non-empty persisted cross-system campaign id (`orders.external_campaign_id`, originally emitted as `campaign_created.campaignId`) shared by every order in the campaign. Never a partner `listId` or the Ballpoint-internal API campaign grouping id. |
 
 The event contains no recipients, contact identifiers, recipient PII, counts, prices, order ids, request id, or acknowledgement fields. The iframe does not call a recipient-update endpoint, mutate any order, or change pricing in response to the click.
 
-**Display-only next-drop note.** While the checkbox is ON, the iframe may show an inline projection beside it — `Next drop: 26,436 leads (adjusted from 26,454)` — computed entirely from data the iframe already holds. It is a preview of what the user just asked for, never a confirmation, and it changes nothing on either side: PropStream remains the only side that decides which drop is applicable and applies the recipient change. Nothing is displayed unless every input is provable, so the note is absent for a Single Send or A/B campaign, when no future drop remains whose recipients PropStream could still change, when the suppression list page is truncated, and when the next drop no longer measures the pre-suppression size shared by the campaign's already-locked drops — which is how the iframe recognises a removal PropStream has already applied and avoids counting it twice. There is no alternative copy: when the projection is not provable, the row shows only the checkbox.
+**Display-only next-drop note.** While the checkbox is ON, the iframe may show an inline projection beside it — `Next drop: 26,436 leads (adjusted from 26,454)` — computed entirely from data the iframe already holds. It is a preview of what the user just asked for, never a confirmation, and it changes nothing on either side: the embedding partner remains the only side that decides which drop is applicable and applies the recipient change. Nothing is displayed unless every input is provable, so the note is absent for a Single Send or A/B campaign, when no future drop remains whose recipients the partner could still change, when the suppression list page is truncated, and when the next drop no longer measures the pre-suppression size shared by the campaign's already-locked drops — which is how the iframe recognises a removal the partner has already applied and avoids counting it twice. There is no alternative copy: when the projection is not provable, the row shows only the checkbox.
 
 **Visibility and state**
 
-- The checkbox is rendered only for an allowlisted **PropStream** parent origin. It is absent in standalone/demo mode and other partner embeds.
+- The checkbox is rendered only in an embedded session when the tenant's cached `/v1/config` response has `auto_suppress_next_drop_enabled: true`. A missing/false flag hides it; an origin alone does not enable it. It is absent in standalone/demo mode.
 - The checkbox is rendered only when the iframe can resolve a non-empty `ballpointCampaignId` from the active campaign detail.
 - The iframe remembers a successfully emitted choice only for the lifetime of the current iframe document so ordinary detail re-renders do not visually undo the click. Reloading the iframe resets that visual state in v1.7.11; there is no hydration message in this contract.
 - The event is delivered only to the origin-locked parent. It is queued until that lock exists and is never added to the pre-lock broadcast allowlist.
 - Fire-and-forget: no parent acknowledgement, retry, or replay is defined, and no price is ever recalculated. The display-only next-drop note described above is the sole optimistic element, and it is confined to the iframe's own suppression panel.
 
-**Expected PropStream behavior**
+**Expected embedding-partner behavior**
 
-1. Listen for `auto_suppress_next_drop_changed` and persist the boolean preference against the supplied `ballpointCampaignId` (or the corresponding campaign record on the PropStream side).
-2. When the next drop becomes applicable, determine the target order and suppression set using PropStream's own campaign/contact context.
+1. Listen for `auto_suppress_next_drop_changed` and persist the boolean preference against the supplied `ballpointCampaignId` (or the corresponding campaign record on the partner side).
+2. When the next drop becomes applicable, determine the target order and suppression set using the partner's own campaign/contact context.
 3. Apply the recipient change through the existing Ballpoint recipient-update API flow; this event does not introduce a new Ballpoint endpoint.
 4. After the authoritative recipient update succeeds, send the existing [`recipients_updated`](#recipients_updated--partner-finished-editing-recipients) message. The iframe then performs its existing campaign-history refresh.
-5. No reply is required for the checkbox click itself. Before production rollout, Ballpoint and PropStream must confirm whether a future hydration contract is needed to restore the checkbox after iframe reload.
+5. No reply is required for the checkbox click itself. Before production rollout, Ballpoint and each partner must confirm whether a future hydration contract is needed to restore the checkbox after iframe reload.
+
+#### `export_leads_requested` — User clicked Export Leads on a campaign
+
+When the tenant's cached `/v1/config` response has `export_leads_delegated: true`, clicking **Export Leads** on a delivered or cancelled campaign sends this event to the origin-locked parent. The parent owns the export and any download or error UI. When the flag is false or absent, the iframe keeps its current local CSV export. The campaign-detail button is available in both modes; the flag selects its action.
+
+```json
+{
+  "source": "ballpoint-mailer",
+  "version": 1,
+  "type": "export_leads_requested",
+  "ballpointCampaignId": "cmp_abc",
+  "orderIds": ["ord_123", "ord_124"],
+  "listId": "list_456"
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `ballpointCampaignId` | string | The persisted cross-system campaign id (`orders.external_campaign_id`, originally emitted as `campaign_created.campaignId`) shared by every order; never the Ballpoint-internal API campaign grouping id. |
+| `orderIds` | string[] | Every Ballpoint order id in the campaign detail, in its displayed order; non-empty. |
+| `listId` | string | The campaign's partner list id. |
+
+The iframe emits nothing when any of these identities is missing or inconsistent. It sends no recipients, addresses, contact identifiers, CSV content, or server credential. The message is queued until the parent origin is locked and delivered only to that origin; there is no acknowledgement or retry in this contract. A partner enabling delegation must listen for the event and perform the export in its own application. No Ballpoint REST route or payload changes are introduced.
 
 #### `recipient_opt_out_changed` — User toggled Opt Out on a recipient row
 
