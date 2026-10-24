@@ -7,13 +7,32 @@
 - **What changed:** each event now covers one Direct Mail campaign, with `data.campaign_id` equal to that campaign's `campaign_created` id, the campaign-wide counters of that campaign, and `piece_id` values equal to the ones `GET /v1/campaigns/{campaign_id}/mail-tracking/pieces` and `/rts` return for the same pieces. A returned piece that cannot be attributed to exactly one order is held back and retried instead of being sent under another id.
 - **Partner action:** none required. Re-sending the returned pieces that were reported under a print-batch id is coordinated separately.
 - **Unchanged:** event type, payload fields, envelope, delivery, events for orders that were not batch-printed, and the partner contract version.
+## v1.7.78 — 2026-10-23 — Required Direct Mail Name; Property Address without duplicate removal; sender disclosure
+
+- **Availability:** staging candidate. Not in production. Applies to every partner on the shared iframe.
+- **Direct Mail Name (BL-614):** Step 1 Next requires a valid Direct Mail Name: not blank after trimming, at most 120 characters, no control characters. A list-derived or `set_list.campaignName` prefill stays editable, and control characters in a prefill become spaces, so a prefill never blocks Next.
+- **Property Address and Remove duplicates (BL-614):** the option stays hidden for Property Address, and choosing Property Address now also clears it, on Step 1 and in a Review draft. Before, a box ticked for Mailing or Both stayed active while hidden. Property Address uses `piece_counts.property.dedup_off` for counts and pricing, and `campaign_submitted.recipient_selection.remove_duplicate_addresses` and the iframe's `POST /orders` are `false` for it. A Property option without `dedup_off` is unavailable, even when `dedup_on` exists. Review Cancel restores the previous committed choice; returning to Mailing or Both leaves the box unticked.
+- **Sender disclosure (BL-611):** optional `set_sender.disclosure` and `POST /orders` `sender.disclosure`, plain text of up to 120 characters. The iframe and the API apply the same cleaning: tags removed, CR/CRLF become line breaks, other control characters removed (line breaks and tabs kept), trimmed, then counted in Unicode characters. In the iframe an overlong value rejects the whole `set_sender` without changing sender state; over REST it returns `422`. The design editor offers `#Disclosure#` under Sender and saves the literal token. Prints and previews show the order's disclosure only where the token is, and nothing when the sender has none.
+- **Partner action:** none required. A partner that offers Property Address sends `piece_counts.property.dedup_off` and sizes its recipient upload from the emitted `recipient_selection.piece_count` and `orders[].pieces`. BatchLeads may send `disclosure`; PropStream payloads without it are unchanged.
+- **Unchanged:** message types, REST routes, Mailing Address and Both behavior, postMessage envelope version `1`, REST `3.1`.
+- **Artifacts:** Iframe Kit (`set_sender`, `piece_counts`, recipient selection, Step 1, dynamic fields), API Kit (`POST /orders` sender, recipient selection), OpenAPI `SenderInfo.disclosure`, Postman and the version headers.
 
 ## Unreleased — First Class addresses are mailed as provided
 
-- **Availability:** documentation clarification of behavior already live in production: the First Class path since 2026-08-26 (API #224) and the Hybrid Letter Presort upgrade since API v3.41.0. No contract version change (`1.7.76`).
+- **Availability:** documentation clarification of behavior already live in production: the First Class path since 2026-08-26 (API #224) and the Hybrid Letter Presort upgrade since API v3.41.0. No contract version change.
 - **What it clarifies:** the API Kit now states that `first_class` pieces of partners on the PropStream partner contract are not presorted or barcoded, so Ballpoint applies no CASS standardization, NCOA move update or undeliverable-address suppression, and every piece is billed. `standard`/`presort` keep the AccuZIP workflow that suppresses undeliverable addresses before billing, except Greeting Letter, which is mailed and billed at its ordered count with any postage. A Hybrid Letter `presort` (Standard Class) order too small to presort may be mailed First Class at Ballpoint's cost; its `postage_type` then reads `first_class`, the price stays at the Presort rate, and it follows the First Class path.
 - **Unchanged:** runtime behavior, request and response shapes, webhooks, pricing and the partner contract version.
 - **Partner action:** none required. Send validated addresses for First Class and Greeting Letter, or choose `standard`/`presort` where the product offers it.
+
+## v1.7.77 — 2026-10-23 — Early `set_dashboard_filter` held until the tenant exists; Iframe Kit corrections
+
+- **Availability:** the `set_dashboard_filter` change is an iframe staging candidate, not in production. The other items correct the Iframe Kit to match behavior already live in production.
+- **`set_dashboard_filter` with `tenantKey` (iframe, staging candidate):** a filter that arrives before `set_api_config` or `set_list` established the tenant scope is now held and checked against the first tenant, instead of being rejected. This makes the documented order-robust dashboard-first bootstrap true for the filter as well. A different `tenantKey` is still rejected.
+- **Recipient controls without `piece_counts` (correction):** the Deliver To and Remove duplicates controls appear on the Step 1 and review screens even without `piece_counts`; the Iframe Kit previously said they were hidden. Without the table the choice has no effect, the iframe uses `count`, and `campaign_submitted` omits `recipient_selection`.
+- **Unpaid orders on the Dashboard (clarification):** the campaign list leaves out orders with `payment_confirmed: false`, so a campaign whose orders all still await recipients and payment is not listed while `GET /v1/billing/orders` returns them. A purchased Multi-Send keeps all of its drops.
+- **Partner action:** none required. A parent that sends `tenantKey` on several messages must use the same value on all of them.
+- **Unchanged:** message types and fields, REST routes, envelope version `1`, REST `3.1`.
+- **Artifacts:** Iframe Kit (`set_dashboard_filter`, `piece_counts`, recipient selection backward compatibility), version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
 
 ## v1.7.76 — 2026-10-23 — Production-lock copy on campaign detail; separate sender address line 2
 
