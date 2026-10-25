@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.7.80 — 2026-10-24 — Previous stays on a paid checkout; `order.usps_update` carries the partner campaign id
+
+- **Availability:** staging candidate. Not in production.
+- **Paid checkout (iframe, ATAI-523; where edit after checkout is enabled, `propstream_checkout_edit_reissue_enabled`):** when any order of the current checkout is paid or already being processed, **Previous** on the Order Summary no longer reopens editing. It stays on the Order Summary and shows "Part of this campaign has already been paid, so it can no longer be edited." in the red message box, titled "Campaign can't be edited". **Continue to Payment** still goes to payment for the same orders (`payment_retry_requested` after a failed payment, the same `campaign_submitted` replay after a plain popup close) and **Back to Direct Mail Dashboard** still leaves. A checkout with no paid order keeps the v1.7.70 edit-after-checkout flow. The **Order not sent** message at Continue to Payment remains for a payment that completes while the user is already editing.
+- **`order.usps_update` (API):** `campaign_id` is now the order's `campaign_created` id (its `external_campaign_id`), the same id `campaign.mail_tracking.rts_update` and `order.drop_completed` carry. Before, it was the campaign the scan was tracked under, which for batch-printed orders is an internal print-batch campaign. Orders created without a `campaign_created` id keep their Ballpoint campaign id.
+- **Partner action:** none required. Keep matching `order.*` events by `order_id`.
+- **Unchanged:** event types, payload fields, envelope version `1`, REST `3.1`, and the void rule of `POST /orders/void`.
+- **Artifacts:** Iframe Kit (Edit after checkout), API Kit (`order.usps_update` fields), OpenAPI and Postman version headers.
+
 ## v1.7.79 — 2026-10-24 — Tenant flags for Auto-suppress on next drop and delegated Export Leads
 
 - **Availability:** staging candidate. Not in production.
