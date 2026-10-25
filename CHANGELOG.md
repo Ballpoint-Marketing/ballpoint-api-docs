@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.81 — 2026-10-25 — `envelope_style` on `POST /orders`; letters in the first-order guide
+
+- **Availability:** staging candidate. Not in production.
+- **`POST /orders` (API, standard API accounts):** an optional `envelope_style` now takes effect, validated like `POST /v1/billing/orders`: letters take one of the documented styles, `color_letter` only `plain_white`, and a postcard that sends it is rejected. An invalid value returns `400 INVALID_PRODUCT_CONFIG` before the idempotency claim or any write. Before, the field was ignored on this route and a letter without a style suffix in `product_name` got `plain_white` with no error.
+- **PropStream-contract partners unchanged:** for PropStream and BatchLeads the field stays ignored, as before: the style still comes from the `product_name` suffix, else `plain_white`, and the idempotency identity is the same, so retries that cross the deploy still replay. The embedded iframe keeps sending both.
+- **Unchanged when absent:** a request without `envelope_style` keeps the previous derivation and identity for every account.
+- **Guide:** START_HERE adds a Letters section: what changes from the postcard sample for Color, Hybrid and Greeting letters, and that `{property_address}` needs `placeHolders.PropertyStreet` on each recipient.
+- **Partner action:** none required. Standard API clients ordering letters should send `envelope_style`.
+- **Artifacts:** API Kit (§6b), START_HERE, OpenAPI and Postman.
+
 ## v1.7.80 — 2026-10-24 — Previous stays on a paid checkout; `order.usps_update` carries the partner campaign id
 
 - **Availability:** staging candidate. Not in production.
