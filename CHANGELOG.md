@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.81 — 2026-10-26 — `campaign_submitted.orders[].productId`
+
+- **Availability:** staging candidate. Not in production.
+- **What changed (iframe):** each entry of `campaign_submitted.orders[]` carries `productId`, the product of that order, from the same ids as `productIds`. For Multi Send each drop and for A/B each variant now names its own product.
+- **Partner action:** none required. The field is additive; `productIds` and every other field are unchanged.
+- **Unchanged:** REST routes and responses, `campaign_created`, envelope version `1`, REST `3.1`.
+- **Artifacts:** Iframe Kit (`campaign_submitted` example and fields), version headers in the Iframe Kit, API Kit, OpenAPI and Postman.
+
 ## v1.7.80 — 2026-10-24 — Previous stays on a paid checkout; `order.usps_update` carries the partner campaign id
 
 - **Availability:** staging candidate. Not in production.
