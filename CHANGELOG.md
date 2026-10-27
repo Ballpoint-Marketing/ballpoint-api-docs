@@ -1,5 +1,24 @@
 # Changelog
 
+
+## v1.7.84 — 2026-10-27 — Operations report ranges and daily account activity
+
+**Staging candidate.** Extends the privileged analytics route with Today,
+Yesterday, Today and yesterday, complete Last 7/14/28/30 days, Last week/month,
+Maximum and inclusive Custom dates. Original week/month/quarter results remain
+compatible. Comparisons use Chicago calendar time; Maximum has no previous
+interval. Adds `history_start` and `comparison_available`.
+
+The privileged summary adds account/source-wide `daily_activity` for the Chicago
+report day, independent of the operational range and customer-tenant quota counters.
+The portal groups currency amounts, explains prices missing in either period and
+SLG exclusions, and offers calendars, manual dates and Update/Cancel.
+
+Customer stats/health, enforcement quotas, order/billing behavior and iframe
+messages are unchanged. Invoice reads remain account-wide; demo/void invoice
+records do not establish live billing availability.
+
+
 ## Unreleased — Faster partner statistics
 
 - **Availability:** staging candidate. Not in production.
