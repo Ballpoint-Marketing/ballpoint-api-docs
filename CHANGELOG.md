@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Faster partner statistics
+
+- **Availability:** staging candidate. Not in production.
+- Partner statistics and the dashboard account summary avoid loading full order
+  artwork metadata when it cannot affect variant classification. This reduces
+  latency for accounts with large saved designs.
+- Response fields, totals, filters, A/B and Multi-Send rules, pricing and payment
+  behavior are unchanged. No partner integration changes are needed.
+
 ## v1.7.83 — 2026-10-27 — Privileged operations analytics
 
 **Staging candidate.** Adds `GET /v1/billing/partner/ops/analytics?period=month`
