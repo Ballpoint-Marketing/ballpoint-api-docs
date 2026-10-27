@@ -193,6 +193,34 @@ A local mock or sample response validates your client logic; it does **not** sat
 
 Go-live is a separate approval with live credentials, product/pricing confirmation, artwork/production validation and the agreed billing setup. Do not point this fictional sample at production.
 
+## Letters
+
+The walkthrough uses a printed postcard. A letter uses the same steps (preview, `POST /orders`, recipients, order read); only the order body changes. Send the preview with the same `product_type`, `postage_type` and `envelope_style` as the order.
+
+| Product | Postage | What the order sends instead of the postcard artwork |
+|---|---|---|
+| `color_letter` | `first_class`, `standard` | `canvas_json` with a one-sided `front` (8.5x11 insert) and `envelope_style: "plain_white"` |
+| `hybrid_letter` | `first_class`, `presort` | `message` (printed in a handwriting font on the insert) and an `envelope_style` |
+| `greeting_letter` | `first_class`, `presort` | `message_parts` (`greeting`, `body`, `signature`), written by hand, and an `envelope_style` |
+
+Letters do not send `postcard_size`. Envelope styles are listed in the [API Kit](API_KIT.md#envelope-styles). For example, the creation body of a Greeting Letter replaces `product_id`, `product_type`, `postcard_size` and `canvas_json` of the sample with:
+
+```json
+{
+  "product_id": "greeting_letter",
+  "product_type": "greeting_letter",
+  "postage_type": "first_class",
+  "envelope_style": "floral",
+  "message_parts": {
+    "greeting": "Hi {first_name},",
+    "body": "I wanted to follow up about {property_address}.",
+    "signature": "Jane"
+  }
+}
+```
+
+Personalized tags work in Greeting Letter `message_parts`; a Hybrid Letter prints the same `message` on every piece, so keep recipient tags out of it. `{first_name}` comes from each recipient's `first_name`. `{property_address}` and `{city}` come from `placeHolders.PropertyStreet` and `placeHolders.PropertyCity` on each recipient and print blank when absent; they never fall back to the mailing address. Agree the length of handwritten text with Ballpoint before a live order: the API accepts more text than a card can hold.
+
 ## Troubleshooting
 
 | Result | Next step |
