@@ -2,8 +2,8 @@ openapi: 3.1.0
 info:
   title: Ballpoint Marketing API (v1, staging)
   version: 3.1.0
-  x-partner-contract-version: 1.7.81
-  description: "This spec documents the v1 API contract using staging as its default server and examples. Partner contract 1.7.81 is iframe-only (campaign_submitted orders[] adds productId; no REST change). Partner contract 1.7.80 makes order.usps_update carry the order's campaign_created id (external_campaign_id) in campaign_id, and the iframe keeps Previous on the Order Summary once a checkout has a paid order. Partner contract 1.7.79 adds the auto_suppress_next_drop_enabled and export_leads_delegated keys to the GET /v1/config flags object. Partner contract 1.7.78 adds the optional sender `disclosure` on POST /orders, a required Direct Mail Name and Property Address without duplicate removal in the iframe. Partner contract 1.7.77 is iframe-only (an early set_dashboard_filter is held until the tenant scope exists) with no REST change. Partner contract 1.7.76 adds the optional sender `address2` on POST /orders and campaign detail production-lock copy in the iframe. Partner contract 1.7.75 is iframe-only (optional set_list campaignName) with no REST change. Partner contract 1.7.74 returns 404 ORDER_NOT_MAILED from mail-tracking for an order not yet mailed and adds the iframe fatal_error event. Partner contract 1.7.73 is iframe-only (Payment Failed Previous) with no REST change. Partner contract 1.7.72 makes the `/v1/billing/partner/stats` headline KPIs (total_pieces, scheduled_drops, completed_orders, rts_summary) the Dashboard insight numbers, all time. Partner contract 1.7.71 makes `/v1/billing/partner/stats` `total_pieces` equal to the Dashboard Pieces Mailed; 1.7.71 and 1.7.72 are live in production since 2026-10-15 (API v3.43.0). Partner contract 1.7.70 adds `POST /orders/void` (replace unpaid orders after a checkout edit; deployed to production on 2026-10-15 (API v3.43.0) but disabled: the flag stays off until PropStream confirms its handler). Partner contract 1.7.65 adds `POST /v1/auth/embed-token`, an optional short-lived per-user token for the iframe; 1.7.62, 1.7.64 and 1.7.65 are live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0); the API parts of 1.7.66 to 1.7.69 are live since 2026-10-05 (API v3.41.0), while the iframe Mailer Count Change display remains a staging candidate and the dynamic-field editor dropdown is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0; the 1.7.63 `standard_v11` catalog/Classic postal profile is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0; the Realtor/Agent handwritten postcards that send the 1.7.60 `message_parts` are not yet offered by the production iframe. A future v2 remains out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Test-mode account principal; not a partner credential |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nErrors raised by the API sit under `detail` (FastAPI wire envelope) and carry a trace ID:\n\n```json\n{\n  \"detail\": {\n    \"error\": {\n      \"type\": \"validation_error\",\n      \"code\": \"INVALID_ADDRESS\",\n      \"message\": \"Address could not be verified\",\n      \"trace_id\": \"tr_abc123\"\n    }\n  }\n}\n```\n\nA key used on a route whose scope it does not hold receives `403` with code `INSUFFICIENT_SCOPE`, `required_scope` and `granted_scopes`. An embed token whose order body names a different `external_user_id` receives `403 EXTERNAL_USER_MISMATCH`. Request-validation failures use FastAPI's list-shaped `detail` with status 422.\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.73`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on rate-limited routes (per-key window):\n    - `X-RateLimit-Remaining`: requests remaining in the per-key window\n    - `X-RateLimit-Limit`: per-key window size\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
+  x-partner-contract-version: 1.7.83
+  description: "Partner contract 1.7.83 adds privileged calendar analytics; customer stats and iframe messages unchanged. This spec documents the v1 API contract using staging as its default server and examples. Partner contract 1.7.81 is iframe-only (campaign_submitted orders[] adds productId; no REST change). Partner contract 1.7.80 makes order.usps_update carry the order's campaign_created id (external_campaign_id) in campaign_id, and the iframe keeps Previous on the Order Summary once a checkout has a paid order. Partner contract 1.7.79 adds the auto_suppress_next_drop_enabled and export_leads_delegated keys to the GET /v1/config flags object. Partner contract 1.7.78 adds the optional sender `disclosure` on POST /orders, a required Direct Mail Name and Property Address without duplicate removal in the iframe. Partner contract 1.7.77 is iframe-only (an early set_dashboard_filter is held until the tenant scope exists) with no REST change. Partner contract 1.7.76 adds the optional sender `address2` on POST /orders and campaign detail production-lock copy in the iframe. Partner contract 1.7.75 is iframe-only (optional set_list campaignName) with no REST change. Partner contract 1.7.74 returns 404 ORDER_NOT_MAILED from mail-tracking for an order not yet mailed and adds the iframe fatal_error event. Partner contract 1.7.73 is iframe-only (Payment Failed Previous) with no REST change. Partner contract 1.7.72 makes the `/v1/billing/partner/stats` headline KPIs (total_pieces, scheduled_drops, completed_orders, rts_summary) the Dashboard insight numbers, all time. Partner contract 1.7.71 makes `/v1/billing/partner/stats` `total_pieces` equal to the Dashboard Pieces Mailed; 1.7.71 and 1.7.72 are live in production since 2026-10-15 (API v3.43.0). Partner contract 1.7.70 adds `POST /orders/void` (replace unpaid orders after a checkout edit; deployed to production on 2026-10-15 (API v3.43.0) but disabled: the flag stays off until PropStream confirms its handler). Partner contract 1.7.65 adds `POST /v1/auth/embed-token`, an optional short-lived per-user token for the iframe; 1.7.62, 1.7.64 and 1.7.65 are live in production since 2026-10-01 (API v3.40.0, iframe v1.22.0); the API parts of 1.7.66 to 1.7.69 are live since 2026-10-05 (API v3.41.0), while the iframe Mailer Count Change display remains a staging candidate and the dynamic-field editor dropdown is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0; the 1.7.63 `standard_v11` catalog/Classic postal profile is live in production since 2026-10-08, API v3.42.0 and iframe v1.24.0; the Realtor/Agent handwritten postcards that send the 1.7.60 `message_parts` are not yet offered by the production iframe. A future v2 remains out of scope.\n\nDirect mail automation API for programmatic postcard, letter, and campaign delivery.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n### Bearer JWT (live/test principals)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"Authorization: Bearer eyJhbG...\"\n```\n\n### Partner Key (platform integrations)\n```bash\ncurl https://staging-api.ballpointmarketing.com/orders \\\n  -H \"X-Partner-Key: pk_test_PARTNER_REPLACE_ME\"\n```\n\n## Principal Types\n\n| Type | Auth Method | Permissions |\n|------|-------------|-------------|\n| `live` | Bearer JWT | Full access to own account |\n| `test` | Bearer JWT | Test-mode account principal; not a partner credential |\n| `partner` | X-Partner-Key | Scoped to source + external_account_id |\n\n## Integration Identity\n\nPartner integrations use identity fields to scope resources:\n\n- `source`: Integration identifier assigned during onboarding\n- `external_account_id`: Partner's tenant/customer ID\n- `external_user_id`: Partner's user ID within tenant\n- `external_id`: Partner's ID for the resource\n\n## Error Handling\n\nErrors raised by the API sit under `detail` (FastAPI wire envelope) and carry a trace ID:\n\n```json\n{\n  \"detail\": {\n    \"error\": {\n      \"type\": \"validation_error\",\n      \"code\": \"INVALID_ADDRESS\",\n      \"message\": \"Address could not be verified\",\n      \"trace_id\": \"tr_abc123\"\n    }\n  }\n}\n```\n\nA key used on a route whose scope it does not hold receives `403` with code `INSUFFICIENT_SCOPE`, `required_scope` and `granted_scopes`. An embed token whose order body names a different `external_user_id` receives `403 EXTERNAL_USER_MISMATCH`. Request-validation failures use FastAPI's list-shaped `detail` with status 422.\n\n## Idempotency\n\n`Idempotency-Key` header is REQUIRED for `POST /orders` (returns 400 if missing):\n\n- Keys are scoped to principal + key; endpoint is enforced via request hash (method + path + body)\n- TTL: 24 hours\n- Matching key + different body = `422 Unprocessable Entity`\n- Matching key + same body = cached response replayed\n\n## Versioning\n\n- REST API: URL versioning (`/v1/...`)\n- Partner contract: `1.7.73`; webhook bodies are governed by the canonical JSON Schemas referenced below\n- API follows semantic versioning (MAJOR.MINOR.PATCH)\n\n    \n    ## Mail Tracking (v2.0)\n    \n    USPS IV-MTR scan data integration for piece-level mail tracking.\n    Upload Accuzip manifests, receive scan events via SFTP, and query\n    campaign-level and piece-level delivery status.\n    \n    See endpoints tagged `Mail Tracking` below.\n\n    \n    ## CORS\n    \n    API supports CORS for browser-based dashboard access. Allowed origins\n    configured via `CORS_ALLOWED_ORIGINS` environment variable.\n    \n    Exposed response headers: `X-Trace-Id`, `X-Request-Id`\n    \n    ## Rate Limiting\n    \n    All endpoints are rate-limited per principal (auth key) with IP fallback.\n    Read endpoints: 60 req/min. Ingest endpoints: 10 req/min.\n    Per-account limits (RPM, RPD, daily piece cap) are also enforced.\n    \n    Rate limit headers on rate-limited routes (per-key window):\n    - `X-RateLimit-Remaining`: requests remaining in the per-key window\n    - `X-RateLimit-Limit`: per-key window size\n    - `Retry-After`: seconds until reset (on 429 only)\n    \n    ## Webhook Security\n    \n    Webhook payloads are signed with HMAC-SHA256. Verify using:\n    - `X-Ballpoint-Signature`: `sha256=<hex>` — HMAC of `timestamp header + exact raw body bytes`\n    - `X-Ballpoint-Timestamp`: ISO 8601 timestamp (reject if > 5 minutes old)\n    - `X-Ballpoint-Event-Id`: stable event ID for deduplication across retries/endpoints\n    - `X-Ballpoint-Delivery`: unique delivery attempt ID\n    \n    Secret rotation: set `WEBHOOK_SECRET_NEXT` during rotation. Both secrets\n    are tried during verification for overlap window.\n"
   contact:
     name: Ballpoint API Support
     email: api-support@ballpointmarketing.com
@@ -1995,6 +1995,138 @@ components:
             type: integer
           reconciled:
             type: boolean
+    OpsAnalyticsAmounts:
+      type: object
+      required:
+      - total_orders
+      - total_pieces
+      - total_cost_cents
+      - known_cost_cents
+      - unpriced_orders
+      - unidentified_orders
+      properties:
+        total_orders:
+          type: integer
+        total_pieces:
+          type: integer
+        total_cost_cents:
+          type: integer
+          nullable: true
+          description: Null when any order is unpriced; otherwise sum of wholesale cents
+            rounded up per order.
+        known_cost_cents:
+          type: integer
+        unpriced_orders:
+          type: integer
+        unidentified_orders:
+          type: integer
+    OpsAnalyticsTotals:
+      allOf:
+      - $ref: '#/components/schemas/OpsAnalyticsAmounts'
+      - type: object
+        required:
+        - postcard_orders
+        - postcard_pieces
+        - new_users
+        - returning_users
+        properties:
+          postcard_orders:
+            type: integer
+          postcard_pieces:
+            type: integer
+          new_users:
+            type: integer
+          returning_users:
+            type: integer
+    OpsAnalyticsRange:
+      type: object
+      required:
+      - from
+      - to
+      - end_exclusive
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        end_exclusive:
+          type: boolean
+          enum:
+          - true
+    OpsAnalytics:
+      type: object
+      required:
+      - period
+      - timezone
+      - basis
+      - comparison
+      - cost_basis
+      - customer_basis
+      - date_ranges
+      - current
+      - previous
+      - categories
+      properties:
+        period:
+          type: string
+          enum:
+          - week
+          - month
+          - quarter
+        timezone:
+          type: string
+          enum:
+          - America/Chicago
+        basis:
+          type: string
+          enum:
+          - created_at
+        comparison:
+          type: string
+          enum:
+          - previous_calendar_period_same_elapsed_local_time
+        cost_basis:
+          type: string
+          enum:
+          - order_wholesale_snapshot_rounded_up_per_order
+        customer_basis:
+          type: string
+          enum:
+          - first_recorded_order_per_customer_tenant_and_external_user_id
+        date_ranges:
+          type: object
+          required:
+          - current
+          - previous
+          properties:
+            current:
+              $ref: '#/components/schemas/OpsAnalyticsRange'
+            previous:
+              $ref: '#/components/schemas/OpsAnalyticsRange'
+        current:
+          $ref: '#/components/schemas/OpsAnalyticsTotals'
+        previous:
+          $ref: '#/components/schemas/OpsAnalyticsTotals'
+        categories:
+          type: array
+          items:
+            type: object
+            required:
+            - product_type
+            - postage_type
+            - current
+            - previous
+            properties:
+              product_type:
+                type: string
+              postage_type:
+                type: string
+              current:
+                $ref: '#/components/schemas/OpsAnalyticsAmounts'
+              previous:
+                $ref: '#/components/schemas/OpsAnalyticsAmounts'
     OpsSummary:
       type: object
       properties:
@@ -4280,6 +4412,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/billing/partner/ops/analytics:
+    get:
+      tags:
+      - Partner Dashboard
+      summary: Privileged calendar order analytics
+      description: Requires dashboard:read. Account/source orders by created_at, all
+        statuses and separate A/B rows. America/Chicago calendar periods, Monday weeks.
+        Previous cutoff uses the same elapsed local days/time, capped at its end. Cost
+        uses recorded wholesale amounts rounded up per order, not invoices. New/returning
+        users use first recorded surviving order per customer tenant and user ID; identifiers
+        are not returned.
+      operationId: getPartnerOpsAnalytics
+      security:
+      - partnerKeyAuth: []
+      parameters:
+      - name: period
+        in: query
+        schema:
+          type: string
+          enum:
+          - week
+          - month
+          - quarter
+          default: month
+      responses:
+        '200':
+          description: Complete current/previous totals and category breakdown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsAnalytics'
+        '401':
+          description: Missing or invalid credentials
+        '403':
+          description: Explicit dashboard:read scope required
+        '422':
+          description: Invalid period
   /v1/billing/partner/ops/summary:
     get:
       tags:
