@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.7.83 — 2026-10-27 — Privileged operations analytics
+
+**Staging candidate.** Adds `GET /v1/billing/partner/ops/analytics?period=month`
+for separately authorized `dashboard:read` keys. Customer statistics, iframe
+messages, pricing and invoicing retain their existing behavior.
+
+- Week (Monday), month and quarter to date in America/Chicago, compared with the
+  same elapsed local days/time of the previous period, capped at its end.
+- Complete creation cohorts within the key's account/source: each non-deleted,
+  non-replaced order is counted separately, including A/B and all statuses.
+- Stored wholesale order costs rounded up to cents per order. Unpriced orders
+  make the total null; known subtotal and unpriced count remain available.
+  These amounts are not invoice totals or retail prices.
+- New/returning users are distinct tenant/user ID pairs, classified by their
+  first surviving order in the integration's available history. Missing IDs are
+  excluded and counted; no user identifiers leave the API. This does not measure
+  new PropStream customers.
+- All 12 catalog combinations are present even when empty. Other recorded
+  combinations remain visible and reconcile to the overall totals.
+
 ## v1.7.81 — 2026-10-26 — `campaign_submitted.orders[].productId`
 
 - **Availability:** staging candidate. Not in production.
