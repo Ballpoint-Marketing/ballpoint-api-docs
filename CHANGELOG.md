@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — BL-1019 missing-sender guidance
+
+- **Availability:** iframe PR pending; BatchLeads staging flag provisioning
+  and partner backend sender/role enforcement are separate dependencies.
+- `GET /v1/config.flags.team_member_missing_sender_guidance_enabled` is an
+  additive tenant capability, default off. The iframe caches it by tenant.
+- With the flag on, an incomplete non-owner sees **Sender Information
+  Required** on the Dashboard and cannot start Direct Mail from either
+  focusable Create control or a parent command. The controls explain the
+  prerequisite on hover, focus, click, and tap. A complete team-member profile
+  can create normally and keeps the sender card hidden. A pending or unavailable
+  config blocks incomplete non-owner creation until resolved.
+- A rejected `open_create_direct_mail` emits `open_create_direct_mail_failed`
+  with `reason: "sender_info_missing"`. Existing message envelope and REST
+  route shapes are unchanged. The iframe is a UI gate; server authorization
+  remains the partner backend's responsibility.
+- Armstrong will coordinate the partner contract version bump with the iframe
+  and API rollout.
+
 
 ## v1.7.84 — 2026-10-27 — Operations report ranges and daily account activity
 

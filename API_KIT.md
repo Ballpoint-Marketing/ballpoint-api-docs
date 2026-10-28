@@ -2270,7 +2270,8 @@ curl https://api.ballpointmarketing.com/v1/config \
     "propstream_send_mail_enabled": false,
     "propstream_cyo_unified_postal_panel_enabled": false,
     "auto_suppress_next_drop_enabled": true,
-    "export_leads_delegated": false
+    "export_leads_delegated": false,
+    "team_member_missing_sender_guidance_enabled": false
   },
   "evaluated_at": "2026-07-14T16:00:00Z",
   "evaluation_context": {
@@ -2291,7 +2292,7 @@ Rate limits are 10 requests/minute per partner-key + external-user pair and
 3,000 requests/minute per partner key. Headerless requests skip the per-user
 tier. Standard `401`, `403`, and `429` errors apply.
 
-Two tenant-scoped iframe capabilities use this same response: `auto_suppress_next_drop_enabled`
+Tenant-scoped iframe capabilities use this same response: `auto_suppress_next_drop_enabled`
 shows the **Auto-suppress on next drop** preference and permits its
 `auto_suppress_next_drop_changed` message; `export_leads_delegated` makes the
 campaign-detail **Export Leads** button send `export_leads_requested` to the
@@ -2302,6 +2303,19 @@ recipient changes or delegated export. They are additive keys in the existing
 a contract partner, so the origin is necessary but not sufficient. Ballpoint
 has auto-suppress on for PropStream and BatchLeads and delegated export off.
 See the Iframe Kit for message payloads.
+
+`team_member_missing_sender_guidance_enabled` is an additive tenant capability
+for the shared iframe. It defaults to `false` when absent. When enabled, an
+embedded team member whose effective `externalUserIsAccountOwner` is not
+strictly `true` cannot start Direct Mail until the accepted `set_sender`
+profile is complete. The Dashboard shows the missing-sender warning and keeps
+both Create controls visible with guidance; a complete team-member profile
+keeps the sender card hidden and allows creation. Until the first flag response
+for a tenant resolves, or if configuration is unavailable, the iframe blocks
+creation for an incomplete non-owner. The iframe caches the flag separately
+per tenant. This UI gate does not authorize API requests: the partner backend
+must provision the flag and enforce sender and role requirements server-side.
+See the Iframe Kit for the exact copy and rejected-command event.
 
 For PropStream, `propstream_send_mail_enabled` authoritatively gates both
 `POST /orders` and `POST /v1/billing/orders`. A disabled evaluation returns
