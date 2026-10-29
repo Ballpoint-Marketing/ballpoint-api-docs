@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.7.85 — 2026-10-29 — BL-1019 missing-sender guidance (tenant capability)
+
+- **Availability:** staging candidate (BatchLeads staging on, PropStream UAT
+  off); not in the production iframe. The API serves the flag from this
+  version (seeded off, migration 076). Partner backend sender/role
+  enforcement is a separate dependency.
+- `GET /v1/config.flags.team_member_missing_sender_guidance_enabled` is an
+  additive tenant capability, default off. The iframe caches it by tenant.
+- With the flag on, an incomplete non-owner sees **Sender Information
+  Required** on the Dashboard and cannot start Direct Mail from either
+  focusable Create control or a parent command. The controls explain the
+  prerequisite on hover, focus, click, and tap. A complete team-member profile
+  can create normally and keeps the sender card hidden. While the tenant's
+  flag is unknown (first config pending or `/v1/config` unavailable) the
+  iframe keeps the existing behavior, so a partner that never enables the
+  capability sees no change.
+- A rejected `open_create_direct_mail` emits `open_create_direct_mail_failed`
+  with `reason: "sender_info_missing"`. Existing message envelope and REST
+  route shapes are unchanged. The iframe is a UI gate; server authorization
+  remains the partner backend's responsibility.
+
 
 ## v1.7.84 — 2026-10-27 — Operations report ranges and daily account activity
 
