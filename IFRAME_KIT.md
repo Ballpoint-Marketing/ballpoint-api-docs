@@ -44,7 +44,7 @@ When enabled, the design gallery says **Choose One Mailer** for Single Send,
 **Choose Two Mailers** for A/B Split Test, or **Choose Two Mailers** through
 **Choose Twelve Mailers** for the configured Multi Send count. Its helper says
 **Click a design to customize it.** The current piece or variant remains
-visible in the selection context. The save-choice action says **Use as
+visible in the existing selection strip. The save-choice action says **Use as
 One-Time Design**, and the exit modal says **Are You Sure You Want to Leave**.
 Selection, template saving, and exit behavior are unchanged. The Direct Mail
 page title, type helpers, and lead-count prompts already match the PRD and do
