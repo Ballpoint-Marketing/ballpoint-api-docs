@@ -99,7 +99,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## Unreleased — `rts_update` for batch-printed orders carries the partner campaign id (fix)
 
-- **Availability:** staging. Reaches production with the next API release. No contract version change.
+- **Availability:** live in production since 2026-10-29 (API v3.44.0). No contract version change.
 - **What was wrong:** since 2026-09-11, `campaign.mail_tracking.rts_update` for pieces of orders printed in a production batch carried an internal print-batch id in `data.campaign_id` instead of the `campaign_created` id this kit documents. One event could also mix returned pieces of several Direct Mail campaigns, with counters for the whole batch.
 - **What changed:** each event now covers one Direct Mail campaign, with `data.campaign_id` equal to that campaign's `campaign_created` id, the campaign-wide counters of that campaign, and `piece_id` values equal to the ones `GET /v1/campaigns/{campaign_id}/mail-tracking/pieces` and `/rts` return for the same pieces. A returned piece that cannot be attributed to exactly one order is held back and retried instead of being sent under another id.
 - **Partner action:** none required. Re-sending the returned pieces that were reported under a print-batch id is coordinated separately.
@@ -142,7 +142,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.75 — 2026-10-20 — Optional `set_list.campaignName`; Direct Mail Name follows the list name
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since 2026-10-29 (iframe v1.25.0, API v3.44.0).
 - **What changed:** a parent may send an optional `campaignName` string on singular `set_list` to prefill the editable Direct Mail Name. An absent, `null` or blank value on the first `set_list` uses the list `name`. A same-list refresh updates only an untouched list-derived prefill, never a name the user edited; omitting the field keeps an earlier explicit prefill.
 - **Validation:** `campaignName` must be a string; any other type makes the whole `set_list` invalid, as for `name`. Values longer than 120 characters are shortened to 120 and markup is removed.
 - **Direct Mail Name default (correction):** the Direct Mail Name now starts from the list `name` sent in `set_list`, when one is sent, or from `campaignName` when present. Before this version, an embedded session could keep a built-in placeholder name instead of the partner's list name. This applies to every partner, including those that do not send `campaignName`.
@@ -153,7 +153,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.74 — 2026-10-20 — Iframe fatal_error; order tracking before mailing
 
-- **Availability:** staging candidate. Not in production; the tracking change reaches production with the next API release and `fatal_error` with the next iframe release.
+- **Availability:** live in production since 2026-10-29: `ORDER_NOT_MAILED` with API v3.44.0 and `fatal_error` with iframe v1.25.0.
 - **Iframe `fatal_error`:** one `fatal_error` per iframe load with `{reason, page, buildId}`. Reasons are `bootstrap_failed`, `auth_failed`, and `runtime_error`; the payload contains no exception text or customer data.
 - **Parent fallback (recommended):** a parent timer of about 10 seconds from setting the iframe `src`, cleared by a trusted `ready`, covers an iframe that cannot start. On timeout, or a trusted `fatal_error` with reason `bootstrap_failed` or `auth_failed`, the parent can hide the iframe and show its own fallback; a retry mounts a new iframe with fresh configuration and a newly issued embed token. `runtime_error` is diagnostic: the iframe usually keeps working. `bootstrap_failed` is sent only when `ready` has not followed an early error within 3 seconds, and a 401 on a later `/v1/config` refresh does not send `auth_failed`.
 - **Order tracking before mailing:** `GET /v1/orders/{order_id}/mail-tracking` returns `404 ORDER_NOT_MAILED` for an order that has not been mailed (status before `shipping`/`complete`, or cancelled/failed) and has no tracking data, instead of a placeholder `shipped` summary. The embedded iframe reads this route once an order shows as mailed and treats any 404 as "no tracking yet", so PropStream and BatchLeads screens are unchanged. Whether an order was mailed is read from the order status.
@@ -176,7 +176,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.73 — 2026-10-14 — Payment Failed: Previous back to the Order Summary
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since 2026-10-29 (iframe v1.25.0).
 - **What changed:** the **Payment Failed** and **Payment Not Completed** screens add **Previous** next to **Try Again**. Previous returns to the Order Summary of the same checkout and sends no checkout message; Previous on that Order Summary goes back to the same Payment Failed screen when edit after checkout does not apply. From that Order Summary, **Continue to Payment** emits `payment_retry_requested` for the same orders, with the same payload as Try Again, and never a new `campaign_submitted`. Where edit after checkout is enabled (v1.7.70, `propstream_checkout_edit_reissue_enabled`), **Previous** on the Order Summary now reopens editing after a failed or not completed payment too, and the next Continue to Payment replaces the unpaid orders as in v1.7.70; a paid order still refuses the replacement.
 - **Partner action:** none beyond what `payment_retry_requested` already requires: reopen payment for the ids it carries. Keep sending `payment_result` for failed payments. With edit after checkout, a `confirm-payment` for a replaced order returns `409 PAYMENT_ALREADY_FAILED`; do not capture that charge.
 - **Unchanged:** message types and payloads, `payment_result` handling, envelope version `1` and REST `3.1`.
@@ -226,7 +226,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.70 — 2026-10-05 — Edit after checkout: replace unpaid orders under the same campaign
 
-- **Availability:** the API part is deployed to production since 2026-10-15 (API v3.43.0) but disabled: the `propstream_checkout_edit_reissue_enabled` flag stays off until PropStream confirms its handler, so `POST /orders/void` returns `403 FEATURE_DISABLED`. The iframe part (Previous reopening editing after checkout) is not in the production iframe yet.
+- **Availability:** the API part is deployed to production since 2026-10-15 (API v3.43.0) but disabled: the `propstream_checkout_edit_reissue_enabled` flag stays off until PropStream confirms its handler, so `POST /orders/void` returns `403 FEATURE_DISABLED`. The iframe part (Previous reopening editing after checkout) is in the production iframe since 2026-10-29 (v1.25.0) and stays inactive while the flag is off.
 - **What changed:** after the `campaign_submitted` handoff, **Previous** on the Order Summary (while the payment popup has no final result) reopens editing. On the next **Continue to Payment** the iframe calls `POST /orders/void` for the previous unpaid orders, creates new orders, and emits `campaign_created` and `campaign_submitted` again with the **same `campaignId`** and `listId`, the current `listName`, `campaignType` and `recipient_selection`, and the new `orders[]`. The user may change any step, including the mailer type. A plain popup reopen that never left the Order Summary still replays the exact cached payload with no new order (v1.7.36).
 - **New endpoint:** `POST /orders/void` with `{ "order_ids": [...] }` moves unpaid `scheduled` or `pending_payment` orders to `payment_failed`, all or nothing. A paid order, or one past those states, rejects the whole call with `409 ORDER_NOT_VOIDABLE` and nothing changes. Repeating the call is a no-op. An embed token can only void its own user's orders. The route returns `403 FEATURE_DISABLED` while the flag is off for the user.
 - **Webhook:** each replaced order emits `order.status_changed` with `new_status: payment_failed`, `trigger: replaced_by_edit` and `failure_reason: replaced_by_edit` (a fifth as-shipped variant). No `order.drop_cancelled` is sent. A replaced order can no longer be paid (`confirm-payment` returns `409`) or cancelled.
@@ -248,7 +248,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.68 — 2026-10-03 — Presort suppression count on orders
 
-- **Availability:** `presort_suppressed_count` is live in production since 2026-10-05 (API v3.41.0). The Direct Mail dashboard's Mailer Count Change display is not in production yet (staging candidate).
+- **Availability:** `presort_suppressed_count` is live in production since 2026-10-05 (API v3.41.0). The Direct Mail dashboard's Mailer Count Change display is live in production since 2026-10-29 (iframe v1.25.0).
 - **What changed:** `GET /v1/billing/orders` and `GET /v1/billing/orders/{order_id}` return a read-only `presort_suppressed_count`: the pieces AccuZIP removed from the order at presort. It is read from the `order.presort_suppressed` event Ballpoint already sent for that order, so it always equals that event's `suppressedCount`, and it is `null` when no such event exists. `piece_count` keeps the ordered quantity.
 - **Partner action:** none. The field is additive; existing requests, responses and webhooks are unchanged. The Direct Mail dashboard uses it to show the adjusted mailer count (staging candidate; not yet in the production iframe).
 - **Artifacts:** API Kit order fields and presort section, OpenAPI `OrderDetail`, Iframe Kit version marker, Postman collection description and matching API/iframe contract markers.
