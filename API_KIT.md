@@ -2254,6 +2254,14 @@ The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date 
 
 ### 6r. Partner Feature Configuration
 
+**Staging candidate (BL-403).** The additive, partner-neutral boolean
+`direct_mail_copy_v2_enabled` selects the PRD gallery, one-time design, and
+exit copy in the shared iframe. It defaults to `false` when absent. This is a
+presentation capability; it changes no order, payment, recipient, sender, or
+embed-token route. The API owner must provision the flag and coordinate a
+contract-version bump before rollout. See the [Iframe Kit](IFRAME_KIT.md#direct-mail-copy-v2-bl-403-staging-candidate)
+for the exact strings and default behavior.
+
 `GET /v1/config` resolves the current partner feature flags for the requesting
 user. The embedded iframe calls this automatically; partners normally do not
 need to call it themselves.
@@ -2271,7 +2279,8 @@ curl https://api.ballpointmarketing.com/v1/config \
     "propstream_cyo_unified_postal_panel_enabled": false,
     "auto_suppress_next_drop_enabled": true,
     "export_leads_delegated": false,
-    "team_member_missing_sender_guidance_enabled": false
+    "team_member_missing_sender_guidance_enabled": false,
+    "direct_mail_copy_v2_enabled": false
   },
   "evaluated_at": "2026-07-14T16:00:00Z",
   "evaluation_context": {

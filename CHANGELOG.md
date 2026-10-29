@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — BL-403 Direct Mail copy v2
+
+**Staging candidate; coordinated contract-version bump pending.** Adds the
+optional tenant-scoped `GET /v1/config.flags.direct_mail_copy_v2_enabled`
+boolean, defaulting to false. When enabled, the shared iframe uses the PRD
+gallery headings and helper, **Use as One-Time Design**, and **Are You Sure
+You Want to Leave**. The current piece or variant stays visible. PropStream
+copy and selection, saving, and exit behavior remain unchanged when the flag
+is absent or false. Armstrong owns flag provisioning and the synchronized
+contract-version bump.
+
 ## v1.7.85 — 2026-10-29 — BL-1019 missing-sender guidance (tenant capability)
 
 - **Availability:** staging candidate (BatchLeads staging on, PropStream UAT

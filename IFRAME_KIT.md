@@ -33,6 +33,23 @@ This guide explains how to embed the Ballpoint direct mail campaign builder into
 
 > See [CHANGELOG.md](CHANGELOG.md) for revision history.
 
+### Direct Mail copy v2 (BL-403; staging candidate)
+
+`GET /v1/config.flags.direct_mail_copy_v2_enabled` is an optional,
+tenant-scoped boolean. A missing or `false` value preserves the existing
+iframe copy, including PropStream's current wording. The iframe re-renders
+the affected copy when the flag changes.
+
+When enabled, the design gallery says **Choose One Mailer** for Single Send,
+**Choose Two Mailers** for A/B Split Test, or **Choose Two Mailers** through
+**Choose Twelve Mailers** for the configured Multi Send count. Its helper says
+**Click a design to customize it.** The current piece or variant remains
+visible in the existing selection strip. The save-choice action says **Use as
+One-Time Design**, and the exit modal says **Are You Sure You Want to Leave**.
+Selection, template saving, and exit behavior are unchanged. The Direct Mail
+page title, type helpers, and lead-count prompts already match the PRD and do
+not change under this flag.
+
 ## Table of Contents
 
 1. [Before You Start](#1-before-you-start)
