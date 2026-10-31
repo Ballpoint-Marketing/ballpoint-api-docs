@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Embed token writes stay on the token's user
+
+- **Availability:** staging candidate. Not in production.
+- With an embed token, cancel, reschedule, `PATCH /v1/billing/orders/{order_id}` and
+  order file upload/delete reach only orders of the user the token was issued for, like `POST /orders/void`
+  already did. Another user's order answers `404 ORDER_NOT_FOUND`.
+- Partner keys, server keys and reads are unchanged. The iframe only acts on its
+  user's own orders, so no partner integration change is needed.
+
 ## Unreleased — Dashboard-first user context (documentation only)
 
 - **Documentation clarification.** No iframe, API or message change.
