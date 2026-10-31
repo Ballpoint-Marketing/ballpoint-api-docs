@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Dashboard-first user context (documentation only)
+
+- **Documentation clarification.** No iframe, API or message change.
+- The [dashboard-first handshake](IFRAME_KIT.md#dashboard-first-handshake-worked-example)
+  now states that the campaign history needs `externalUserId` at bootstrap, in
+  the iframe URL or a `set_list`, and that a new list then needs a remounted
+  iframe, which is how the iframe already behaves.
+- `campaign_submitted.externalAccountId` / `externalUserId` come from
+  `set_list` or the URL parameters; the table wrongly said `set_api_config`.
+
 ## v1.7.85 — 2026-10-29 — BL-1019 missing-sender guidance (tenant capability)
 
 - **Availability:** staging candidate (BatchLeads staging on, PropStream UAT

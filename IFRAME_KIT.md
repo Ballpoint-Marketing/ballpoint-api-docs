@@ -700,6 +700,8 @@ Recommended bootstrap order in dashboard-first mode:
    3. `open_direct_mail_dashboard`
    4. `set_sender` *(optional — pre-fills sender info)*
 
+   **User context is required for the campaign history.** The Dashboard loads the user's campaigns only once the iframe knows `externalUserId`, which none of the four messages above carries. Provide it at bootstrap either in the iframe URL (`index.html?externalUserId=<id>`, see [URL Parameters](#8-url-parameters-alternative-bootstrap)) or in a `set_list`. Without it the Dashboard shows *"No campaign history available. Missing external user context."* and no campaign list. Either way also fixes that iframe instance's list context: after a URL `externalUserId` every later `set_list` is ignored, and after a bootstrap `set_list` any `set_list` with a different `listId` is ignored (a following `open_create_direct_mail` then opens Create on the bootstrap list, without an error). To create a campaign for a new list, remount the iframe with a `src` that has no bare `externalUserId`, send the bootstrap again on its `ready` (`set_api_config` first), and give the user context in step 5's `set_list` before `open_create_direct_mail`.
+
    The iframe is **order-robust** and ends on the Dashboard regardless of the actual arrival order, except during the active checkout/result hold documented above. The recommended order avoids a brief one-frame flash of the create page — sending `open_direct_mail_dashboard` **before** `set_sender` prevents the iframe from momentarily composing the post-`set_sender` create view before the Dashboard navigation lands.
 
 2. The iframe shows the Dashboard.
@@ -708,7 +710,7 @@ Recommended bootstrap order in dashboard-first mode:
 
 4. The parent creates its own list / record on its backend.
 
-5. On success, the parent sends — **in this order**:
+5. On success, the parent sends — **in this order**, to a remounted iframe if this instance already has user or list context (see the user-context note in step 1):
    1. `set_list` *(context for the newly created list)*
    2. `open_create_direct_mail` *(navigation)*
 
@@ -1816,8 +1818,8 @@ This is the most important event. It confirms the order(s) were sent to Ballpoin
 | `orderIds` | string[] | All iframe-side order ids in this submission batch. |
 | `listId` | string or null | Verbatim echo of the `listId` the parent app passed via `set_list`. Use this as the join key when reconciling on the parent side — Ballpoint also echoes the same value as `list_id` on `order.status_changed` webhooks. |
 | `listName` | string or null | Verbatim echo of the `listName` the parent app passed via `set_list` (display label only). |
-| `externalAccountId` | string or null | Account id passed via `set_api_config`. |
-| `externalUserId` | string or null | End-user id passed via `set_api_config`. |
+| `externalAccountId` | string or null | Account id passed via `set_list` (or the `externalAccountId` URL parameter). `set_api_config` does not carry it. |
+| `externalUserId` | string or null | End-user id passed via `set_list` (or the `externalUserId` URL parameter). `set_api_config` does not carry it. |
 | `productIds` | string[] | Product ids selected for this submission. |
 | `orders[].orderId` | string | Local iframe order ID. |
 | `orders[].ballpointOrderId` | string | Server-assigned order ID; present for every emitted order. |
