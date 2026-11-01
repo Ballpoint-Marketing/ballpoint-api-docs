@@ -2,7 +2,7 @@
 
 ## Unreleased — Embed token writes stay on the token's user
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since 2026-11-01 (API v3.44.1). No contract version change.
 - With an embed token, cancel, reschedule, `PATCH /v1/billing/orders/{order_id}` and
   order file upload/delete reach only orders of the user the token was issued for, like `POST /orders/void`
   already did. Another user's order answers `404 ORDER_NOT_FOUND`.
@@ -98,7 +98,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.80 — 2026-10-24 — Previous stays on a paid checkout; `order.usps_update` carries the partner campaign id
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** the paid-checkout part (iframe, ATAI-523) is live in production since 2026-10-30 (iframe v1.25.1), and the `propstream_checkout_edit_reissue_enabled` flag is on for PropStream since the same day; the `order.usps_update` part (API) is a staging candidate, not in production.
 - **Paid checkout (iframe, ATAI-523; where edit after checkout is enabled, `propstream_checkout_edit_reissue_enabled`):** when any order of the current checkout is paid or already being processed, **Previous** on the Order Summary no longer reopens editing. It stays on the Order Summary and shows "Part of this campaign has already been paid, so it can no longer be edited." in the red message box, titled "Campaign can't be edited". **Continue to Payment** still goes to payment for the same orders (`payment_retry_requested` after a failed payment, the same `campaign_submitted` replay after a plain popup close) and **Back to Direct Mail Dashboard** still leaves. A checkout with no paid order keeps the v1.7.70 edit-after-checkout flow. The **Order not sent** message at Continue to Payment remains for a payment that completes while the user is already editing.
 - **`order.usps_update` (API):** `campaign_id` is now the order's `campaign_created` id (its `external_campaign_id`), the same id `campaign.mail_tracking.rts_update` and `order.drop_completed` carry. Before, it was the campaign the scan was tracked under, which for batch-printed orders is an internal print-batch campaign. Orders created without a `campaign_created` id keep their Ballpoint campaign id.
 - **Partner action:** none required. Keep matching `order.*` events by `order_id`.
@@ -245,7 +245,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.70 — 2026-10-05 — Edit after checkout: replace unpaid orders under the same campaign
 
-- **Availability:** the API part is deployed to production since 2026-10-15 (API v3.43.0) but disabled: the `propstream_checkout_edit_reissue_enabled` flag stays off until PropStream confirms its handler, so `POST /orders/void` returns `403 FEATURE_DISABLED`. The iframe part (Previous reopening editing after checkout) is in the production iframe since 2026-10-29 (v1.25.0) and stays inactive while the flag is off.
+- **Availability:** the API part is deployed to production since 2026-10-15 (API v3.43.0) and the `propstream_checkout_edit_reissue_enabled` flag is on for PropStream since 2026-10-30 (off for other sources, where `POST /orders/void` returns `403 FEATURE_DISABLED`). The iframe part (Previous reopening editing after checkout) is in the production iframe since 2026-10-29 (v1.25.0), active for PropStream since 2026-10-30 with the v1.7.80 paid-checkout rule (iframe v1.25.1).
 - **What changed:** after the `campaign_submitted` handoff, **Previous** on the Order Summary (while the payment popup has no final result) reopens editing. On the next **Continue to Payment** the iframe calls `POST /orders/void` for the previous unpaid orders, creates new orders, and emits `campaign_created` and `campaign_submitted` again with the **same `campaignId`** and `listId`, the current `listName`, `campaignType` and `recipient_selection`, and the new `orders[]`. The user may change any step, including the mailer type. A plain popup reopen that never left the Order Summary still replays the exact cached payload with no new order (v1.7.36).
 - **New endpoint:** `POST /orders/void` with `{ "order_ids": [...] }` moves unpaid `scheduled` or `pending_payment` orders to `payment_failed`, all or nothing. A paid order, or one past those states, rejects the whole call with `409 ORDER_NOT_VOIDABLE` and nothing changes. Repeating the call is a no-op. An embed token can only void its own user's orders. The route returns `403 FEATURE_DISABLED` while the flag is off for the user.
 - **Webhook:** each replaced order emits `order.status_changed` with `new_status: payment_failed`, `trigger: replaced_by_edit` and `failure_reason: replaced_by_edit` (a fifth as-shipped variant). No `order.drop_cancelled` is sent. A replaced order can no longer be paid (`confirm-payment` returns `409`) or cancelled.
