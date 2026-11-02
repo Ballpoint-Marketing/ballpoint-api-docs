@@ -19,6 +19,24 @@
 - `campaign_submitted.externalAccountId` / `externalUserId` come from
   `set_list` or the URL parameters; the table wrongly said `set_api_config`.
 
+## v1.7.86 — 2026-11-02 — Hybrid Letter message merge tags
+
+- **Availability:** staging candidate; not in production.
+- The Hybrid Letter message now offers the same four merge chips as the
+  approved handwritten postcards: `{first_name}`, `{property_address}`,
+  `{city}` and `{property_value}`. The proof resolves them from the lead the
+  parent sends with `set_preview_recipient`.
+- Each printed Hybrid insert fills them for its own recipient during
+  production batching, with the same sources as the postcards. A lead with no
+  first name reads "Homeowner" on the insert and on the proof.
+- Only those four tags are filled on a Hybrid insert; any other brace or
+  `#Token#` text prints as written, and the Hybrid proof shows it as written.
+- Values are never shortened. A letter whose own values do not fit keeps the
+  name and blanks the other tags instead of failing the batch.
+- Before this version those aliases were printed literally on a Hybrid insert.
+- No message, field, event or REST shape changes; the order `message` keeps
+  the raw aliases. No partner integration change is needed.
+
 ## v1.7.85 — 2026-10-29 — BL-1019 missing-sender guidance (tenant capability)
 
 - **Availability:** staging candidate (BatchLeads staging on, PropStream UAT
