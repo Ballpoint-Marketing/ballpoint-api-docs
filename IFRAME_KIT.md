@@ -882,9 +882,9 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 | `zip` | string or number | ZIP code: 5 digits, 9 digits, or ZIP+4 (`12345-6789`). Alphabetic/malformed values are rejected. |
 | `phone` | string | 10 digits, or 11 digits beginning with `1`. Standard `+`, parentheses, space, period, and hyphen formatting is accepted; letters are rejected. |
 | `email` | string | Optional email address |
-| `website` | string | Website URL |
+| `website` | string | Optional website, at most 40 characters after trimming outer whitespace (BL-613 staging candidate). Overlong text is retained for correction, not shortened; the profile cannot complete or submit an order until corrected. |
 | `disclosure` | string | Optional sender legal text (v1.7.78). Up to 120 Unicode characters after cleaning: tags removed, CR/CRLF become line breaks, other control characters removed (line breaks and tabs kept), trimmed. An overlong value rejects the entire `set_sender` message before sender state changes. Omitted on a later patch preserves the current value; `""` clears it. |
-| `logo` | string | Optional. URL to sender logo image |
+| `logo` | string | Optional inline `data:image/…` image. The parent must fetch a hosted profile image and convert it to a data URL before sending; the iframe does not fetch remote image URLs. Omitted on a later patch preserves the current logo; `""` clears it. |
 | `externalUserIsAccountOwner` | boolean | Optional Dashboard-first role bootstrap. Honored only until a singular `set_list` is accepted; `set_list` is authoritative afterward. Strict boolean `true` is required. |
 | `tenantKey` | string | Optional. Tenant scope key |
 
@@ -900,7 +900,7 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 
 #### Complete and partial profiles
 
-A sender profile is complete only when `fullName`, `address`, `city`, and `state` are non-empty and both `zip` and `phone` are valid according to the formats above. `email`, `website`, `disclosure`, and `logo` are optional.
+A sender profile is complete only when `fullName`, `address`, `city`, and `state` are non-empty and both `zip` and `phone` are valid according to the formats above. `website` is optional, but a non-empty value must fit the 40-character limit. `email`, `disclosure`, and `logo` are optional.
 
 | Profile received | Sender Information step | Direct Mail Dashboard |
 |------------------|-------------------------|-----------------------|
@@ -2271,7 +2271,7 @@ https://mailer.ballpointmarketing.com/index.html?count=847&list=Pre-Foreclosure+
 | `state` | string | 2 | Sender state (two-letter code) |
 | `zip` | string | 10 | Sender ZIP: 5 digits, 9 digits, or ZIP+4. Invalid values leave the sender profile incomplete. |
 | `phone` | string | 20 | Sender phone: 10 digits, or 11 beginning with `1`; standard formatting is accepted. Invalid values leave the sender profile incomplete. |
-| `website` | string | 200 | Sender website |
+| `website` | string | 40 | Optional sender website after trimming. Overlong values are retained for profile correction and block campaign submission (BL-613 staging candidate). |
 
 > **Important:** The API token (`apiToken`) must **never** be passed as a URL parameter. It must always be sent via `postMessage` using `set_api_config`. URLs are visible in browser history, Referer headers, and server logs.
 

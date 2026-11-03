@@ -715,6 +715,14 @@ POST /v1/billing/orders
 
 **Partner iframe compatibility sender (`POST /orders`):**
 
+BL-613 iframe staging candidate: the iframe keeps `sender.website` optional and
+validates a maximum of 40 characters after trimming before creating an order.
+An overlong parent or cached value must be corrected in the sender profile;
+the iframe does not truncate it. This is iframe validation, not a new REST
+validation response or route. See [sender profile fields](IFRAME_KIT.md#set_sender)
+for the website and inline logo transport rules. API-side alignment and contract
+version assignment remain with the API owner.
+
 For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, unsafe artwork, or an exported text object left at the exact default `Enter Text` with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. Hidden/non-exported placeholders and changed copy do not trigger this guard. This conditional rule does not change other partners or non-printed-postcard products.
 
 **`mail_date` format (`POST /orders`):** when `mail_date` is present it must be `YYYY-MM-DD`. Any other value (`09/30/2026`, a datetime, an empty string) is rejected with `400 MAIL_DATE_INVALID_FORMAT` — the same code the reschedule endpoint uses (§6k) — after the replay check for an identical request already accepted, and before the idempotency claim, campaign/order creation or billing. Previously a malformed value was ignored and the order opened as send-now.
