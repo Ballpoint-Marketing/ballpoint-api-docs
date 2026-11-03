@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Sender website validation and logo transport (BL-613)
+
+- Staging candidate: the shared iframe sender website limit is 40 characters
+  after trimming outer whitespace. Website stays optional. Overlong parent or
+  cached values remain intact for correction; they block profile completion and
+  campaign submission. Embedded account owners correct them through the existing
+  `sender_setup_requested` flow; local forms reject invalid saves.
+- Correct the logo input guidance: send an inline `data:image/…` image in
+  `set_sender.logo`. A parent with a hosted profile image fetches and converts it
+  first, as the deployed BatchLeads staging parent already does. Remote image
+  URLs are not fetched by the iframe. Existing logo product placement is unchanged.
+- No new route, message type or payload field. Armstrong owns API-side alignment
+  and contract version assignment; this entry does not bump the contract version.
+
 ## Unreleased — Embed token writes stay on the token's user
 
 - **Availability:** live in production since 2026-11-01 (API v3.44.1). No contract version change.
