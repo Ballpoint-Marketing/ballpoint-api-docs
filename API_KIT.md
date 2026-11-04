@@ -2230,6 +2230,12 @@ Campaign-level delta add/remove endpoint. One call applies recipient changes acr
 
 ### 6q. Product SLA Lead Times (Business Days)
 
+**Pending BL-901 coordination — not deployed:** the shared holiday calendar
+proposal below extends the weekday-only behavior described in this section.
+Armstrong owns the approved production closures, API implementation, contract
+version assignment, and deployment. The new iframe must follow the API rollout.
+Existing persisted production dates are not backfilled.
+
 Ballpoint computes `scheduled_production_date` by subtracting the product's SLA lead time (in **business days**, Mon–Fri) from `mail_date`. Weekends are skipped; no holiday calendar is applied.
 
 **Partner-contract product types:**
@@ -2255,6 +2261,54 @@ The 3/4/6 policy applies when Ballpoint computes a schedule for a new order or a
 The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date ≤ today + 1 day`.
 
 ### 6r. Partner Feature Configuration
+
+#### Pending BL-901: shared scheduling calendar
+
+The proposed additive `scheduling_calendar` field is a sibling of `flags` on
+`GET /v1/config`. It is resolved for the same tenant/user context. Older consumers
+can ignore it; the BL-901 iframe requires it for date-dependent actions.
+
+| Field | Meaning |
+|---|---|
+| `revision` | Nonblank string identifying the approved calendar revision |
+| `timezone` | `UTC`, preserving existing scheduling day boundaries |
+| `valid_from`, `valid_through` | Inclusive coverage boundaries, strict `YYYY-MM-DD` |
+| `usps_closed_dates` | Complete array of USPS operational closure dates within coverage |
+| `production_closed_dates` | Complete array of separately confirmed production closure dates within coverage |
+
+Empty arrays explicitly mean no closures of that kind within the stated range;
+missing fields or invalid dates mean unavailable. Do not infer full-week holiday
+shutdowns or use employee leave observance as a postal closure rule. Armstrong
+must supply the exact production closure dates before staging acceptance.
+
+Production lead time skips weekends and the union of both arrays. USPS delivery
+estimates skip weekends and USPS closures only. Count strictly before/after the
+starting date. Retain product SLAs, UTC midnight, the reschedule predicate
+`scheduled_production_date > UTC_today + 1 calendar day`, and existing requested
+mail-date eligibility. The change applies to new/recomputed schedules without
+rewriting historical persisted dates or parent-owned billing policy.
+
+The API must use the same effective calendar for `subtract_business_days` and
+publish complete coverage for the supported mail-date range plus its production
+lookback and delivery-estimate tail. Unknown coverage is not implicitly open.
+Server-side mutations must revalidate against the current calendar.
+
+The existing in-memory config TTL, context isolation, and rate limits apply.
+The iframe hides derived estimates and blocks scheduling on missing, invalid,
+expired, or insufficient coverage, and offers Retry scheduling. It preserves
+authoritative `bill_at`, `billed_at`, and persisted production dates. A valid
+fresh snapshot is reused across batch submissions to respect the per-user rate
+limit. No REST request field or postMessage changes are proposed.
+
+Parity fixtures and rollout instructions are in the iframe repository's
+`docs/BL-901_HOLIDAY_SCHEDULING_HANDOFF.md` and
+`tests/_fixtures/holiday-scheduling-cases.json`, paired with
+`tests/_fixtures/api/scheduling-calendar.json`. The fixture production closures
+are synthetic, not approved operational dates. Ship and verify the API calendar
+and matching arithmetic first; do not release the consuming iframe against the
+current weekday-only API. This section is a proposal, not an availability claim.
+
+#### Current feature configuration
 
 `GET /v1/config` resolves the current partner feature flags for the requesting
 user. The embedded iframe calls this automatically; partners normally do not
