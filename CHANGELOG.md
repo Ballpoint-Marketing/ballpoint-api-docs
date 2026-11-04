@@ -1,5 +1,20 @@
 # Changelog
 
+## Pending coordination — BL-901 holiday scheduling
+
+- Proposed additive `GET /v1/config.scheduling_calendar`: revision, UTC timezone,
+  inclusive coverage and separate USPS/production closure arrays. Backend and
+  iframe use the same table; production counts exclude both kinds of closures,
+  delivery estimates exclude USPS closures only.
+- Missing, invalid, expired or insufficient coverage stops date-dependent iframe
+  actions and hides derived estimates with retry available. Existing requested
+  mail-date eligibility, product SLAs, UTC reschedule threshold, parent messages,
+  billing policy and persisted historical production dates remain unchanged.
+- **Not deployed; version unassigned.** Armstrong owns approved production
+  closures, backend implementation, contract version and deployment. API-first
+  rollout and shared fixture parity are required before iframe staging acceptance.
+  Test fixture production closures are synthetic and must not be deployed.
+
 ## Unreleased — Embed token writes stay on the token's user
 
 - **Availability:** live in production since 2026-11-01 (API v3.44.1). No contract version change.
