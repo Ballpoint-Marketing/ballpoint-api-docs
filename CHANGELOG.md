@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — BL-504 layer duplication and stable editor identity
+
+- **Availability:** iframe review candidate; not deployed by this change.
+- Layers offers Duplicate through the row button and context menu. The copy is
+  inserted immediately above its source with a 10-unit offset, subject to trim
+  constraints, and can be removed with one undo step.
+- Saved Fabric objects may include optional `__layerUid` metadata. Existing
+  layers keep their IDs through save/reopen and undo/redo; copies, including
+  grouped members, get new IDs. Old ID-less designs remain supported.
+- The ID is opaque editor metadata. Raw merge tokens and printable content
+  retain their existing semantics. No parent message or route change, partner
+  action, API deployment or contract-version bump is included.
+- API-side round-trip retention is not asserted by the local editor tests;
+  release/versioning remains with the API owner.
+
 ## Unreleased — Embed token writes stay on the token's user
 
 - **Availability:** live in production since 2026-11-01 (API v3.44.1). No contract version change.
