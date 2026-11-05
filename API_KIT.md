@@ -713,6 +713,16 @@ POST /v1/billing/orders
 | `deliver_to` | string | No | Optional, additive. Recipient address routing the user selected on the iframe's piece-selection page when a `piece_counts` table was active. One of `"mailing"` \| `"property"` \| `"both"`. Case-insensitive and trimmed server-side (`"MAILING"`, `" both "` → `"mailing"`, `"both"`); any other value is rejected with 422. Sent only when a validated recipient selection exists; paths without `piece_counts` leave it `null`. Persisted to `metadata.deliver_to` and round-tripped on GET responses. Iframe-driven persistence — no partner-side action required. |
 | `remove_duplicate_addresses` | boolean | No | Optional, additive. Whether the user enabled the "Remove duplicates" checkbox on the iframe's piece-selection page (paired with `deliver_to`). For iframe-created Property Address orders this is always `false`, and `piece_count` uses `piece_counts.property.dedup_off`; the checkbox is unavailable for Property Address. Persisted to `metadata.remove_duplicate_addresses` and round-tripped on GET responses **even when `false`**, so partners can read back the user's exact selection. `null`/absent when no recipient-selection UI was shown. Iframe-driven persistence. A partner offering Property Address sends `piece_counts.property.dedup_off` and sizes its recipient upload from the emitted `piece_count`. |
 
+**Optional canvas layer metadata (BL-504 iframe candidate):** Fabric objects
+inside `canvas_json`, including grouped members, may contain an optional opaque
+string `__layerUid`. The iframe uses it to preserve editor identity through
+save/reopen and undo/redo; a duplicated layer gets a fresh ID. It has no print,
+authorization or recipient semantics. Existing ID-less artwork remains
+supported. No endpoint, authentication or partner message change is required.
+See [stable layer identity](IFRAME_KIT.md#stable-layer-identity-in-saved-canvas-artwork-bl-504-candidate).
+Available on staging (iframe `5734c1f`), not yet in production. Saved
+templates return the field unchanged from `GET /v1/templates/{id}`.
+
 **Partner iframe compatibility sender (`POST /orders`):**
 
 For a PropStream partner request whose canonical `product_type` is `4x6_printed` or `6x9_printed`, the iframe request must include `postcard_size` matching that type and a two-sided `canvas_json` with non-empty `front` and `back` objects. Ballpoint rejects missing, partial, oversized, unsafe artwork, or an exported text object left at the exact default `Enter Text` with `400 INVALID_PRODUCT_CONFIG` before claiming the idempotency key, creating a campaign/order, or reaching billing. After correcting the body, the caller may reuse the same idempotency key. Hidden/non-exported placeholders and changed copy do not trigger this guard. This conditional rule does not change other partners or non-printed-postcard products.

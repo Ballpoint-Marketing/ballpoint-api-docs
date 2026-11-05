@@ -2102,6 +2102,24 @@ For the 37 approved canvas-backed printed postcard products, the standard handwr
 
 > For campaign-level Edit Leads / delta (`PATCH /v1/billing/campaigns/{campaign_id}/recipients`), `contact_id` + `address_type` are required and together form the unique upsert/remove key. See [`API_KIT.md §6p`](API_KIT.md#6p-campaign-delta-recipients--addremove-across-editable-drops).
 
+### Stable layer identity in saved canvas artwork (BL-504 candidate)
+
+Editable Fabric objects in saved `canvas_json` may carry an optional string
+`__layerUid`, including members of groups. This is opaque editor metadata for
+identifying a layer across save/reopen and undo/redo. It is unrelated to user,
+tenant, recipient or order identity and does not affect printed artwork.
+
+The Layers panel's Duplicate action creates a copy above its source with a
+10-unit offset (subject to existing trim constraints), a new layer ID, and one
+undo step. It preserves text, raw merge tokens, formatting and image crop data.
+The source's ID is retained; redo restores the copy's ID. Existing artwork
+without IDs remains supported and receives IDs when opened in the editor.
+Partners do not need to generate IDs or change any parent message.
+
+Availability: on staging (iframe `5734c1f`), not yet in production. Saved
+templates return every `__layerUid` unchanged from `GET /v1/templates/{id}`.
+No contract-version change.
+
 ### Dynamic fields in the design editor
 
 The design editor (Create Your Own, Color Letter and the editable catalog artwork) offers these dynamic fields. The artwork stores the literal `#Token#`; Ballpoint replaces it per recipient when it renders the piece. A field with no data prints blank: it never falls back to another field or to sample text.
