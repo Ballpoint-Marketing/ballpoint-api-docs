@@ -2116,8 +2116,9 @@ The source's ID is retained; redo restores the copy's ID. Existing artwork
 without IDs remains supported and receives IDs when opened in the editor.
 Partners do not need to generate IDs or change any parent message.
 
-Availability: iframe review candidate; not a statement of deployment or API
-round-trip verification. Any contract-version bump is owned by the API release.
+Availability: on staging (iframe `5734c1f`), not yet in production. Saved
+templates return every `__layerUid` unchanged from `GET /v1/templates/{id}`.
+No contract-version change.
 
 ### Dynamic fields in the design editor
 

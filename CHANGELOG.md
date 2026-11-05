@@ -2,7 +2,8 @@
 
 ## Unreleased — BL-504 layer duplication and stable editor identity
 
-- **Availability:** iframe review candidate; not deployed by this change.
+- **Availability:** staging candidate (iframe `5734c1f`); not in production. No contract
+  version change.
 - Layers offers Duplicate through the row button and context menu. The copy is
   inserted immediately above its source with a 10-unit offset, subject to trim
   constraints, and can be removed with one undo step.
@@ -12,8 +13,24 @@
 - The ID is opaque editor metadata. Raw merge tokens and printable content
   retain their existing semantics. No parent message or route change, partner
   action, API deployment or contract-version bump is included.
-- API-side round-trip retention is not asserted by the local editor tests;
-  release/versioning remains with the API owner.
+- Verified on staging through the PropStream UAT on 2026-11-05: a saved template
+  returned every `__layerUid` unchanged from `GET /v1/templates/{id}`.
+
+## Unreleased — Prepaid balance with automatic card refill
+
+- **Availability:** staging candidate; not in production. No contract version
+  change: the new codes reach only prepaid accounts, none of which is live yet,
+  and no existing request, response or event changes.
+- Standard API accounts can pay in advance: orders are debited from the
+  balance and, when the balance runs short, the saved card is charged the
+  shortfall or US$50, whichever is larger, before the order is created. The
+  first deposit (US$10 minimum) is paid through a Ballpoint payment link that
+  saves the card. See [Prepaid balance](API_KIT.md#prepaid-balance).
+- New error codes for prepaid accounts only: `402 AUTO_REFILL_FAILED` (card
+  declined or needs the cardholder) and `503 PAYMENT_PROVIDER_UNAVAILABLE`.
+  Successful order responses are unchanged.
+- Invoiced accounts (PropStream, BatchLeads and other weekly-invoice
+  accounts) are unaffected and never receive these codes.
 
 ## Unreleased — Embed token writes stay on the token's user
 

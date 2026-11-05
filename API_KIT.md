@@ -720,8 +720,8 @@ save/reopen and undo/redo; a duplicated layer gets a fresh ID. It has no print,
 authorization or recipient semantics. Existing ID-less artwork remains
 supported. No endpoint, authentication or partner message change is required.
 See [stable layer identity](IFRAME_KIT.md#stable-layer-identity-in-saved-canvas-artwork-bl-504-candidate).
-This documents an iframe candidate, not verified API-side retention or a
-deployment; the API owner controls release/versioning.
+Available on staging (iframe `5734c1f`), not yet in production. Saved
+templates return the field unchanged from `GET /v1/templates/{id}`.
 
 **Partner iframe compatibility sender (`POST /orders`):**
 
@@ -3368,7 +3368,7 @@ A `403 INSUFFICIENT_SCOPE` looks like this:
 | `202` | Order accepted | — | — |
 | `400` | Bad request (malformed JSON, missing fields) | **No** | Fix your request payload |
 | `401` | Authentication failed | **No** | Check your API key |
-| `402` | Insufficient balance or spending limit hit | **No** | Applies only to accounts with prepaid balance or spending-limit enforcement; `billing_mode: none` accounts always pass balance checks |
+| `402` | Insufficient balance, spending limit hit, or the prepaid card was declined (`AUTO_REFILL_FAILED`) | **No** | Applies only to accounts with prepaid balance or spending-limit enforcement; `billing_mode: none` accounts always pass balance checks. See [Prepaid balance](#prepaid-balance) |
 | `403` | Account suspended, or the key lacks a required scope (`INSUFFICIENT_SCOPE`) | **No** | Contact Ballpoint; for `INSUFFICIENT_SCOPE`, call the route from your backend with the server key (see §1) |
 | `404` | Resource not found | **No** | Check the ID |
 | `409` | Conflict (idempotency key reuse with different body) | **No** | Use a new idempotency key |
@@ -3378,6 +3378,26 @@ A `403 INSUFFICIENT_SCOPE` looks like this:
 | `502` | Gateway error | **Yes** — same idempotency key | Retry |
 | `503` | Service unavailable | **Yes** — after `Retry-After` | Wait, then retry |
 | `504` | Gateway timeout | **Yes** — same idempotency key | Request may have succeeded — retry with same key to find out |
+
+### Prepaid balance
+
+Some standard API accounts pay in advance. Each order is debited from the account balance when it is created; there are no spending limits other than the balance itself.
+
+- The first deposit (US$10 minimum) is paid by card through a Ballpoint payment link. The card is saved for later refills.
+- When an order costs more than the balance, the saved card is charged before the order is created: the shortfall, or US$50 if the shortfall is smaller. The order is then accepted as usual (`202` / `200`); the response does not change.
+- Cancelled orders are credited back to the balance. Unused balance is not refunded.
+
+Order creation for a prepaid account can return:
+
+| Status | `detail.error.code` | Meaning | What to do |
+|--------|--------------------|---------|------------|
+| `402` | `INSUFFICIENT_BALANCE` | The balance does not cover the order and no card is saved, or another order used the refill at the same moment | Pay a deposit link if no card is saved; otherwise retry |
+| `402` | `AUTO_REFILL_FAILED` | The saved card was declined or needs the cardholder to confirm the payment. Extra fields: `required_cents`, `available_cents`, `refill_cents`, and `decline_code` or `payment_status` | Pay a new deposit link or update the card, then retry with the same `Idempotency-Key` |
+| `503` | `PAYMENT_PROVIDER_UNAVAILABLE` | The card refill could not reach the payment provider | Retry with the same `Idempotency-Key` after `Retry-After` |
+
+No order is created and nothing is debited from the balance when any of these is returned. A retry with the same `Idempotency-Key` never charges the card twice for the same refill attempt; if the balance changed between attempts, a new refill can run, and any amount charged stays in the balance. A retry after a decline with the same card returns the same decline; update the card or pay a deposit link first.
+
+The automatic refill applies to order creation (`POST /orders` and `POST /v1/billing/orders`). Print jobs (`POST /v1/print-jobs`) are debited from the balance but do not trigger a refill.
 
 ### Retry Strategy
 
