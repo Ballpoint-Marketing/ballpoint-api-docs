@@ -560,6 +560,8 @@ components:
               - AMBIGUOUS_LOOKUP
               - IDEMPOTENCY_CONFLICT
               - INSUFFICIENT_BALANCE
+              - AUTO_REFILL_FAILED
+              - PAYMENT_PROVIDER_UNAVAILABLE
               - INVALID_PIECE_COUNT
               - RATE_LIMITED
               - NOT_FOUND
@@ -4151,6 +4153,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '402':
+          description: 'Billing rejected the order: a spending limit, INSUFFICIENT_BALANCE, or, for a prepaid account, AUTO_REFILL_FAILED when the saved card was declined or needs the cardholder. No order is created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
           description: Account suspended or PropStream Send Mail feature disabled
           content:
@@ -4171,6 +4179,12 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
         '429':
           description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: 'PAYMENT_PROVIDER_UNAVAILABLE: a prepaid card refill could not reach the payment provider. No order is created; retry with the same Idempotency-Key after Retry-After.'
           content:
             application/json:
               schema:
