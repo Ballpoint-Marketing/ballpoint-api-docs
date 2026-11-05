@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Prepaid balance with automatic card refill
+
+- **Availability:** staging candidate; not in production. No contract version
+  change: the new codes reach only prepaid accounts, none of which is live yet,
+  and no existing request, response or event changes.
+- Standard API accounts can pay in advance: orders are debited from the
+  balance and, when the balance runs short, the saved card is charged the
+  shortfall or US$50, whichever is larger, before the order is created. The
+  first deposit (US$10 minimum) is paid through a Ballpoint payment link that
+  saves the card. See [Prepaid balance](API_KIT.md#prepaid-balance).
+- New error codes for prepaid accounts only: `402 AUTO_REFILL_FAILED` (card
+  declined or needs the cardholder) and `503 PAYMENT_PROVIDER_UNAVAILABLE`.
+  Successful order responses are unchanged.
+- Invoiced accounts (PropStream, BatchLeads and other weekly-invoice
+  accounts) are unaffected and never receive these codes.
+
 ## Unreleased — Embed token writes stay on the token's user
 
 - **Availability:** live in production since 2026-11-01 (API v3.44.1). No contract version change.
