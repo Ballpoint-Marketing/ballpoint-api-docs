@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — Sender first and last name print as given (BL-610)
+## v1.7.87 — 2026-11-08 — Sender first and last name print as given (BL-610)
 
-- **Availability:** staging candidate; not in production. Additive and optional; the contract version is set at release.
+- **Availability:** staging candidate; not in production. Additive and optional; requests without the new fields behave exactly as before.
 - `POST /orders` accepts optional `sender.firstName` and `sender.lastName` (up to 60 characters each). `#MyFirstName#` and `#MyLastName#` print them as given instead of splitting `sender.name` at its first space, so compound names like `Mary Ann Smith` and profiles whose full name is a business name print correctly.
 - The iframe sends `set_sender.firstName`/`lastName` on new orders when both are set. It leaves them out when the user typed a different name in the Customize form. API callers should send both: with only one, the tags keep splitting `sender.name`.
 - Without the new fields nothing changes: the tags still split `sender.name`, and `#MyFullName#` and the return address still use `sender.name`.
