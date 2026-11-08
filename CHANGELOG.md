@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Multi-send: a failed drop does not stop the later drops (documentation correction)
+
+- **Availability:** documentation only. No API, iframe or contract-version change; this is how the API already behaves.
+- API_KIT §6k used to tell partners to pause the later drops of a Multi-send when one drop's payment failed. That was wrong. Each drop is its own order: confirm each one before its `scheduled_production_date`. A failed drop is terminal, and the later drops keep their schedule. A drop that is still unpaid on its production date moves to `payment_failed` (`trigger: payment_confirmation_expired`), so pausing the later drops would make them expire as well.
+
 ## Unreleased — BL-504 layer duplication and stable editor identity
 
 - **Availability:** staging candidate (iframe `5734c1f`); not in production. No contract

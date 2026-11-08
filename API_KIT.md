@@ -1432,7 +1432,7 @@ Payment retry logic lives **on the partner side**. Ballpoint does not retry the 
 
 - Handle retries internally with the partner payment provider. Only call `/confirm-payment` with the **final** outcome.
 - The partner may retry payment internally according to its own billing policy, as long as Ballpoint only receives the final `success` or terminal `failed` result.
-- Multi-send drops: if a drop fails, pause subsequent drops on the partner side (stop calling `/confirm-payment` for downstream drops).
+- Multi-send drops: each drop is its own order with its own `/confirm-payment` call. Confirm each drop's payment before its `scheduled_production_date`; a drop still unpaid when that date arrives is moved to `payment_failed` by the scheduler (`trigger: payment_confirmation_expired`, see the [per-trigger field inventory](#d1-order-status_changed-field-name-pairs)). A failed drop is terminal, but the later drops are not affected: keep confirming each one before its own production date. Do not stop confirming later drops because an earlier one failed, or they expire unpaid too. To mail the failed drop again, create a new order.
 - Once an order is in `payment_failed`, it stays there. To reschedule, submit a **new** order via `POST /orders` with the new `mail_date` — the failed order remains in `payment_failed` for audit.
 - If the partner is still retrying with the end-user, **do not** send `status:failed` yet — only send it when payment is truly terminal.
 
