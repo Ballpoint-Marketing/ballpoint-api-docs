@@ -872,8 +872,8 @@ If provided, the iframe reconciles the parent-owned Marketing Profile into its r
 | Field | Type | Description |
 |-------|------|-------------|
 | `fullName` | string | Canonical sender name or company. When present, this value wins over the name aliases below. |
-| `firstName` | string | Optional person-name alias. If `fullName` is omitted, the iframe derives it from `businessName`, or from `firstName` + `lastName`. |
-| `lastName` | string | Optional person-name alias used with `firstName` when `fullName` and `businessName` are omitted. |
+| `firstName` | string | Optional person first name (up to 60 characters). If `fullName` is omitted, the iframe derives it from `businessName`, or from `firstName` + `lastName`. When both `firstName` and `lastName` are set, the iframe also sends them on new orders as `sender.firstName`/`sender.lastName`, so `#MyFirstName#`/`#MyLastName#` print them as given; it leaves them out if the user typed a different name on the Customize form. Send empty strings to clear them when the person's name changes. |
+| `lastName` | string | Optional person last name (up to 60 characters), used with `firstName` when `fullName` and `businessName` are omitted. Sent on new orders together with `firstName` (see above). |
 | `businessName` | string | Optional company-name alias. If `fullName` is omitted, a non-empty `businessName` takes precedence over the derived person name. |
 | `address` | string | Street address line 1 (up to 200 characters). |
 | `address2` | string | Optional street address line 2 (up to 200 characters), such as `Apt 4`. Send it separately from `address`; the iframe retains both fields and sends `sender.address2` on new orders. The iframe cleans it as the API does: line breaks become spaces, control and invisible formatting characters are removed, repeated spaces collapse, and longer values are cut to 200 characters. |
@@ -2126,7 +2126,7 @@ The design editor (Create Your Own, Color Letter and the editable catalog artwor
 
 | Token | Source | Notes |
 |-------|--------|-------|
-| `#MyFirstName#`, `#MyLastName#`, `#MyFullName#` | `set_sender` name fields | |
+| `#MyFirstName#`, `#MyLastName#`, `#MyFullName#` | `set_sender` name fields | `#MyFirstName#`/`#MyLastName#` print `set_sender.firstName`/`lastName` when both are sent; otherwise they split `fullName` at its first space. `#MyFullName#` prints `fullName`. |
 | `#MyBusinessPhone#`, `#MyBusinessWebsite#` | `set_sender.phone`, `set_sender.website` | |
 | `#MyBusinessEmail#` | `set_sender.email` | v1.7.69. The iframe sends it with the order. Blank when the profile has no email. |
 | `#Disclosure#` | `set_sender.disclosure` | BL-611 staging candidate. Optional sender-profile text, sent as order `sender.disclosure`. It prints only where this token appears in artwork, and prints blank when absent. |

@@ -1673,6 +1673,18 @@ components:
           - type: string
           - type: 'null'
           title: Name
+        firstName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Firstname
+          description: "Optional sender first name (BL-610). Send it together with lastName; #MyFirstName# then prints it as given. At most 60 characters (longer returns 422); blank is treated as absent. Without it, #MyFirstName# is the first word of `name`."
+        lastName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lastname
+          description: "Optional sender last name (BL-610). Send it together with firstName; #MyLastName# then prints it as given (alone it is ignored and `name` is split). At most 60 characters (longer returns 422); blank is treated as absent."
         company:
           anyOf:
           - type: string
