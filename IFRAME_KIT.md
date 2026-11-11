@@ -464,6 +464,37 @@ Example refresh payload (after Edit Leads modal save):
 
 See also the [`edit_leads_requested` event](#edit_leads_requested--user-clicked-edit-leads-on-a-campaign-card) for the iframe → parent trigger that opens the modal.
 
+#### Create from selected properties (BatchLeads My Lists example)
+
+When a user selects properties in My Lists and chooses **Actions → Add to Campaign → Direct Mail**, BatchLeads creates a new synthetic list record on its backend for this Direct Mail activity. Store **only the explicitly selected property IDs** behind that record; a filter or the containing My List does not expand the selection. Give each activity a distinct, backend-resolvable `listId`: Ballpoint groups orders by `list_id`, and BatchLeads needs the same selected records later for recipient upload and edits. The property IDs stay on the BatchLeads backend; `set_list` does not carry them.
+
+For example, suppose the user selects two records: one with property and mailing address **123 Main Street**, and one with property address **456 Main Street** and mailing address **123 Main Street**. All addresses have the same city, state, and ZIP, so the two 123 Main Street destinations normalize to one address. On a fresh iframe's `ready`, have the BatchLeads backend issue a short-lived embed token for the signed-in `externalUserId` (`bl_user_7` below). Send [`set_api_config`](#set_api_config--api-credentials-required) with that token, `apiBaseUrl: "https://batch-staging-api.ballpointmarketing.com"`, and `tenantKey: "bl_tenant_42"`, then this `set_list` to the exact staging iframe origin, `https://batch-staging-mailer.ballpointmarketing.com`:
+
+```json
+{
+  "source": "batchleads",
+  "version": 1,
+  "type": "set_list",
+  "listId": "bl_dm_selection_abc123",
+  "name": "Selected properties",
+  "count": 2,
+  "tenantKey": "bl_tenant_42",
+  "externalAccountId": "bl_account_42",
+  "externalUserId": "bl_user_7",
+  "piece_counts": {
+    "property": { "dedup_off": 2, "dedup_on": 2 },
+    "mailing":  { "dedup_off": 2, "dedup_on": 1 },
+    "both":     { "dedup_off": 4, "dedup_on": 2 }
+  }
+}
+```
+
+`count` is the number of selected source records, **not** the number of mail pieces. The six `piece_counts` values count eligible destinations for each Deliver To and Remove duplicates combination: two property destinations, two mailing destinations or one distinct mailing address, and four combined destinations or two distinct combined addresses. `property.dedup_on` is accepted in the table but cannot be selected in the iframe; Property Address uses `property.dedup_off`. Compute these values from the selected records rather than reusing a placeholder count. See the [recipient selection contract](#recipient-selection-contract-piece-count--dedup) for the full rules.
+
+After the list context is accepted, send [`open_create_direct_mail`](#open_create_direct_mail--open-the-create-direct-mail-flow-optional) with `{"source":"batchleads","version":1,"type":"open_create_direct_mail"}`. With a complete sender profile, this enters the shared Select a Direct Mail Type flow directly, without the BatchLeads Create DM Campaign modal; otherwise the existing sender-information prerequisite applies. BatchLeads must supply or reconcile sender information through the existing [`set_sender`](#set_sender--pre-fill-sender-info-optional) flow. The list `name` prefills the editable Direct Mail Name because this example omits `campaignName`. A new activity with a different synthetic ID needs a fresh iframe session; a different `listId` cannot replace the active one in the same session.
+
+On `campaign_submitted`, the BatchLeads backend resolves the synthetic ID, reads `recipient_selection`, and uploads recipients matching that delivery/dedup choice and each `orders[].pieces` count. For A/B Split, upload a different recipient slice to each variant, not the full selection to both. See [Recipient Upload Flow](#7-recipient-upload-flow). If the user changes the selection through Edit Leads **during creation, before submission**, update the backend record and resend [`set_list` with the **same** `listId`](#set_list-refresh-post-modal-sync), refreshed `count`, and recomputed `piece_counts`; the iframe retains the user's delivery choice and reprices it. After submission, use the existing recipient-edit flow rather than a list-context refresh. Keep the synthetic ID resolvable for later upload and edits.
+
 ### `set_preview_recipient` — Representative recipient for handwritten proof (v1.7.45+)
 
 After an accepted singular `set_list`, send one real representative lead so eligible printed handwritten-postcard proofs can display the personalized message and postal address before order submission. Select the first valid lead in stable list order and format it with the same rules used for recipient upload.
