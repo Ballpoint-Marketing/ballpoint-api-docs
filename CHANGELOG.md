@@ -2,7 +2,7 @@
 
 ## v1.7.87 — 2026-11-08 — Sender first and last name print as given (BL-610)
 
-- **Availability:** staging candidate; not in production. Additive and optional; requests without the new fields behave exactly as before.
+- **Availability:** live in production since 2026-11-11 (API v3.45.1, iframe v1.26.0). Additive and optional; requests without the new fields behave exactly as before.
 - `POST /orders` accepts optional `sender.firstName` and `sender.lastName` (up to 60 characters each). `#MyFirstName#` and `#MyLastName#` print them as given instead of splitting `sender.name` at its first space, so compound names like `Mary Ann Smith` and profiles whose full name is a business name print correctly.
 - The iframe sends `set_sender.firstName`/`lastName` on new orders when both are set. It leaves them out when the user typed a different name in the Customize form. API callers should send both: with only one, the tags keep splitting `sender.name`.
 - Without the new fields nothing changes: the tags still split `sender.name`, and `#MyFullName#` and the return address still use `sender.name`.
@@ -14,7 +14,7 @@
 
 ## Unreleased — BL-504 layer duplication and stable editor identity
 
-- **Availability:** staging candidate (iframe `5734c1f`); not in production. No contract
+- **Availability:** live in production since 2026-11-11 (iframe v1.26.0). No contract
   version change.
 - Layers offers Duplicate through the row button and context menu. The copy is
   inserted immediately above its source with a 10-unit offset, subject to trim
@@ -30,9 +30,9 @@
 
 ## Unreleased — Prepaid balance with automatic card refill
 
-- **Availability:** staging candidate; not in production. No contract version
-  change: the new codes reach only prepaid accounts, none of which is live yet,
-  and no existing request, response or event changes.
+- **Availability:** live in production since 2026-11-07 (API v3.44.4). No contract
+  version change: the new codes reach only prepaid accounts, and no existing
+  request, response or event changes.
 - Standard API accounts can pay in advance: orders are debited from the
   balance and, when the balance runs short, the saved card is charged the
   shortfall or US$50, whichever is larger, before the order is created. The
@@ -65,7 +65,8 @@
 
 ## v1.7.86 — 2026-11-02 — Hybrid Letter message merge tags
 
-- **Availability:** staging candidate; not in production.
+- **Availability:** live in production: printed inserts since 2026-11-03 (API
+  v3.44.2), the merge chips and proof since 2026-11-11 (iframe v1.26.0).
 - The Hybrid Letter message now offers the same four merge chips as the
   approved handwritten postcards: `{first_name}`, `{property_address}`,
   `{city}` and `{property_value}`. The proof resolves them from the lead the
@@ -83,10 +84,9 @@
 
 ## v1.7.85 — 2026-10-29 — BL-1019 missing-sender guidance (tenant capability)
 
-- **Availability:** staging candidate (BatchLeads staging on, PropStream UAT
-  off); not in the production iframe. The API serves the flag from this
-  version (seeded off, migration 076). Partner backend sender/role
-  enforcement is a separate dependency.
+- **Availability:** live in production since 2026-11-11 (API v3.45.1, iframe
+  v1.26.0). The flag is off for every partner in production (migration 076).
+  Partner backend sender/role enforcement is a separate dependency.
 - `GET /v1/config.flags.team_member_missing_sender_guidance_enabled` is an
   additive tenant capability, default off. The iframe caches it by tenant.
 - With the flag on, an incomplete non-owner sees **Sender Information
@@ -105,7 +105,7 @@
 
 ## v1.7.84 — 2026-10-27 — Operations report ranges and daily account activity
 
-**Staging candidate.** Extends the privileged analytics route with Today,
+**Live in production since 2026-11-11 (API v3.45.1).** Extends the privileged analytics route with Today,
 Yesterday, Today and yesterday, complete Last 7/14/28/30 days, Last week/month,
 Maximum and inclusive Custom dates. Original week/month/quarter results remain
 compatible. Comparisons use Chicago calendar time; Maximum has no previous
@@ -123,7 +123,7 @@ records do not establish live billing availability.
 
 ## Unreleased — Faster partner statistics
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since 2026-11-11 (API v3.45.1).
 - Partner statistics and the dashboard account summary avoid loading full order
   artwork metadata when it cannot affect variant classification. This reduces
   latency for accounts with large saved designs.
@@ -132,7 +132,7 @@ records do not establish live billing availability.
 
 ## v1.7.83 — 2026-10-27 — Privileged operations analytics
 
-**Staging candidate.** Adds `GET /v1/billing/partner/ops/analytics?period=month`
+**Live in production since 2026-11-11 (API v3.45.1).** Adds `GET /v1/billing/partner/ops/analytics?period=month`
 for separately authorized `dashboard:read` keys. Customer statistics, iframe
 messages, pricing and invoicing retain their existing behavior.
 
@@ -152,7 +152,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.81 — 2026-10-26 — `campaign_submitted.orders[].productId`
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since 2026-11-11 (iframe v1.26.0).
 - **What changed (iframe):** each entry of `campaign_submitted.orders[]` carries `productId`, the product of that order, from the same ids as `productIds`. For Multi Send each drop and for A/B each variant now names its own product.
 - **Partner action:** none required. The field is additive; `productIds` and every other field are unchanged.
 - **Unchanged:** REST routes and responses, `campaign_created`, envelope version `1`, REST `3.1`.
@@ -160,7 +160,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.80 — 2026-10-24 — Previous stays on a paid checkout; `order.usps_update` carries the partner campaign id
 
-- **Availability:** the paid-checkout part (iframe, ATAI-523) is live in production since 2026-10-30 (iframe v1.25.1), and the `propstream_checkout_edit_reissue_enabled` flag is on for PropStream since the same day; the `order.usps_update` part (API) is a staging candidate, not in production.
+- **Availability:** the paid-checkout part (iframe, ATAI-523) is live in production since 2026-10-30 (iframe v1.25.1), and the `propstream_checkout_edit_reissue_enabled` flag is on for PropStream since the same day; the `order.usps_update` part (API) is live in production since 2026-11-11 (API v3.45.1).
 - **Paid checkout (iframe, ATAI-523; where edit after checkout is enabled, `propstream_checkout_edit_reissue_enabled`):** when any order of the current checkout is paid or already being processed, **Previous** on the Order Summary no longer reopens editing. It stays on the Order Summary and shows "Part of this campaign has already been paid, so it can no longer be edited." in the red message box, titled "Campaign can't be edited". **Continue to Payment** still goes to payment for the same orders (`payment_retry_requested` after a failed payment, the same `campaign_submitted` replay after a plain popup close) and **Back to Direct Mail Dashboard** still leaves. A checkout with no paid order keeps the v1.7.70 edit-after-checkout flow. The **Order not sent** message at Continue to Payment remains for a payment that completes while the user is already editing.
 - **`order.usps_update` (API):** `campaign_id` is now the order's `campaign_created` id (its `external_campaign_id`), the same id `campaign.mail_tracking.rts_update` and `order.drop_completed` carry. Before, it was the campaign the scan was tracked under, which for batch-printed orders is an internal print-batch campaign. Orders created without a `campaign_created` id keep their Ballpoint campaign id.
 - **Partner action:** none required. Keep matching `order.*` events by `order_id`.
@@ -169,7 +169,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.79 — 2026-10-24 — Tenant flags for Auto-suppress on next drop and delegated Export Leads
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since 2026-11-11 (API v3.45.1, iframe v1.26.0).
 - **`/v1/config` flags (additive):** the `flags` object gains `auto_suppress_next_drop_enabled` and `export_leads_delegated`. Ballpoint has `auto_suppress_next_drop_enabled` on for PropStream and BatchLeads and `export_leads_delegated` off for both. A missing or false value disables the capability.
 - **Auto-suppress on next drop (BL-1016):** the existing checkbox and its `auto_suppress_next_drop_changed` event now follow `auto_suppress_next_drop_enabled` for the tenant, instead of the parent origin alone. While a config refresh is pending or has failed, the iframe keeps the last value it evaluated for the same tenant and user, so the control does not disappear and reappear; a new tenant or user starts from a fresh evaluation. The event payload is unchanged.
 - **Delegated Export Leads (BL-1004):** with `export_leads_delegated: true`, the delivered/cancelled campaign-detail **Export Leads** button sends the new `export_leads_requested` event with `{ ballpointCampaignId, orderIds, listId }` instead of downloading the CSV. With the flag off, the CSV export is unchanged. The parent must check those ids against its own signed-in user before exporting.
@@ -187,7 +187,7 @@ messages, pricing and invoicing retain their existing behavior.
 - **Unchanged:** event type, payload fields, envelope, delivery, events for orders that were not batch-printed, and the partner contract version.
 ## v1.7.78 — 2026-10-23 — Required Direct Mail Name; Property Address without duplicate removal; sender disclosure
 
-- **Availability:** staging candidate. Not in production. Applies to every partner on the shared iframe.
+- **Availability:** live in production since 2026-11-11 (API v3.45.1, iframe v1.26.0). Applies to every partner on the shared iframe.
 - **Direct Mail Name (BL-614):** Step 1 Next requires a valid Direct Mail Name: not blank after trimming, at most 120 characters, no control characters. A list-derived or `set_list.campaignName` prefill stays editable, and control characters in a prefill become spaces, so a prefill never blocks Next.
 - **Property Address and Remove duplicates (BL-614):** the option stays hidden for Property Address, and choosing Property Address now also clears it, on Step 1 and in a Review draft. Before, a box ticked for Mailing or Both stayed active while hidden. Property Address uses `piece_counts.property.dedup_off` for counts and pricing, and `campaign_submitted.recipient_selection.remove_duplicate_addresses` and the iframe's `POST /orders` are `false` for it. A Property option without `dedup_off` is unavailable, even when `dedup_on` exists. Review Cancel restores the previous committed choice; returning to Mailing or Both leaves the box unticked.
 - **Sender disclosure (BL-611):** optional `set_sender.disclosure` and `POST /orders` `sender.disclosure`, plain text of up to 120 characters. The iframe and the API apply the same cleaning: tags removed, CR/CRLF become line breaks, other control characters removed (line breaks and tabs kept), trimmed, then counted in Unicode characters. In the iframe an overlong value rejects the whole `set_sender` without changing sender state; over REST it returns `422`. The design editor offers `#Disclosure#` under Sender and saves the literal token. Prints and previews show the order's disclosure only where the token is, and nothing when the sender has none.
@@ -204,8 +204,8 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.77 — 2026-10-23 — Early `set_dashboard_filter` held until the tenant exists; Iframe Kit corrections
 
-- **Availability:** the `set_dashboard_filter` change is an iframe staging candidate, not in production. The other items correct the Iframe Kit to match behavior already live in production.
-- **`set_dashboard_filter` with `tenantKey` (iframe, staging candidate):** a filter that arrives before `set_api_config` or `set_list` established the tenant scope is now held and checked against the first tenant, instead of being rejected. This makes the documented order-robust dashboard-first bootstrap true for the filter as well. A different `tenantKey` is still rejected.
+- **Availability:** the `set_dashboard_filter` change is live in production since 2026-11-11 (iframe v1.26.0). The other items correct the Iframe Kit to match behavior already live in production.
+- **`set_dashboard_filter` with `tenantKey` (iframe):** a filter that arrives before `set_api_config` or `set_list` established the tenant scope is now held and checked against the first tenant, instead of being rejected. This makes the documented order-robust dashboard-first bootstrap true for the filter as well. A different `tenantKey` is still rejected.
 - **Recipient controls without `piece_counts` (correction):** the Deliver To and Remove duplicates controls appear on the Step 1 and review screens even without `piece_counts`; the Iframe Kit previously said they were hidden. Without the table the choice has no effect, the iframe uses `count`, and `campaign_submitted` omits `recipient_selection`.
 - **Unpaid orders on the Dashboard (clarification):** the campaign list leaves out orders with `payment_confirmed: false`, so a campaign whose orders all still await recipients and payment is not listed while `GET /v1/billing/orders` returns them. A purchased Multi-Send keeps all of its drops.
 - **Partner action:** none required. A parent that sends `tenantKey` on several messages must use the same value on all of them.
@@ -214,7 +214,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.76 — 2026-10-23 — Production-lock copy on campaign detail; separate sender address line 2
 
-- **Availability:** staging candidate. Not in production.
+- **Availability:** live in production since 2026-11-11 (API v3.45.1, iframe v1.26.0).
 - **Production-lock copy (BL-902 / BL-1008):** locked rows on the campaign detail show the product's live `sla_business_days` in business days, followed by the production message. When the matching pricing row is unavailable, they show only the production message and no invented number. Scheduled-view activities whose drops have all crossed the production lock keep Edit Leads visible as a focusable, unavailable control with the production reason, including a delivered drop beside a production drop. A later editable Multi Send drop keeps the action available; Delivered-view activities keep Export Leads. This is shown to every partner; no message or payload changes.
 - **Sender address line 2 (BL-609):** `set_sender.address2` is an optional string of up to 200 characters. The iframe keeps it in sender snapshots, order creation and retries, and sends non-empty values as `POST /orders` `sender.address2`. The API stores the field with the order and prints `sender.address` plus `sender.address2` on one street line (`123 Main St Apt 4`) in the postal return address and `#MyAddress#`. Line breaks inside `address2` print as spaces, control and invisible formatting characters are removed and repeated spaces collapse, the same in the iframe and the API; a blank value counts as absent.
 - **Partner action:** none required. A parent whose sender profile has a separate Address Line 2 may send line 1 only in `set_sender.address` and line 2 only in `set_sender.address2`, without also appending line 2 to `address`. Parents that omit `address2`, including current PropStream payloads, keep their output.
@@ -331,7 +331,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 - **Availability:** `presort_suppressed_count` is live in production since 2026-10-05 (API v3.41.0). The Direct Mail dashboard's Mailer Count Change display is live in production since 2026-10-29 (iframe v1.25.0).
 - **What changed:** `GET /v1/billing/orders` and `GET /v1/billing/orders/{order_id}` return a read-only `presort_suppressed_count`: the pieces AccuZIP removed from the order at presort. It is read from the `order.presort_suppressed` event Ballpoint already sent for that order, so it always equals that event's `suppressedCount`, and it is `null` when no such event exists. `piece_count` keeps the ordered quantity.
-- **Partner action:** none. The field is additive; existing requests, responses and webhooks are unchanged. The Direct Mail dashboard uses it to show the adjusted mailer count (staging candidate; not yet in the production iframe).
+- **Partner action:** none. The field is additive; existing requests, responses and webhooks are unchanged. The Direct Mail dashboard uses it to show the adjusted mailer count (live in production since 2026-10-29, iframe v1.25.0).
 - **Artifacts:** API Kit order fields and presort section, OpenAPI `OrderDetail`, Iframe Kit version marker, Postman collection description and matching API/iframe contract markers.
 
 ## v1.7.67 — 2026-10-02 — Retry-safe recipient upload blocks
@@ -402,7 +402,7 @@ messages, pricing and invoicing retain their existing behavior.
 
 ## v1.7.60 — 2026-09-26 — Handwritten message parts for Realtor/Agent postcards
 
-- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.24.0); they remain a staging candidate.
+- **Availability:** the API accepts `message_parts` in production since 2026-09-29 (API v3.39.0). The Realtor/Agent handwritten postcards that send it are not yet offered by the production iframe (v1.26.0); they remain a staging candidate.
 - **What changed:** `POST /orders` accepts an optional `message_parts` object (`greeting`, required `body`, `signature`) for handwritten pieces whose writing robots place those parts separately. If `message` is also sent it must equal the parts joined by one blank line, otherwise `400 MESSAGE_PARTS_MISMATCH` before any write; a Cursive canvas that still prints the managed message returns `400 MESSAGE_PARTS_PRINTED`; each part holds at most 20 merge tags; the parts are not editable through `PATCH`. `GET /v1/billing/orders/{order_id}/recipients` returns `message_greeting`, `message_body` and `message_signature` per recipient, with message merge tags resolved, for orders that carry parts.
 - **Iframe:** the Realtor/Agent Just Listed and Just Sold postcards replace the single message box with Greeting, Message and Signature fields and a live back preview; their orders send `message_parts` alongside the unchanged composed `message`. Cursive print files leave the message blank because the robots write it; Printed pieces keep it on the card.
 - **Partner action:** none. PropStream sends no new message; the iframe fills the new field. Server-to-server callers may keep sending `message` only.
