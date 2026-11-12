@@ -12,6 +12,30 @@ Contract 1.7.57 binds the envelope `source` to the partner that owns the parent 
 Contract 1.7.56 adds a separate operations portal protected by `dashboard:read`. Customer iframe keys, payloads, messages and existing KPIs are unchanged. Never pass an operations key to the embedded customer iframe. See [API_KIT.md](API_KIT.md#privileged-operations-portal-contract-1756).
 
 New flag-enabled Create Your Own 6x9 proofs use `cyo_compact_white_v3`: the barcode and its clear area fit within the unchanged recipient box. New 4x6 proofs keep `cyo_compact_white_v2`, and frozen earlier orders are never silently upgraded or rerendered. During coordinated API/iframe rollout, an outdated 6x9 proof returns the existing `409 POSTAL_LAYOUT_PROFILE_MISMATCH` before mutation and requires review of the current proof. No PropStream-side payload change is required.
+### Multi Send configuration candidate (BL-602)
+
+**Availability:** iframe consumer candidate; API field provisioning and partner
+contract version assignment remain with Armstrong. The current API omits this
+field, so users retain a minimum of 2, maximum of 12, and default of 3 mailers.
+
+The iframe consumes optional `GET /v1/config.multi_send` with integer `min`,
+`max`, and `default` values. The accepted shape and fallback rules are in
+[API Kit §6r](API_KIT.md#bl-602-candidate-multi-send-limits-api-handoff).
+No parent payload or message changes are required.
+
+The native **How many mailers?** slider uses these bounds with a step of one,
+an accessible label, and its current count exposed to assistive technology.
+Count, timeline, totals, and fill reflect the same value. Invalid programmatic
+counts retain the last valid value. Equal bounds select the fixed count.
+
+New campaigns and confirmed type changes use the latest configured default.
+Canceling a type change preserves the existing sequence. Before template
+selection starts, late configuration applies its default to an untouched slider;
+it preserves an edited value within the new range and clamps it to a boundary
+when needed. Advancing to template selection freezes that sequence's limits
+and count against background refreshes, including after returning to Step 1.
+Starting a new campaign or confirming a type reset adopts the latest limits.
+
 ### Create Your Own review maintenance candidate
 
 **Availability:** release candidate in preparation; not yet released to production.

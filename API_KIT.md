@@ -2267,6 +2267,42 @@ The `MAIL_DATE_TOO_SOON` rejection (§6m) fires when `scheduled_production_date 
 
 ### 6r. Partner Feature Configuration
 
+#### BL-602 candidate: Multi Send limits (API handoff)
+
+**Availability:** proposed additive response field for coordinated API/iframe
+rollout; not provided by the current API. Armstrong owns backend implementation,
+tenant provisioning, and the partner contract version assignment. The iframe
+consumer can ship first with the existing defaults. Do not enable overrides
+until the API implementation and contract version are reviewed together.
+
+The proposed `GET /v1/config` response may include a top-level `multi_send`
+object alongside `flags`, scoped to the authenticated tenant:
+
+```json
+{ "multi_send": { "min": 2, "max": 12, "default": 3 } }
+```
+
+All three fields must be JSON safe integers with
+`2 <= min <= default <= max`. A missing, partial, or invalid object uses the
+complete legacy fallback `{ "min": 2, "max": 12, "default": 3 }`; numeric strings
+are invalid. Equal minimum and maximum are supported. These are numbers of
+sequential drops, not recipient quantity tiers from pricing rows. Numeric
+configuration must remain outside the boolean `flags` object.
+
+The iframe uses the existing config request, credentials, context isolation,
+in-memory TTL, and stale-response guards. A transient failed refresh retains
+the last successful limits for that same context; a successful response that
+omits or invalidates `multi_send` restores defaults. Tenant, API, or user changes
+clear retained limits. No parent message or request header is added.
+
+Backend handoff: return tenant-configured values using the response shape above,
+retain existing responses for tenants without an override, and validate any
+authoritative order limits server-side. This consumer is UI configuration,
+not server authorization or evidence that the API enforces campaign limits.
+See [the iframe behavior](IFRAME_KIT.md#multi-send-configuration-candidate-bl-602).
+
+#### Current released response
+
 `GET /v1/config` resolves the current partner feature flags for the requesting
 user. The embedded iframe calls this automatically; partners normally do not
 need to call it themselves.

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — BL-602 Multi Send configuration consumer and API handoff
+
+- **Availability:** iframe consumer candidate. The API does not yet emit
+  `multi_send`; backend implementation, tenant provisioning, and versioning
+  belong to Armstrong. No contract version bump or deployment is included.
+- Proposed optional `GET /v1/config.multi_send` response object contains
+  integer `min`, `max`, and `default` values. Missing or invalid configuration
+  preserves the 2–12 range and default of 3. Numeric fields are separate from
+  boolean feature flags and use the existing context-scoped cache.
+- Slider bounds/default, count, timeline, totals, fill, keyboard controls, and
+  confirmed resets follow configuration. Active template-selection sequences
+  remain stable during background config refreshes; new campaigns use the
+  latest default. No partner message or payload change is required.
+
 ## v1.7.87 — 2026-11-08 — Sender first and last name print as given (BL-610)
 
 - **Availability:** live in production since 2026-11-11 (API v3.45.1, iframe v1.26.0). Additive and optional; requests without the new fields behave exactly as before.
